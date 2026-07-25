@@ -8,6 +8,7 @@ import (
 type UserService interface {
 	Register(ctx context.Context, req *types.RegisterRequest) (*types.RegisterResponse, error)
 	Login(ctx context.Context, req *types.LoginRequest) (*types.LoginResponse, error)
+	GetUserByID(ctx context.Context, id string) (*types.User, error)
 	GetUsersByIDs(ctx context.Context, ids []string) (map[string]*types.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*types.User, error)
 	UpdateUser(ctx context.Context, user *types.User) error
@@ -38,7 +39,7 @@ type UserRepository interface {
 	DeleteUser(ctx context.Context, id string) error
 	// ListUsers lists users with pagination
 	ListUsers(ctx context.Context, offset, limit int) ([]*types.User, error)
-	// SearchUsers searches users by username or email
+	// SearchUsers searches users by nickname or email
 	SearchUsers(ctx context.Context, query string, limit int) ([]*types.User, error)
 }
 

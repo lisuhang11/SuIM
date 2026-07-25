@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package friend;
+
+option go_package = "friend/proto/userpb";
+
+// 好友服务
+service FriendService {
+  // 申请好友
+  rpc ApplyToAddFriend(ApplyToAddFriendReq) returns (ApplyToAddFriendResp);
+  // 处理好友申请
+  rpc HandleFriendApply(HandleFriendApplyReq) returns (HandleFriendApplyResp);
+  // 设置好友备注
+  rpc SetFriendRemark(SetFriendRemarkReq) returns (SetFriendRemarkResp);
+  // 删除好友
+  rpc DeleteFriend(DeleteFriendReq) returns (DeleteFriendResp);
+  // 加入黑名单
+  rpc AddBlack(AddBlackReq) returns (AddBlackResp);
+  // 移除黑名单
+  rpc RemoveBlack(RemoveBlackReq) returns (RemoveBlackResp);
+}
+
+// 申请好友
+message ApplyToAddFriendReq {
+  string fromUserID = 1;
+  string toUserID   = 2;
+  string reqMsg     = 3;
+}
+
+// 申请好友
+message ApplyToAddFriendResp {}
+
+// 处理好友申请
+message HandleFriendApplyReq {
+  string fromUserID = 1;
+  string toUserID   = 2;
+  int32  handleRes  = 3; // 1=同意，2=不同意
+  string handleMsg  = 4;
+}
+
+message HandleFriendApplyResp {}
+
+// 获取好友列表
+message GetFriendsListReq{
+  string UserID = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message GetFriendsListResp{
+  repeated FriendInfo = 1;
+  int32 total = 2;
+}
+
+// 设置好友备注
+message SetFriendRemarkReq {
+  string ownerUserID  = 1;
+  string friendUserID = 2;
+  string remark       = 3;
+}
+
+message SetFriendRemarkResp {}
+
+// 删除好友 - 请求
+message DeleteFriendReq {
+  string ownerUserID  = 1;
+  string friendUserID = 2;
+}
+
+// 删除好友 - 响应
+message DeleteFriendResp {}
+
+// 加入黑名单 - 请求
+message AddBlackReq {
+  string ownerUserID  = 1;
+  string friendUserID = 2;
+}
+
+// 加入黑名单 - 响应
+message AddBlackResp {}
+
+// 移除黑名单 - 请求
+message RemoveBlackReq {
+  string ownerUserID  = 1;
+  string friendUserID = 2;
+}
+
+// 移除黑名单 - 响应
+message RemoveBlackResp {}

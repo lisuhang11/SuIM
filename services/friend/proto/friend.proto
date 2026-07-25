@@ -4,55 +4,167 @@ package friend;
 
 option go_package = "friend/proto/userpb";
 
+// -----------------------------------------------------------------
 // 好友服务
+// -----------------------------------------------------------------
 service FriendService {
+  // ---- 好友申请 ----
   // 申请好友
   rpc ApplyToAddFriend(ApplyToAddFriendReq) returns (ApplyToAddFriendResp);
-  // 处理好友申请
+  // 处理好友申请（同意/拒绝）
   rpc HandleFriendApply(HandleFriendApplyReq) returns (HandleFriendApplyResp);
+  // 获取发给自己的好友申请列表（分页）
+  rpc GetFriendApplyList(GetFriendApplyListReq) returns (GetFriendApplyListResp);
+  // 获取自己未处理的好友申请数量
+  rpc GetUnhandledApplyCount(GetUnhandledApplyCountReq) returns (GetUnhandledApplyCountResp);
+
+  // ---- 好友管理 ----
+  // 获取好友列表（分页）
+  rpc GetFriendsList(GetFriendsListReq) returns (GetFriendsListResp);
+  // 获取指定好友信息
+  rpc GetSpecifiedFriends(GetSpecifiedFriendsReq) returns (GetSpecifiedFriendsResp);
+  // 更新好友信息（备注、置顶、扩展字段）
+  rpc UpdateFriends(UpdateFriendsReq) returns (UpdateFriendsResp);
   // 设置好友备注
   rpc SetFriendRemark(SetFriendRemarkReq) returns (SetFriendRemarkResp);
   // 删除好友
   rpc DeleteFriend(DeleteFriendReq) returns (DeleteFriendResp);
+
+  // ---- 黑名单 ----
   // 加入黑名单
   rpc AddBlack(AddBlackReq) returns (AddBlackResp);
   // 移除黑名单
   rpc RemoveBlack(RemoveBlackReq) returns (RemoveBlackResp);
+  // 获取黑名单列表（分页）
+  rpc GetBlackList(GetBlackListReq) returns (GetBlackListResp);
+
+  // ---- 关系检查 ----
+  // 检查是否为好友
+  rpc IsFriend(IsFriendReq) returns (IsFriendResp);
+  // 检查是否在黑名单中
+  rpc IsBlack(IsBlackReq) returns (IsBlackResp);
 }
 
-// 申请好友
+// -----------------------------------------------------------------
+// 通用结构
+// -----------------------------------------------------------------
+
+// 好友信息
+message FriendInfo {
+  string ownerUserID   = 1;  // 用户ID（谁的好友）
+  string friendUserID  = 2;  // 好友ID
+  string friendNickname = 3; // 好友昵称
+  string friendFaceURL = 4;  // 好友头像URL
+  string remark        = 5;  // 备注
+  int64  createTime    = 6;  // 成为好友的时间
+  int32  addSource     = 7;  // 添加来源
+  string operatorUserID = 8; // 操作人ID
+  string ex            = 9;  // 扩展字段
+  bool   isPinned      = 10; // 是否置顶
+}
+
+// 黑名单信息
+message BlackInfo {
+  string ownerUserID = 1; // 用户ID
+  string blackUserID = 2; // 被拉黑用户ID
+  int64  createTime  = 3; // 拉黑时间
+  string ex          = 4; // 扩展字段
+}
+
+// 好友申请信息
+message FriendRequest {
+  string fromUserID  = 1; // 发起申请的用户ID
+  string toUserID    = 2; // 收到申请的用户ID
+  int32  handleResult = 3; // 处理结果: 0-未处理, 1-同意, -1-拒绝
+  string reqMsg      = 4; // 申请附言
+  string handleMsg   = 5; // 处理附言
+  string ex          = 6; // 扩展字段
+  int64  createTime  = 7; // 申请时间
+}
+
+// 分页请求
+message RequestPagination {
+  int32 pageNumber = 1; // 页码，从 1 开始
+  int32 showNumber = 2; // 每页数量
+}
+
+// -----------------------------------------------------------------
+// 好友申请相关消息
+// -----------------------------------------------------------------
+
 message ApplyToAddFriendReq {
   string fromUserID = 1;
   string toUserID   = 2;
   string reqMsg     = 3;
+  string ex         = 4; // 扩展字段
 }
 
-// 申请好友
 message ApplyToAddFriendResp {}
 
-// 处理好友申请
 message HandleFriendApplyReq {
-  string fromUserID = 1;
-  string toUserID   = 2;
-  int32  handleRes  = 3; // 1=同意，2=不同意
+  string fromUserID = 1; // 申请发起人ID
+  string toUserID   = 2; // 当前用户ID
+  int32  handleRes  = 3; // 1-同意, -1-拒绝
   string handleMsg  = 4;
 }
 
 message HandleFriendApplyResp {}
 
-// 获取好友列表
-message GetFriendsListReq{
-  string UserID = 1;
-  int32 limit = 2;
-  int32 offset = 3;
+message GetFriendApplyListReq {
+  string userID              = 1;
+  RequestPagination pagination = 2;
+  repeated int32 handleResults = 3; // 按处理状态过滤，可选
 }
 
-message GetFriendsListResp{
-  repeated FriendInfo = 1;
+message GetFriendApplyListResp {
+  repeated FriendRequest friendRequests = 1;
   int32 total = 2;
 }
 
-// 设置好友备注
+message GetUnhandledApplyCountReq {
+  string userID = 1;
+}
+
+message GetUnhandledApplyCountResp {
+  int64 count = 1;
+}
+
+// -----------------------------------------------------------------
+// 好友管理相关消息
+// -----------------------------------------------------------------
+
+message GetFriendsListReq {
+  string userID          = 1;
+  int32  pageNumber      = 2; // 分页参数（也可统一为 pagination）
+  int32  showNumber      = 3;
+}
+
+message GetFriendsListResp {
+  repeated FriendInfo friendInfos = 1;
+  int32 total = 2;
+}
+
+message GetSpecifiedFriendsReq {
+  string ownerUserID    = 1;
+  repeated string friendUserIDs = 2;
+}
+
+message GetSpecifiedFriendsResp {
+  repeated FriendInfo friendsInfo = 1;
+}
+
+message UpdateFriendsReq {
+  string ownerUserID          = 1;
+  repeated string friendUserIDs = 2;
+  // 以下字段只更新非零/非空值
+  string remark        = 3;  // 新备注（空串表示不更新）
+  bool   isPinned      = 4;  // 是否置顶（配合 has_pinned 使用）
+  bool   hasPinned     = 5;  // 若 true 则更新 isPinned
+  string ex            = 6;  // 新扩展字段（空串表示不更新）
+}
+
+message UpdateFriendsResp {}
+
 message SetFriendRemarkReq {
   string ownerUserID  = 1;
   string friendUserID = 2;
@@ -61,29 +173,63 @@ message SetFriendRemarkReq {
 
 message SetFriendRemarkResp {}
 
-// 删除好友 - 请求
 message DeleteFriendReq {
   string ownerUserID  = 1;
   string friendUserID = 2;
 }
 
-// 删除好友 - 响应
 message DeleteFriendResp {}
 
-// 加入黑名单 - 请求
+
+// -----------------------------------------------------------------
+// 黑名单相关消息
+// -----------------------------------------------------------------
+
 message AddBlackReq {
-  string ownerUserID  = 1;
-  string friendUserID = 2;
+  string ownerUserID = 1;
+  string blackUserID = 2;
+  string ex          = 3;
 }
 
-// 加入黑名单 - 响应
 message AddBlackResp {}
 
-// 移除黑名单 - 请求
 message RemoveBlackReq {
-  string ownerUserID  = 1;
-  string friendUserID = 2;
+  string ownerUserID = 1;
+  string blackUserID = 2;
 }
 
-// 移除黑名单 - 响应
 message RemoveBlackResp {}
+
+message GetBlackListReq {
+  string userID              = 1;
+  RequestPagination pagination = 2;
+}
+
+message GetBlackListResp {
+  repeated BlackInfo blacks = 1;
+  int32 total = 2;
+}
+
+// -----------------------------------------------------------------
+// 关系检查相关消息
+// -----------------------------------------------------------------
+
+message IsFriendReq {
+  string userID1 = 1;
+  string userID2 = 2;
+}
+
+message IsFriendResp {
+  bool inUser1Friends = 1; // user2 是否在 user1 的好友列表中
+  bool inUser2Friends = 2; // user1 是否在 user2 的好友列表中
+}
+
+message IsBlackReq {
+  string userID1 = 1;
+  string userID2 = 2;
+}
+
+message IsBlackResp {
+  bool inUser1Blacks = 1; // user2 是否在 user1 的黑名单中
+  bool inUser2Blacks = 2; // user1 是否在 user2 的黑名单中
+}

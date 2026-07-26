@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package friend;
 
-option go_package = "friend/proto/userpb";
+option go_package = "relation/proto/userpb";
 
 // -----------------------------------------------------------------
 // 好友服务

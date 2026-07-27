@@ -1,0 +1,281 @@
+# ============================================================
+# SuIM - Docker Compose
+# ============================================================
+# Usage:
+#   docker compose up -d              # start all services
+#   docker compose up -d mysql        # start DB only
+#   docker compose ps                 # check status
+#   docker compose logs -f <service>  # tail logs
+# ============================================================
+
+services:
+  # ==========================================================
+  # MySQL 8.0
+  # ==========================================================
+  mysql:
+    image: mysql:8.0
+    container_name: suim-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      MYSQL_DATABASE: suim
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-suim123}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # ==========================================================
+  # user service (:8080)
+  # ==========================================================
+  user:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        SERVICE: user
+    image: suim-user:latest
+    container_name: suim-user
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8080"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      DB_NAME: suim
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-24h}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-720h}
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ==========================================================
+  # relation service (:8081)
+  # ==========================================================
+  relation:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        SERVICE: relation
+    image: suim-relation:latest
+    container_name: suim-relation
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8081"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      DB_NAME: suim
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ==========================================================
+  # group service (:8082) — depends on user
+  # ==========================================================
+  group:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        SERVICE: group
+    image: suim-group:latest
+    container_name: suim-group
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8082"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      DB_NAME: suim
+      USER_SERVICE_ADDR: user:8080
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      user:
+        condition: service_started
+
+  # ==========================================================
+  # conversation service (:8083)
+  # ==========================================================
+  conversation:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        SERVICE: conversation
+    image: suim-conversation:latest
+    container_name: suim-conversation
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8083"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      DB_NAME: suim
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ==========================================================
+  # message service (:8084) — depends on push
+  # ==========================================================
+  message:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        SERVICE: message
+    image: suim-message:latest
+    container_name: suim-message
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8084"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      DB_NAME: suim
+      PUSH_ADDR: push:8085
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      push:
+        condition: service_started
+
+  # ==========================================================
+  # push service (:8085)
+  # ==========================================================
+  push:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        SERVICE: push
+    image: suim-push:latest
+    container_name: suim-push
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8085"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      DB_NAME: suim
+    ports:
+      - "8085:8085"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ==========================================================
+  # msggateway — WebSocket + gRPC
+  # ==========================================================
+  msggateway:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        SERVICE: msggateway
+    image: suim-msggateway:latest
+    container_name: suim-msggateway
+    restart: unless-stopped
+    environment:
+      MSGGW_WS_ADDR: ":9001"
+      MSGGW_GRPC_ADDR: ":9091"
+      MSGGW_METRICS_ADDR: ":9092"
+      MSGGW_MAX_CONN_PER_USER: ${MSGGW_MAX_CONN_PER_USER:-10}
+      MSGGW_PING_INTERVAL: ${MSGGW_PING_INTERVAL:-30s}
+      MSGGW_READ_TIMEOUT: ${MSGGW_READ_TIMEOUT:-60s}
+      MSGGW_WRITE_TIMEOUT: ${MSGGW_WRITE_TIMEOUT:-10s}
+      MSGGW_SHUTDOWN_TIMEOUT: ${MSGGW_SHUTDOWN_TIMEOUT:-30s}
+    ports:
+      - "${MSGGW_WS_PORT:-9001}:9001"
+      - "${MSGGW_GRPC_PORT:-9091}:9091"
+      - "${MSGGW_METRICS_PORT:-9092}:9092"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ==========================================================
+  # apigateway — HTTP REST API
+  # ==========================================================
+  apigateway:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        SERVICE: apigateway
+    image: suim-apigateway:latest
+    container_name: suim-apigateway
+    restart: unless-stopped
+    environment:
+      GATEWAY_LISTEN_ADDR: ":9000"
+      GATEWAY_METRICS_ADDR: ":9090"
+      GATEWAY_JWT_SECRET: ${GATEWAY_JWT_SECRET:-change-me-in-production}
+      GATEWAY_USER_ADDR: user:8080
+      GATEWAY_RELATION_ADDR: relation:8081
+      GATEWAY_GROUP_ADDR: group:8082
+      GATEWAY_CONVERSATION_ADDR: conversation:8083
+      GATEWAY_MESSAGE_ADDR: message:8084
+      GATEWAY_RATE_LIMIT_ENABLED: ${GATEWAY_RATE_LIMIT_ENABLED:-true}
+      GATEWAY_RATE_LIMIT: ${GATEWAY_RATE_LIMIT:-100.0}
+      GATEWAY_RATE_BURST: ${GATEWAY_RATE_BURST:-200}
+      GATEWAY_CORS_ORIGINS: ${GATEWAY_CORS_ORIGINS:-*}
+      ETCD_ENDPOINTS: ${ETCD_ENDPOINTS:-}
+      ETCD_CONFIG_KEY: ${ETCD_CONFIG_KEY:-/suim/gateway/config}
+    ports:
+      - "${GATEWAY_PORT:-9000}:9000"
+      - "${GATEWAY_METRICS_PORT:-9090}:9090"
+    depends_on:
+      - user
+      - relation
+      - group
+      - conversation
+      - message
+
+  # ==========================================================
+  # etcd (optional — for apigateway dynamic config)
+  # ==========================================================
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    container_name: suim-etcd
+    restart: unless-stopped
+    profiles:
+      - with-etcd
+    environment:
+      ETCD_NAME: suim-etcd
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      ETCD_AUTO_COMPACTION_MODE: periodic
+      ETCD_AUTO_COMPACTION_RETENTION: "1"
+    ports:
+      - "2379:2379"
+    volumes:
+      - etcd-data:/etcd-data
+
+volumes:
+  mysql-data:
+  etcd-data:

@@ -1,28 +1,29 @@
+// Package types 定义用户服务的领域模型。
 package types
 
 import "time"
 
+// AuthToken 认证令牌模型，存储 JWT 令牌的持久化信息。
 type AuthToken struct {
-	// Unique identifier of the token
+	// ID 令牌唯一标识。
 	ID string `json:"id"         gorm:"type:varchar(36);primaryKey"`
-	// User ID that owns this token
+	// UserID 令牌所属用户 ID。
 	UserID string `json:"user_id"    gorm:"type:varchar(64);index;not null"`
-	// Token value (JWT or other format)
+	// Token 令牌值（JWT 格式）。
 	Token string `json:"token"      gorm:"type:text;not null"`
-	// Token type (access_token, refresh_token)
+	// TokenType 令牌类型（access_token / refresh_token）。
 	TokenType string `json:"token_type" gorm:"type:varchar(50);not null"`
-	// Token expiration time
+	// ExpiresAt 令牌过期时间。
 	ExpiresAt time.Time `json:"expires_at"`
-	// Whether the token is revoked
+	// IsRevoked 是否已吊销。
 	IsRevoked bool `json:"is_revoked" gorm:"default:false"`
-	// Creation time of the token
+	// CreatedAt 创建时间。
 	CreatedAt time.Time `json:"created_at"`
-	// Last updated time of the token
+	// UpdatedAt 更新时间。
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// User is the unified user domain model, covering both OpenIM-style
-// profile fields and authentication fields.
+// User 统一用户领域模型，覆盖个人资料和认证字段。
 type User struct {
 	UserID           string    `json:"user_id"             gorm:"type:varchar(64);primaryKey;comment:用户ID"`
 	Email            string    `json:"email"               gorm:"type:varchar(255);uniqueIndex;not null;comment:邮箱"`
@@ -35,29 +36,4 @@ type User struct {
 	IsActive         bool      `json:"is_active"           gorm:"not null;default:true;comment:是否激活"`
 	CreateTime       time.Time `json:"create_time"         gorm:"autoCreateTime:milli;comment:创建时间"`
 	UpdatedAt        time.Time `json:"updated_at"          gorm:"autoUpdateTime:milli;comment:更新时间"`
-}
-
-type RegisterRequest struct {
-	Username string `json:"username" binding:"required,min=2,max=50"`
-	Email    string `json:"email"    binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
-}
-
-type RegisterResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message,omitempty"`
-	User    *User  `json:"user,omitempty"`
-}
-
-type LoginRequest struct {
-	Email    string `json:"email"    binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
-}
-
-type LoginResponse struct {
-	Success      bool   `json:"success"`
-	Message      string `json:"message,omitempty"`
-	User         *User  `json:"user,omitempty"`
-	AccessToken  string `json:"access_token,omitempty"`
-	RefreshToken string `json:"refresh_token,omitempty"`
 }

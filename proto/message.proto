@@ -1,0 +1,141 @@
+syntax = "proto3";
+
+package message;
+
+option go_package = "SuIM/proto/messagepb";
+
+// OfflinePush carries the offline push payload for a message.
+message OfflinePush {
+  string title = 1;
+  string desc = 2;
+  string ex = 3;
+  string ios_sound = 4;
+  bool   ios_badge_count = 5;
+}
+
+// RevokeInfo records who/when revoked a message.
+message RevokeInfo {
+  int32  role = 1;
+  string user_id = 2;
+  string nickname = 3;
+  int64  time = 4;
+}
+
+// MsgData is a single chat message. It maps 1:1 to the msg_info storage model.
+message MsgData {
+  string client_msg_id = 1;    // client-generated id, used for idempotency
+  string server_msg_id = 2;    // server-generated id
+  string conversation_id = 3;
+  string send_id = 4;          // sender user id
+  string recv_id = 5;          // peer user id (single chat)
+  string group_id = 6;         // group id (group chat)
+  int32  session_type = 7;     // 1=single 2=group
+  int32  msg_from = 8;
+  int32  content_type = 9;     // text/image/voice/file/...
+  string content = 10;         // json payload defined by caller
+  int64  seq = 11;             // per-conversation increasing sequence
+  int64  send_time = 12;       // epoch millis
+  int32  status = 13;          // 0=normal 1=revoked
+  string ex = 14;
+  bool   is_read = 15;
+
+  // ---- extended fields (OpenIM MsgDataModel) ----
+  int32  sender_platform_id = 16;
+  string sender_nickname = 17;
+  string sender_face_url = 18;
+  string options = 19;         // json map[string]bool
+  repeated string at_user_id_list = 20;
+  string attached_info = 21;
+
+  OfflinePush offline_push = 22;
+  RevokeInfo  revoke = 23;
+
+  // server-assigned, returned to the caller
+  string doc_id = 24;          // conversationID:docIndex (batching)
+  int32  msg_index = 25;       // index within the document
+
+  // senders-only: recipients whose seq_user.max_seq should advance. Excludes
+  // the sender. For single chat use [recv_id]; for group chat use the member
+  // list (provided by the caller / gateway).
+  repeated string recv_user_ids = 26;
+}
+
+// --------------- SendMsg ---------------
+message SendMsgReq {
+  MsgData msg_data = 1;
+}
+message SendMsgResp {
+  string server_msg_id = 1;
+  int64  seq = 2;
+  int64  send_time = 3;
+  string doc_id = 4;
+  int32  msg_index = 5;
+}
+
+// --------------- GetHistoryMessages ---------------
+// `seq` is the anchor. order=0 (newest->oldest, default) returns messages with
+// seq < anchor; order=1 (oldest->newest) returns messages with seq > anchor.
+// anchor=0 with order=0 returns the latest page.
+message GetHistoryMessagesReq {
+  string conversation_id = 1;
+  int64  seq = 2;
+  int32  limit = 3;
+  int32  order = 4;
+}
+message GetHistoryMessagesResp {
+  repeated MsgData msg_data = 1;
+  bool is_end = 2;
+}
+
+// --------------- GetMessagesBySeq ---------------
+message GetMessagesBySeqReq {
+  string conversation_id = 1;
+  repeated int64 seqs = 2;
+}
+message GetMessagesBySeqResp {
+  repeated MsgData msg_data = 1;
+}
+
+// --------------- GetMessagesByClientMsgIDs ---------------
+message GetMessagesByClientMsgIDsReq {
+  repeated string client_msg_ids = 1;
+}
+message GetMessagesByClientMsgIDsResp {
+  repeated MsgData msg_data = 1;
+}
+
+// --------------- RevokeMsg ---------------
+message RevokeMsgReq {
+  string conversation_id = 1;
+  string client_msg_id = 2;
+  string send_id = 3;
+  int32  revoke_role = 4;
+  string revoke_nickname = 5;
+}
+message RevokeMsgResp {}
+
+// --------------- MarkMsgsAsRead ---------------
+message MarkMsgsAsReadReq {
+  string conversation_id = 1;
+  string user_id = 2;
+  int64  seq = 3;  // mark all messages with seq <= this as read
+}
+message MarkMsgsAsReadResp {}
+
+// --------------- DeleteMsgs ---------------
+message DeleteMsgsReq {
+  string conversation_id = 1;
+  repeated int64 seqs = 2;
+}
+message DeleteMsgsResp {}
+
+// --------------- service ---------------
+service message {
+  rpc SendMsg(SendMsgReq) returns (SendMsgResp);
+  rpc GetHistoryMessages(GetHistoryMessagesReq) returns (GetHistoryMessagesResp);
+  rpc GetMessagesBySeq(GetMessagesBySeqReq) returns (GetMessagesBySeqResp);
+  rpc GetMessagesByClientMsgIDs(GetMessagesByClientMsgIDsReq) returns (GetMessagesByClientMsgIDsResp);
+  rpc RevokeMsg(RevokeMsgReq) returns (RevokeMsgResp);
+  rpc MarkMsgsAsRead(MarkMsgsAsReadReq) returns (MarkMsgsAsReadResp);
+  rpc DeleteMsgs(DeleteMsgsReq) returns (DeleteMsgsResp);
+}

@@ -1,3 +1,4 @@
+// Package interfaces 定义用户服务的接口契约，解耦业务逻辑与具体实现。
 package interfaces
 
 import (
@@ -5,9 +6,12 @@ import (
 	"user/internal/types"
 )
 
+// UserService 定义用户业务逻辑的接口契约。
 type UserService interface {
-	Register(ctx context.Context, req *types.RegisterRequest) (*types.RegisterResponse, error)
-	Login(ctx context.Context, req *types.LoginRequest) (*types.LoginResponse, error)
+	// Register 注册新用户，邮箱不能重复，密码需满足策略。成功返回创建的 User。
+	Register(ctx context.Context, email, username, password string) (*types.User, error)
+	// Login 验证邮箱和密码，成功返回用户、访问令牌和刷新令牌。
+	Login(ctx context.Context, email, password string) (*types.User, string, string, error)
 	GetUserByID(ctx context.Context, id string) (*types.User, error)
 	GetUsersByIDs(ctx context.Context, ids []string) (map[string]*types.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*types.User, error)
@@ -23,39 +27,40 @@ type UserService interface {
 	SearchUsers(ctx context.Context, query string, limit int) ([]*types.User, error)
 }
 
+// UserRepository 定义用户持久化操作的接口契约。
 type UserRepository interface {
-	// CreateUser creates a user
+	// CreateUser 创建用户。
 	CreateUser(ctx context.Context, user *types.User) error
-	// GetUserByID gets a user by ID
+	// GetUserByID 根据 ID 获取用户。
 	GetUserByID(ctx context.Context, id string) (*types.User, error)
-	// GetUsersByIDs batch-fetches users by id, returning a map keyed by
-	// user id. Missing ids are simply absent from the result.
+	// GetUsersByIDs 批量获取用户，返回 ID 到 User 的映射，不存在的 ID 不出现在结果中。
 	GetUsersByIDs(ctx context.Context, ids []string) (map[string]*types.User, error)
-	// GetUserByEmail gets a user by email
+	// GetUserByEmail 根据邮箱获取用户。
 	GetUserByEmail(ctx context.Context, email string) (*types.User, error)
-	// UpdateUser updates a user
+	// UpdateUser 更新用户信息。
 	UpdateUser(ctx context.Context, user *types.User) error
-	// DeleteUser deletes a user
+	// DeleteUser 删除用户。
 	DeleteUser(ctx context.Context, id string) error
-	// ListUsers lists users with pagination
+	// ListUsers 分页查询用户列表。
 	ListUsers(ctx context.Context, offset, limit int) ([]*types.User, error)
-	// SearchUsers searches users by nickname or email
+	// SearchUsers 按昵称或邮箱模糊搜索。
 	SearchUsers(ctx context.Context, query string, limit int) ([]*types.User, error)
 }
 
+// AuthTokenRepository 定义认证令牌持久化操作的接口契约。
 type AuthTokenRepository interface {
-	// CreateToken creates an auth token
+	// CreateToken 创建认证令牌。
 	CreateToken(ctx context.Context, token *types.AuthToken) error
-	// GetTokenByValue gets a token by its value
+	// GetTokenByValue 根据令牌值查询。
 	GetTokenByValue(ctx context.Context, tokenValue string) (*types.AuthToken, error)
-	// GetTokensByUserID gets all tokens for a user
+	// GetTokensByUserID 查询用户所有令牌。
 	GetTokensByUserID(ctx context.Context, userID string) ([]*types.AuthToken, error)
-	// UpdateToken updates a token
+	// UpdateToken 更新令牌记录。
 	UpdateToken(ctx context.Context, token *types.AuthToken) error
-	// DeleteToken deletes a token
+	// DeleteToken 删除令牌。
 	DeleteToken(ctx context.Context, id string) error
-	// DeleteExpiredTokens deletes all expired tokens
+	// DeleteExpiredTokens 删除所有过期令牌。
 	DeleteExpiredTokens(ctx context.Context) error
-	// RevokeTokensByUserID revokes all tokens for a user
+	// RevokeTokensByUserID 吊销用户所有令牌。
 	RevokeTokensByUserID(ctx context.Context, userID string) error
 }

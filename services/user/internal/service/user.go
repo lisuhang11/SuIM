@@ -1,3 +1,4 @@
+// Package service 实现用户业务逻辑，包括注册、登录、令牌管理等核心流程。
 package service
 
 import (
@@ -8,11 +9,15 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
+	apperrors "user/internal/errors"
+
+	"user/internal/config"
 	"user/internal/types"
 	"user/internal/types/interfaces"
 
@@ -25,11 +30,14 @@ var (
 	jwtSecretOnce sync.Once
 	jwtSecret     string
 
+	// ErrPasswordPolicy 密码策略不满足的错误。
 	ErrPasswordPolicy = errors.New("password must be 8-32 characters and contain at least one letter and one number")
+
+	// emailRegex 校验邮箱格式的正则表达式。
+	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 )
 
-// ValidatePasswordPolicy keeps administrative password resets aligned with
-// the registration form's documented policy.
+// ValidatePasswordPolicy 验证密码符合长度（8-32）且包含至少一个字母和一个数字的策略。
 func ValidatePasswordPolicy(password string) error {
 	length := utf8.RuneCountInString(password)
 	if length < 8 || length > 32 {
@@ -51,8 +59,7 @@ func ValidatePasswordPolicy(password string) error {
 	return nil
 }
 
-// getJwtSecret retrieves the JWT secret from the environment, falling back
-// to a securely generated random secret.
+// getJwtSecret 获取 JWT 密钥，优先使用环境变量 JWT_SECRET，否则生成随机密钥。
 func getJwtSecret() string {
 	jwtSecretOnce.Do(func() {
 		if envSecret := strings.TrimSpace(os.Getenv("JWT_SECRET")); envSecret != "" {
@@ -68,69 +75,67 @@ func getJwtSecret() string {
 	return jwtSecret
 }
 
-// userService implements the UserService interface.
+// userService 实现 UserService 接口，封装用户业务逻辑。
 type userService struct {
 	userRepo  interfaces.UserRepository
 	tokenRepo interfaces.AuthTokenRepository
+	config    *config.Config
 }
 
-// NewUserService creates a new user service instance.
+// NewUserService 创建用户服务实例。
 func NewUserService(
 	userRepo interfaces.UserRepository,
 	tokenRepo interfaces.AuthTokenRepository,
+	cfg *config.Config,
 ) interfaces.UserService {
 	return &userService{
 		userRepo:  userRepo,
 		tokenRepo: tokenRepo,
+		config:    cfg,
 	}
 }
 
-// Register creates a new user account.
-func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) (*types.RegisterResponse, error) {
+// Register 注册新用户，校验邮箱唯一性和密码策略，创建用户记录。
+// 注：username 参数最终存储到领域模型 User.Nickname 字段，作为用户的显示昵称。
+func (s *userService) Register(ctx context.Context, email, username, password string) (*types.User, error) {
 	slog.InfoContext(ctx, "start user registration")
 
-	if req.Username == "" || req.Email == "" || req.Password == "" {
-		return &types.RegisterResponse{
-			Success: false,
-			Message: "username, email and password are required",
-		}, nil
+	// 校验必填字段。
+	if username == "" || email == "" || password == "" {
+		return nil, apperrors.NewValidationError("username, email and password are required")
 	}
 
-	// Check if user already exists by email.
-	existingUser, _ := s.userRepo.GetUserByEmail(ctx, req.Email)
+	// 校验邮箱格式。
+	if !emailRegex.MatchString(email) {
+		return nil, apperrors.NewValidationError("invalid email format")
+	}
+
+	// 检查邮箱是否已被注册。
+	existingUser, _ := s.userRepo.GetUserByEmail(ctx, email)
 	if existingUser != nil {
-		slog.WarnContext(ctx, "email already registered", "email", req.Email)
-		return &types.RegisterResponse{
-			Success: false,
-			Message: "user with this email already exists",
-		}, nil
+		slog.WarnContext(ctx, "email already registered", "email", email)
+		return nil, apperrors.NewUserExistsError()
 	}
 
-	// Validate password policy.
-	if err := ValidatePasswordPolicy(req.Password); err != nil {
-		return &types.RegisterResponse{
-			Success: false,
-			Message: "password must be 8-32 characters with at least one letter and one number",
-		}, nil
+	// 验证密码策略。
+	if err := ValidatePasswordPolicy(password); err != nil {
+		return nil, apperrors.NewPasswordPolicyError()
 	}
 
-	// Hash password.
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	// 使用 bcrypt 哈希密码。
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to hash password", "error", err)
-		return &types.RegisterResponse{
-			Success: false,
-			Message: "failed to process password",
-		}, nil
+		return nil, apperrors.NewInternalError("failed to process password").WithDetails(err)
 	}
 
-	// Create user.
+	// 创建用户记录。
 	now := time.Now()
 	user := &types.User{
 		UserID:       uuid.New().String(),
-		Email:        req.Email,
+		Email:        email,
 		PasswordHash: string(hashedPassword),
-		Nickname:     req.Username,
+		Nickname:     username,
 		IsActive:     true,
 		CreateTime:   now,
 		UpdatedAt:    now,
@@ -138,108 +143,93 @@ func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) 
 
 	if err := s.userRepo.CreateUser(ctx, user); err != nil {
 		slog.ErrorContext(ctx, "failed to create user", "error", err)
-		return &types.RegisterResponse{
-			Success: false,
-			Message: "failed to create user",
-		}, nil
+		return nil, apperrors.NewInternalError("failed to create user").WithDetails(err)
 	}
 
 	slog.InfoContext(ctx, "user registered successfully", "user_id", user.UserID)
-	return &types.RegisterResponse{
-		Success: true,
-		Message: "registration successful",
-		User:    user,
-	}, nil
+	return user, nil
 }
 
-// Login authenticates a user and returns tokens.
-func (s *userService) Login(ctx context.Context, req *types.LoginRequest) (*types.LoginResponse, error) {
+// Login 验证用户邮箱和密码，生成并返回用户、访问令牌和刷新令牌。
+func (s *userService) Login(ctx context.Context, email, password string) (*types.User, string, string, error) {
 	slog.InfoContext(ctx, "start user login")
 
-	// Get user by email.
-	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
+	// 校验必填字段。
+	if email == "" || password == "" {
+		return nil, "", "", apperrors.NewValidationError("email and password are required")
+	}
+
+	// 校验邮箱格式。
+	if !emailRegex.MatchString(email) {
+		return nil, "", "", apperrors.NewValidationError("invalid email format")
+	}
+
+	// 根据邮箱查询用户。
+	user, err := s.userRepo.GetUserByEmail(ctx, email)
 	if err != nil || user == nil {
-		return &types.LoginResponse{
-			Success: false,
-			Message: "invalid email or password",
-		}, nil
+		return nil, "", "", apperrors.NewPasswordInvalidError()
 	}
 
-	// Check if user is active.
+	// 检查账户是否激活。
 	if !user.IsActive {
-		return &types.LoginResponse{
-			Success: false,
-			Message: "account is disabled",
-		}, nil
+		return nil, "", "", apperrors.NewUserInactiveError()
 	}
 
-	// Verify password.
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return &types.LoginResponse{
-			Success: false,
-			Message: "invalid email or password",
-		}, nil
+	// 验证密码。
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return nil, "", "", apperrors.NewPasswordInvalidError()
 	}
 
-	// Generate tokens.
+	// 生成令牌对。
 	accessToken, refreshToken, err := s.GenerateTokens(ctx, user)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to generate tokens", "error", err)
-		return &types.LoginResponse{
-			Success: false,
-			Message: "login failed",
-		}, nil
+		return nil, "", "", apperrors.NewInternalError("login failed").WithDetails(err)
 	}
 
 	slog.InfoContext(ctx, "user logged in successfully", "user_id", user.UserID)
-	return &types.LoginResponse{
-		Success:      true,
-		Message:      "login successful",
-		User:         user,
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}, nil
+	return user, accessToken, refreshToken, nil
 }
 
-// GetUserByID gets a user by ID.
+// GetUserByID 根据 ID 获取用户信息。
 func (s *userService) GetUserByID(ctx context.Context, id string) (*types.User, error) {
 	return s.userRepo.GetUserByID(ctx, id)
 }
 
-// GetUsersByIDs batch-fetches users.
+// GetUsersByIDs 批量获取用户信息。
 func (s *userService) GetUsersByIDs(ctx context.Context, ids []string) (map[string]*types.User, error) {
 	return s.userRepo.GetUsersByIDs(ctx, ids)
 }
 
-// GetUserByEmail gets a user by email.
+// GetUserByEmail 根据邮箱获取用户信息。
 func (s *userService) GetUserByEmail(ctx context.Context, email string) (*types.User, error) {
 	return s.userRepo.GetUserByEmail(ctx, email)
 }
 
-// UpdateUser updates user information.
+// UpdateUser 更新用户信息，自动设置更新时间。
 func (s *userService) UpdateUser(ctx context.Context, user *types.User) error {
 	user.UpdatedAt = time.Now()
 	return s.userRepo.UpdateUser(ctx, user)
 }
 
-// DeleteUser deletes a user.
+// DeleteUser 删除指定用户。
 func (s *userService) DeleteUser(ctx context.Context, id string) error {
 	return s.userRepo.DeleteUser(ctx, id)
 }
 
-// ChangePassword changes user password.
+// ChangePassword 修改用户密码：验证旧密码 → 哈希新密码 → 保存 → 吊销所有旧令牌。
 func (s *userService) ChangePassword(ctx context.Context, userID string, oldPassword, newPassword string) error {
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		return err
 	}
 
-	// Verify old password.
+	// 验证旧密码。
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
 		return errors.New("invalid old password")
 	}
 
-	// Hash new password.
+	// 哈希新密码。
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -252,12 +242,11 @@ func (s *userService) ChangePassword(ctx context.Context, userID string, oldPass
 		return err
 	}
 
-	// Invalidate every outstanding session so a stolen token cannot
-	// survive a password rotation.
+	// 吊销所有旧令牌，防止密码变更后被窃取的令牌继续有效。
 	return s.tokenRepo.RevokeTokensByUserID(ctx, userID)
 }
 
-// ValidatePassword validates user password.
+// ValidatePassword 验证用户密码是否正确。
 func (s *userService) ValidatePassword(ctx context.Context, userID string, password string) error {
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
@@ -266,45 +255,47 @@ func (s *userService) ValidatePassword(ctx context.Context, userID string, passw
 	return bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 }
 
-// GenerateTokens generates access and refresh tokens for a user.
+// GenerateTokens 为用户生成一对 JWT 令牌（访问令牌 + 刷新令牌），有效期从配置读取，并持久化。
 func (s *userService) GenerateTokens(
 	ctx context.Context,
 	user *types.User,
 ) (accessToken, refreshToken string, err error) {
 	now := time.Now()
+	accessExpireAt := now.Add(s.config.AccessTokenTTL)
+	refreshExpireAt := now.Add(s.config.RefreshTokenTTL)
 
-	// Access token: short-lived.
+	// 访问令牌：短时效，用于 API 鉴权。
 	accessClaims := jwt.MapClaims{
-		"user_id":  user.UserID,
-		"email":    user.Email,
-		"type":     "access",
-		"iat":      now.Unix(),
-		"exp":      now.Add(24 * time.Hour).Unix(),
+		"user_id": user.UserID,
+		"email":   user.Email,
+		"type":    "access",
+		"iat":     now.Unix(),
+		"exp":     accessExpireAt.Unix(),
 	}
 	accessToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString([]byte(getJwtSecret()))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign access token: %w", err)
 	}
 
-	// Refresh token: long-lived.
+	// 刷新令牌：长时效，用于换取新的访问令牌。
 	refreshClaims := jwt.MapClaims{
 		"user_id": user.UserID,
 		"type":    "refresh",
 		"iat":     now.Unix(),
-		"exp":     now.Add(30 * 24 * time.Hour).Unix(),
+		"exp":     refreshExpireAt.Unix(),
 	}
 	refreshToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(getJwtSecret()))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign refresh token: %w", err)
 	}
 
-	// Persist both tokens.
+	// 将两类令牌持久化到数据库。
 	for _, t := range []struct {
 		token, tokenType string
 		expiresAt        time.Time
 	}{
-		{accessToken, "access_token", now.Add(24 * time.Hour)},
-		{refreshToken, "refresh_token", now.Add(30 * 24 * time.Hour)},
+		{accessToken, "access_token", accessExpireAt},
+		{refreshToken, "refresh_token", refreshExpireAt},
 	} {
 		record := &types.AuthToken{
 			ID:        uuid.New().String(),
@@ -324,7 +315,7 @@ func (s *userService) GenerateTokens(
 	return accessToken, refreshToken, nil
 }
 
-// ValidateToken validates an access token and returns the associated user.
+// ValidateToken 验证访问令牌，检查签名、类型、吊销状态，返回关联的用户。
 func (s *userService) ValidateToken(ctx context.Context, tokenString string) (*types.User, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -346,11 +337,12 @@ func (s *userService) ValidateToken(ctx context.Context, tokenString string) (*t
 		return nil, errors.New("invalid user ID in token")
 	}
 
+	// 不支持用刷新令牌替代访问令牌。
 	if isRefreshTokenClaims(claims) {
 		return nil, errors.New("refresh token cannot be used as access token")
 	}
 
-	// Check if token is revoked.
+	// 检查令牌是否已吊销。
 	tokenRecord, err := s.tokenRepo.GetTokenByValue(ctx, tokenString)
 	if err != nil || tokenRecord == nil || tokenRecord.IsRevoked {
 		return nil, errors.New("token is revoked")
@@ -366,11 +358,13 @@ func (s *userService) ValidateToken(ctx context.Context, tokenString string) (*t
 	return user, nil
 }
 
+// isRefreshTokenClaims 判断 JWT claims 中的 type 是否为 refresh。
 func isRefreshTokenClaims(claims jwt.MapClaims) bool {
 	tokenType, ok := claims["type"].(string)
 	return ok && tokenType == "refresh"
 }
 
+// userIDFromSignedToken 从已签名的 JWT 中提取 user_id（不做完整校验）。
 func userIDFromSignedToken(tokenString string) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -394,7 +388,7 @@ func userIDFromSignedToken(tokenString string) (string, error) {
 	return userID, nil
 }
 
-// RefreshToken refreshes access token using refresh token.
+// RefreshToken 使用刷新令牌换取新的令牌对，同时吊销旧的刷新令牌。
 func (s *userService) RefreshToken(
 	ctx context.Context,
 	refreshTokenString string,
@@ -424,7 +418,7 @@ func (s *userService) RefreshToken(
 		return "", "", errors.New("invalid user ID in token")
 	}
 
-	// Check if token is revoked.
+	// 检查刷新令牌是否已吊销。
 	tokenRecord, err := s.tokenRepo.GetTokenByValue(ctx, refreshTokenString)
 	if err != nil || tokenRecord == nil || tokenRecord.IsRevoked {
 		return "", "", errors.New("refresh token is revoked")
@@ -433,21 +427,20 @@ func (s *userService) RefreshToken(
 		return "", "", errors.New("not a refresh token")
 	}
 
-	// Get user.
+	// 获取用户信息。
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Revoke old refresh token.
+	// 吊销旧的刷新令牌并生成新令牌对（令牌轮换）。
 	tokenRecord.IsRevoked = true
 	_ = s.tokenRepo.UpdateToken(ctx, tokenRecord)
 
-	// Generate new tokens.
 	return s.GenerateTokens(ctx, user)
 }
 
-// Logout invalidates every outstanding session for the user.
+// Logout 吊销指定用户的所有令牌以实现登出。
 func (s *userService) Logout(ctx context.Context, tokenString string) error {
 	userID, err := userIDFromSignedToken(tokenString)
 	if err != nil {
@@ -456,7 +449,7 @@ func (s *userService) Logout(ctx context.Context, tokenString string) error {
 	return s.tokenRepo.RevokeTokensByUserID(ctx, userID)
 }
 
-// RevokeToken revokes a specific token.
+// RevokeToken 吊销特定的令牌。
 func (s *userService) RevokeToken(ctx context.Context, tokenString string) error {
 	tokenRecord, err := s.tokenRepo.GetTokenByValue(ctx, tokenString)
 	if err != nil {
@@ -467,7 +460,7 @@ func (s *userService) RevokeToken(ctx context.Context, tokenString string) error
 	return s.tokenRepo.UpdateToken(ctx, tokenRecord)
 }
 
-// SearchUsers searches users by nickname or email.
+// SearchUsers 按昵称或邮箱搜索用户。
 func (s *userService) SearchUsers(ctx context.Context, query string, limit int) ([]*types.User, error) {
 	if query == "" {
 		return []*types.User{}, nil

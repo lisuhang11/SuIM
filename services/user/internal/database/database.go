@@ -1,4 +1,4 @@
-// Package database initialises the GORM MySQL connection and runs auto-migration.
+// Package database 初始化 GORM MySQL 连接并执行自动迁移。
 package database
 
 import (
@@ -12,9 +12,8 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// MustOpen opens a MySQL connection via GORM, runs auto-migration for the
-// domain models, and returns the *gorm.DB. It panics on unrecoverable errors
-// so the caller can defer the decision to crash or recover.
+// MustOpen 打开 MySQL 连接，执行自动迁移，返回 *gorm.DB。
+// 若发生不可恢复的错误则 panic，由调用方决定是否恢复。
 func MustOpen(cfg *config.Config) *gorm.DB {
 	db, err := gorm.Open(mysql.Open(cfg.DSN()), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Warn),
@@ -30,6 +29,7 @@ func MustOpen(cfg *config.Config) *gorm.DB {
 	sqlDB.SetMaxOpenConns(25)
 	sqlDB.SetMaxIdleConns(10)
 
+	// 自动迁移用户和令牌表结构。
 	if err := db.AutoMigrate(&types.User{}, &types.AuthToken{}); err != nil {
 		panic(fmt.Sprintf("failed to auto-migrate: %v", err))
 	}

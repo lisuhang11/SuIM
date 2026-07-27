@@ -1,5 +1,4 @@
-// Package middleware provides gRPC interceptors for cross-cutting concerns
-// such as recovery, logging, and request-id propagation.
+// Package middleware 提供 gRPC 拦截器，处理请求 ID 注入、panic 恢复和请求日志等横切关注点。
 package middleware
 
 import (
@@ -16,8 +15,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// UnaryServerInterceptor returns a gRPC unary interceptor chain that
-// provides: request-id injection, panic recovery, and request logging.
+// UnaryServerInterceptor 返回 gRPC 一元拦截器链，提供：
+// 1) 请求 ID 注入与传播  2) panic 恢复  3) 请求日志记录。
 func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
@@ -25,11 +24,11 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (resp any, err error) {
-		// 1. Inject or propagate request-id.
+		// 1. 注入或传播 request-id。
 		requestID := uuid.New().String()
 		ctx = logger.WithRequestID(ctx, requestID)
 
-		// 2. Panic recovery.
+		// 2. panic 恢复，防止单个请求崩溃导致整个服务宕机。
 		defer func() {
 			if r := recover(); r != nil {
 				slog.ErrorContext(ctx, "panic recovered",
@@ -41,7 +40,7 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			}
 		}()
 
-		// 3. Request logging.
+		// 3. 请求日志记录，包含方法名和耗时。
 		start := time.Now()
 		logger.Info(ctx, "gRPC request started", "method", info.FullMethod)
 

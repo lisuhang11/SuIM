@@ -3,8 +3,10 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
+	pbFile "SuIM/proto/filepb"
 	pb "SuIM/proto/messagepb"
 
 	"github.com/gin-gonic/gin"
@@ -12,12 +14,13 @@ import (
 
 // MessageHandler 处理 /api/v1/messages 路由。
 type MessageHandler struct {
-	client pb.MessageClient
+	client     pb.MessageClient
+	fileClient pbFile.FileServiceClient
 }
 
 // NewMessageHandler 创建 message handler。
-func NewMessageHandler(client pb.MessageClient) *MessageHandler {
-	return &MessageHandler{client: client}
+func NewMessageHandler(client pb.MessageClient, fileClient pbFile.FileServiceClient) *MessageHandler {
+	return &MessageHandler{client: client, fileClient: fileClient}
 }
 
 // RegisterRoutes 注册路由。
@@ -38,7 +41,33 @@ func (h *MessageHandler) SendMsg(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second) // 发消息允许更长超时
+	if req.MsgData == nil {
+		c.JSON(400, gin.H{"code": 400, "message": "msg_data is required"})
+		return
+	}
+	userID := userIDFromCtx(c)
+	req.MsgData.SendId = userID
+	if req.MsgData.ContentType == 2 {
+		var content struct {
+			FileID string `json:"file_id"`
+		}
+		if err := json.Unmarshal([]byte(req.MsgData.Content), &content); err != nil || content.FileID == "" {
+			c.JSON(400, gin.H{"code": 400, "message": "file message content must contain file_id"})
+			return
+		}
+		if h.fileClient == nil {
+			c.JSON(503, gin.H{"code": 503, "message": "file service unavailable"})
+			return
+		}
+		ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
+		_, err := h.fileClient.BindFile(ctx, &pbFile.BindFileReq{UserId: userID, FileId: content.FileID, ConversationId: req.MsgData.ConversationId})
+		cancel()
+		if err != nil {
+			RespondError(c, err)
+			return
+		}
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 5*time.Second) // 发消息允许更长超时
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.SendMsg(ctx, &req)

@@ -114,14 +114,14 @@ type CreateGroupInput struct {
 type UpdateGroupInfoInput struct {
 	GroupID           string
 	OpUserID          string
-	GroupName         string
-	Notification      string
-	Introduction      string
-	FaceURL           string
+	GroupName         *string
+	Notification      *string
+	Introduction      *string
+	FaceURL           *string
 	NeedVerification  *int
 	LookMemberInfo    *int
 	ApplyMemberFriend *int
-	Ex                string
+	Ex                *string
 }
 
 // InviteInput 邀请用户入群的输入参数。

@@ -1,8 +1,5 @@
 "use client";
 
-// ============================================================
-// MessageList — 消息列表（虚拟滚动优化）
-// ============================================================
 import React, { useEffect, useRef } from "react";
 import type { Message } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,62 +7,18 @@ import { useChat } from "@/contexts/ChatContext";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 
-interface MessageListProps {
-  messages: Message[];
-  conversationId: string;
-  typingUsers: string[];
-}
-
-export default function MessageList({
-  messages,
-  conversationId,
-  typingUsers,
-}: MessageListProps) {
+export default function MessageList({ messages, conversationId, typingUsers }: { messages: Message[]; conversationId: string; typingUsers: string[] }) {
   const { user } = useAuth();
   const { conversations } = useChat();
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  // 判断是否为群聊
-  const conv = conversations.find((c) => c.conversationId === conversationId);
-  const isGroup = conv?.type === "group";
-
-  // 自动滚动到底部
+  const listRef = useRef<HTMLDivElement>(null);
+  const isGroup = conversations.find((item) => item.conversationId === conversationId)?.type === "group";
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, typingUsers]);
 
-  // 判断是否需要显示头像（群聊中连续消息合并）
-  const shouldShowAvatar = (index: number): boolean => {
-    if (index === 0) return true;
-    const prev = messages[index - 1];
-    return prev?.senderId !== messages[index].senderId;
-  };
-
-  return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 py-2">
-      {messages.length === 0 ? (
-        <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-          暂无消息，发送第一条消息吧
-        </div>
-      ) : (
-        messages.map((msg, idx) => (
-          <MessageBubble
-            key={msg.messageId}
-            message={msg}
-            isMine={msg.senderId === user?.userId}
-            isGroup={isGroup}
-            showAvatar={shouldShowAvatar(idx)}
-          />
-        ))
-      )}
-
-      {/* 正在输入 */}
-      {typingUsers.length > 0 && (
-        <TypingIndicator conversationId={conversationId} />
-      )}
-
-      {/* 滚动锚点 */}
-      <div ref={bottomRef} />
-    </div>
-  );
+  return <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto bg-[#f5f7f9] py-5">
+    {messages.length > 0 && <div className="mb-5 text-center"><span className="text-[11px] font-medium text-slate-400">今天</span></div>}
+    {messages.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center"><p className="text-sm font-medium text-slate-500">还没有消息</p><p className="mt-1 text-xs text-slate-400">发送一条消息开始对话</p></div> : messages.map((message, index) => <MessageBubble key={message.messageId} message={message} isMine={message.senderId === user?.userId} isGroup={Boolean(isGroup)} showAvatar={index === 0 || messages[index - 1]?.senderId !== message.senderId} />)}
+    {typingUsers.length > 0 && <TypingIndicator conversationId={conversationId} />}
+  </div>;
 }

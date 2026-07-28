@@ -1,131 +1,79 @@
 "use client";
 
-// ============================================================
-// MessageInput — 消息输入框 + 发送按钮
-// ============================================================
-import React, { useState, useRef, useCallback, useEffect } from "react";
-import { Send, Paperclip, Smile } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Image, Loader2, Mic, Paperclip, Send, Smile } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface MessageInputProps {
+type Props = {
   onSend: (content: string) => void;
+  onFile: (file: File, onProgress: (value: number) => void) => Promise<void>;
   onTyping: (isTyping: boolean) => void;
   disabled?: boolean;
-}
+};
 
-export default function MessageInput({ onSend, onTyping, disabled }: MessageInputProps) {
+export default function MessageInput({ onSend, onFile, onTyping, disabled }: Props) {
   const [text, setText] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [uploadError, setUploadError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // 发送消息
-  const handleSend = useCallback(() => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    onSend(trimmed);
+  const send = useCallback(() => {
+    const content = text.trim();
+    if (!content || disabled || uploading) return;
+    onSend(content);
     setText("");
     onTyping(false);
+    if (inputRef.current) inputRef.current.style.height = "40px";
+  }, [disabled, onSend, onTyping, text, uploading]);
 
-    // 重置输入框高度
-    if (inputRef.current) {
-      inputRef.current.style.height = "auto";
-    }
-  }, [text, onSend, onTyping]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  // 键盘事件
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+  const change = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(event.target.value);
+    event.target.style.height = "40px";
+    event.target.style.height = `${Math.min(event.target.scrollHeight, 104)}px`;
+    onTyping(Boolean(event.target.value));
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => onTyping(false), 2500);
+  };
+
+  const selectFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setProgress(0);
+    setUploadError("");
+    try {
+      await onFile(file, setProgress);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "文件上传失败");
+    } finally {
+      setUploading(false);
     }
   };
 
-  // 输入变化
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
+  const iconButton = "flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40";
 
-    // 自动调整高度
-    const el = e.target;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 120) + "px";
-
-    // 正在输入
-    const isTyping = e.target.value.length > 0;
-    onTyping(isTyping);
-
-    // 防抖：停止输入后发送
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    if (isTyping) {
-      typingTimerRef.current = setTimeout(() => onTyping(false), 3000);
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    };
-  }, []);
-
-  return (
-    <div className="border-t border-gray-200 bg-white px-4 py-3">
-      <div className="flex items-end gap-2">
-        {/* 附件按钮 */}
-        <button
-          className={cn(
-            "p-2 rounded-xl text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors",
-            disabled && "opacity-50 cursor-not-allowed"
-          )}
-          disabled={disabled}
-          title="发送文件"
-        >
-          <Paperclip className="w-5 h-5" />
-        </button>
-
-        {/* 输入框 */}
-        <div className="flex-1 relative">
-          <textarea
-            ref={inputRef}
-            value={text}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            placeholder="输入消息..."
-            rows={1}
-            disabled={disabled}
-            className={cn(
-              "w-full resize-none rounded-xl border border-gray-200 px-4 py-2.5 text-sm",
-              "focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100",
-              "placeholder:text-gray-400 max-h-[120px] transition-all",
-              disabled && "bg-gray-50 cursor-not-allowed"
-            )}
-          />
-          {/* Emoji 按钮 */}
-          <button
-            className={cn(
-              "absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg",
-              "text-gray-400 hover:text-amber-500 hover:bg-amber-50 transition-colors",
-              disabled && "opacity-50 cursor-not-allowed"
-            )}
-            disabled={disabled}
-            title="表情"
-          >
-            <Smile className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* 发送按钮 */}
-        <button
-          onClick={handleSend}
-          disabled={disabled || !text.trim()}
-          className={cn(
-            "p-2.5 rounded-xl transition-all flex-shrink-0",
-            "bg-indigo-500 text-white shadow-md shadow-indigo-200",
-            "hover:bg-indigo-600 active:scale-95",
-            (disabled || !text.trim()) && "bg-gray-300 shadow-none cursor-not-allowed hover:bg-gray-300"
-          )}
-        >
-          <Send className="w-5 h-5" />
-        </button>
-      </div>
+  return <div className="flex-shrink-0 border-t border-slate-200 bg-white px-3 py-3 sm:px-5">
+    <input ref={fileRef} type="file" className="hidden" onChange={selectFile} />
+    <input ref={imageRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={selectFile} />
+    <div className="mb-2 hidden h-8 items-center gap-1 sm:flex">
+      <button className={iconButton} title="表情" disabled={uploading}><Smile className="h-[18px] w-[18px]" /></button>
+      <button className={iconButton} title="发送文件" disabled={uploading || disabled} onClick={() => fileRef.current?.click()}><Paperclip className="h-[18px] w-[18px]" /></button>
+      <button className={iconButton} title="发送图片" disabled={uploading || disabled} onClick={() => imageRef.current?.click()}><Image className="h-[18px] w-[18px]" /></button>
+      {uploading && <div className="ml-2 flex min-w-36 items-center gap-2 text-xs text-slate-500"><Loader2 className="h-3.5 w-3.5 animate-spin" /><div className="h-1.5 flex-1 overflow-hidden rounded bg-slate-100"><div className="h-full bg-emerald-500 transition-[width]" style={{ width: `${progress}%` }} /></div><span className="w-8 text-right tabular-nums">{progress}%</span></div>}
+      {uploadError && <span className="ml-2 truncate text-xs text-rose-600">{uploadError}</span>}
     </div>
-  );
+    <div className="flex items-end gap-2">
+      <button className={cn(iconButton, "h-10 w-10 flex-shrink-0 border border-slate-200 sm:hidden")} title="发送文件" disabled={uploading || disabled} onClick={() => fileRef.current?.click()}>{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}</button>
+      <textarea ref={inputRef} value={text} onChange={change} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} rows={1} disabled={disabled || uploading} placeholder="输入消息" className="h-10 max-h-[104px] min-h-10 flex-1 resize-none rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-800 outline-none transition focus:border-emerald-400 focus:bg-white" />
+      <button className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 sm:hidden" title="语音消息"><Mic className="h-4 w-4" /></button>
+      <button onClick={send} disabled={disabled || uploading || !text.trim()} className={cn("flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md transition", text.trim() && !uploading ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-slate-100 text-slate-300")} title="发送消息"><Send className="h-4 w-4" /></button>
+    </div>
+  </div>;
 }

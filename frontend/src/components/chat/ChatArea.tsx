@@ -47,6 +47,20 @@ export default function ChatArea({
     [conversation.conversationId, sendTyping]
   );
 
+  const handleFile = useCallback(
+    async (file: File, onProgress: (value: number) => void) => {
+      const { uploadFile } = await import("@/services/api");
+      const attachment = await uploadFile(file, onProgress);
+      await sendMessage({
+        conversationId: conversation.conversationId,
+        content: attachment.name,
+        type: attachment.category === "image" ? "image" : "file",
+        file: attachment,
+      });
+    },
+    [conversation.conversationId, sendMessage]
+  );
+
   const handleToggleMute = () => {
     addConversation({ ...conversation, isMuted: !conversation.isMuted });
   };
@@ -58,7 +72,7 @@ export default function ChatArea({
   const typingForThisConv = typingUsers[conversation.conversationId] || [];
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-white min-w-0">
+    <div className="relative flex h-full min-w-0 flex-1 flex-col bg-white">
       <ChatHeader
         conversation={conversation}
         onBack={onBack}
@@ -72,6 +86,7 @@ export default function ChatArea({
       />
       <MessageInput
         onSend={handleSend}
+        onFile={handleFile}
         onTyping={handleTyping}
       />
     </div>

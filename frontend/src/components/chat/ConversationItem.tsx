@@ -1,107 +1,40 @@
 "use client";
 
-// ============================================================
-// ConversationItem — 单个会话条目
-// ============================================================
 import React from "react";
-import { Pin, BellOff, CheckCheck, Check } from "lucide-react";
+import { BellOff, CheckCheck, Pin, UsersRound } from "lucide-react";
 import type { Conversation } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { mockContacts } from "@/services/mock-data";
 import { cn, formatConvTime, truncate } from "@/lib/utils";
 import UserAvatar from "../shared/UserAvatar";
-import OnlineBadge from "../shared/OnlineBadge";
 
-interface ConversationItemProps {
-  conversation: Conversation;
-  isActive: boolean;
-  onClick: () => void;
-}
-
-export default function ConversationItem({
-  conversation,
-  isActive,
-  onClick,
-}: ConversationItemProps) {
+export default function ConversationItem({ conversation, isActive, onClick }: { conversation: Conversation; isActive: boolean; onClick: () => void }) {
   const { user } = useAuth();
-
-  // 私聊显示对方信息
-  const otherMember = conversation.type === "private"
-    ? conversation.members.find((m) => m.userId !== user?.userId)
-    : null;
-
-  const lastMsg = conversation.lastMessage;
-  const isMyLastMsg = lastMsg?.senderId === user?.userId;
-
-  // 最后一条消息预览
-  const preview = lastMsg
-    ? `${isMyLastMsg ? "我: " : ""}${truncate(lastMsg.content, 30)}`
-    : "暂无消息";
-
-  // 最后消息状态图标
-  const StatusIcon = lastMsg?.status === "read" ? CheckCheck : Check;
+  const otherId = conversation.members.find((item) => item.userId !== user?.userId)?.userId;
+  const contact = mockContacts.find((item) => item.userId === otherId);
+  const last = conversation.lastMessage;
+  const mine = last?.senderId === user?.userId;
 
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
-        "hover:bg-gray-50 dark:hover:bg-gray-750",
-        isActive && "bg-indigo-50 hover:bg-indigo-50"
-      )}
-    >
-      {/* 头像 */}
-      <div className="relative flex-shrink-0">
-        <UserAvatar
-          src={conversation.avatar}
-          name={conversation.title}
-          size="md"
-        />
-        {conversation.type === "private" && otherMember && (
-          <OnlineBadge
-            status="offline"
-            size="sm"
-            className="absolute -bottom-0.5 -right-0.5"
-          />
-        )}
+    <button onClick={onClick} className={cn("relative flex w-full items-center gap-3 px-4 py-3 text-left transition", isActive ? "bg-emerald-50/80" : "hover:bg-slate-50")}>
+      {isActive && <span className="absolute left-0 top-3 h-10 w-[3px] rounded-r bg-emerald-500" />}
+      <div className="relative">
+        {conversation.type === "group" && !conversation.avatar ? (
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-100 text-sky-700"><UsersRound className="h-5 w-5" /></div>
+        ) : <UserAvatar src={conversation.avatar} name={conversation.title} size="md" className="h-11 w-11" />}
+        {contact && <span className={cn("absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white", contact.status === "online" ? "bg-emerald-500" : contact.status === "away" ? "bg-amber-400" : "bg-slate-300")} />}
       </div>
-
-      {/* 内容 */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <h3 className={cn(
-              "font-medium truncate text-sm",
-              conversation.unreadCount > 0 ? "text-gray-900" : "text-gray-700"
-            )}>
-              {conversation.title}
-            </h3>
-            {conversation.isPinned && (
-              <Pin className="w-3 h-3 text-amber-500 flex-shrink-0" />
-            )}
-          </div>
-          <span className="text-[11px] text-gray-400 flex-shrink-0 ml-2">
-            {lastMsg ? formatConvTime(lastMsg.createdAt) : ""}
-          </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <h3 className={cn("min-w-0 flex-1 truncate text-sm", conversation.unreadCount ? "font-semibold text-slate-900" : "font-medium text-slate-700")}>{conversation.title}</h3>
+          {conversation.isPinned && <Pin className="h-3 w-3 text-amber-500" />}
+          <time className="text-[11px] text-slate-400">{last ? formatConvTime(last.createdAt) : ""}</time>
         </div>
-
-        <div className="flex items-center justify-between mt-0.5">
-          <p className={cn(
-            "text-xs truncate",
-            conversation.unreadCount > 0 ? "text-gray-600 font-medium" : "text-gray-400"
-          )}>
-            {conversation.isMuted && (
-              <BellOff className="w-3 h-3 inline mr-1 text-gray-400" />
-            )}
-            {preview}
-          </p>
-          {conversation.unreadCount > 0 ? (
-            <span className="flex-shrink-0 bg-indigo-500 text-white text-[10px] font-semibold
-              min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 ml-2">
-              {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
-            </span>
-          ) : isMyLastMsg ? (
-            <StatusIcon className="w-3 h-3 text-gray-300 flex-shrink-0 ml-2" />
-          ) : null}
+        <div className="mt-1 flex items-center gap-1.5">
+          {mine && <CheckCheck className={cn("h-3.5 w-3.5", last?.status === "read" ? "text-emerald-500" : "text-slate-300")} />}
+          <p className="min-w-0 flex-1 truncate text-xs text-slate-400">{last ? truncate(last.content, 34) : "暂无消息"}</p>
+          {conversation.isMuted && <BellOff className="h-3.5 w-3.5 text-slate-400" />}
+          {conversation.unreadCount > 0 && <span className="min-w-[19px] rounded-full bg-rose-500 px-1.5 text-center text-[10px] font-semibold leading-[19px] text-white">{conversation.unreadCount}</span>}
         </div>
       </div>
     </button>

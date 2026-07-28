@@ -1,125 +1,74 @@
 "use client";
 
-// ============================================================
-// ConversationList — 会话列表（图标导航下的聊天列表面板）
-// ============================================================
-import React, { useState, useMemo } from "react";
-import {
-  MessageSquare,
-  UsersRound,
-  Search,
-  Wifi,
-  WifiOff,
-} from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Edit3, Search, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChat } from "@/contexts/ChatContext";
+import { cn } from "@/lib/utils";
 import ConversationItem from "./ConversationItem";
 import CreateGroupDialog from "./CreateGroupDialog";
-import UserAvatar from "../shared/UserAvatar";
-import UserProfilePopover from "../shared/UserProfilePopover";
 
-export default function ConversationList() {
+interface ConversationListProps {
+  onOpenConversation?: () => void;
+}
+
+export default function ConversationList({ onOpenConversation }: ConversationListProps) {
   const { user } = useAuth();
-  const {
-    conversations,
-    activeConversationId,
-    setActiveConversation,
-    wsConnected,
-  } = useChat();
-
+  const { conversations, activeConversationId, setActiveConversation, wsConnected } = useChat();
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "unread" | "groups">("all");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return conversations;
-    const q = search.toLowerCase();
-    return conversations.filter((c) => c.title.toLowerCase().includes(q));
-  }, [conversations, search]);
+  const sorted = useMemo(() => conversations
+    .filter((item) => {
+      const matchesSearch = item.title.toLowerCase().includes(search.trim().toLowerCase());
+      const matchesFilter = filter === "all" || (filter === "unread" && item.unreadCount > 0) || (filter === "groups" && item.type === "group");
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()), [conversations, filter, search]);
 
-  const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    });
-  }, [filtered]);
+  const open = (id: string) => {
+    setActiveConversation(id);
+    onOpenConversation?.();
+  };
 
   return (
-    <div className="h-full flex flex-col bg-white w-full">
-      {/* 头部: 标题 + 用户信息 */}
-      <div className="h-14 flex items-center justify-between px-4 border-b border-gray-100 flex-shrink-0">
-        <button
-          onClick={() => setShowProfile(true)}
-          className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
-        >
-          <UserAvatar
-            name={user?.displayName || user?.username || ""}
-            size="sm"
-          />
+    <div className="flex h-full w-full flex-col bg-white">
+      <header className="px-5 pb-3 pt-5">
+        <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900 truncate max-w-[120px]">
-              {user?.displayName || user?.username}
-            </h2>
-            <div className="flex items-center gap-1 text-[10px] text-gray-400">
-              <span className={wsConnected ? "text-green-500" : "text-red-400"}>
-                {wsConnected ? "●" : "○"}
-              </span>
-              {wsConnected ? "在线" : "离线"}
-            </div>
+            <p className="text-xs font-medium text-slate-400">SUIM WORKSPACE</p>
+            <h1 className="mt-1 text-xl font-semibold text-slate-900">消息</h1>
           </div>
-        </button>
-        <button
-          onClick={() => setShowCreateGroup(true)}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-indigo-500 transition-colors"
-          title="创建群聊"
-        >
-          <UsersRound className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* 搜索框 */}
-      <div className="px-3 py-2.5">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索会话..."
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-100 rounded-lg
-              placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
-          />
+          <button onClick={() => setShowCreateGroup(true)} className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 shadow-sm hover:border-emerald-300 hover:text-emerald-600" title="发起会话">
+            <Edit3 className="h-4 w-4" />
+          </button>
         </div>
-      </div>
-
-      {/* 会话列表 */}
-      <div className="flex-1 overflow-y-auto">
-        {sorted.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm px-4">
-            <MessageSquare className="w-8 h-8 mb-2 opacity-40" />
-            <p>暂无会话</p>
-            <p className="text-xs mt-1">创建群聊开始对话</p>
+        <div className="mt-4 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索联系人或会话" className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-emerald-400 focus:bg-white" />
           </div>
-        ) : (
-          sorted.map((conv) => (
-            <ConversationItem
-              key={conv.conversationId}
-              conversation={conv}
-              isActive={conv.conversationId === activeConversationId}
-              onClick={() => setActiveConversation(conv.conversationId)}
-            />
-          ))
-        )}
+          <button className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-500" title="筛选设置"><SlidersHorizontal className="h-4 w-4" /></button>
+        </div>
+      </header>
+
+      <div className="flex items-center gap-1 border-b border-slate-100 px-4 pb-3">
+        {([['all', '全部'], ['unread', '未读'], ['groups', '群聊']] as const).map(([id, label]) => (
+          <button key={id} onClick={() => setFilter(id)} className={cn("h-8 rounded-md px-3 text-xs font-medium", filter === id ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100")}>{label}</button>
+        ))}
+        <span className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-400"><span className={cn("h-1.5 w-1.5 rounded-full", wsConnected ? "bg-emerald-500" : "bg-rose-500")} />{wsConnected ? "实时连接" : "连接中断"}</span>
       </div>
 
-      {showCreateGroup && (
-        <CreateGroupDialog onClose={() => setShowCreateGroup(false)} />
-      )}
+      <div className="min-h-0 flex-1 overflow-y-auto py-2">
+        {sorted.map((conversation) => <ConversationItem key={conversation.conversationId} conversation={conversation} isActive={conversation.conversationId === activeConversationId} onClick={() => open(conversation.conversationId)} />)}
+        {sorted.length === 0 && <div className="px-8 py-16 text-center"><p className="text-sm font-medium text-slate-600">没有匹配的会话</p><p className="mt-1 text-xs text-slate-400">换个关键词或筛选条件试试</p></div>}
+      </div>
 
-      {showProfile && user && (
-        <UserProfilePopover user={user} onClose={() => setShowProfile(false)} />
-      )}
+      <footer className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-xs text-slate-400">
+        <span>{user?.displayName}</span><span>{conversations.reduce((sum, item) => sum + item.unreadCount, 0)} 条未读</span>
+      </footer>
+      {showCreateGroup && <CreateGroupDialog onClose={() => setShowCreateGroup(false)} />}
     </div>
   );
 }

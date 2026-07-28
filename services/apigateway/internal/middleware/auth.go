@@ -28,9 +28,9 @@ type AuthConfig struct {
 
 // AuthMiddleware 管理 JWT 鉴权与本地令牌缓存。
 type AuthMiddleware struct {
-	authCfg  AuthConfig
-	cache    map[string]*cacheEntry
-	cacheMu  sync.RWMutex
+	authCfg AuthConfig
+	cache   map[string]*cacheEntry
+	cacheMu sync.RWMutex
 }
 
 type cacheEntry struct {

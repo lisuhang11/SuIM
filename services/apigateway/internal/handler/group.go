@@ -48,7 +48,8 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.CreatorUserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.CreateGroup(ctx, &req)
@@ -62,8 +63,8 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 
 // DismissGroup DELETE /groups/:id
 func (h *GroupHandler) DismissGroup(c *gin.Context) {
-	req := &pb.DismissGroupReq{GroupId: c.Param("id")}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req := &pb.DismissGroupReq{GroupId: c.Param("id"), OpUserId: userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.DismissGroup(ctx, req)
@@ -83,7 +84,8 @@ func (h *GroupHandler) TransferGroupOwner(c *gin.Context) {
 		return
 	}
 	req.GroupId = c.Param("id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.OpUserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.TransferGroupOwner(ctx, &req)
@@ -103,7 +105,8 @@ func (h *GroupHandler) UpdateGroupInfo(c *gin.Context) {
 		return
 	}
 	req.GroupId = c.Param("id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.OpUserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.UpdateGroupInfo(ctx, &req)
@@ -118,7 +121,7 @@ func (h *GroupHandler) UpdateGroupInfo(c *gin.Context) {
 // GetGroup GET /groups/:id
 func (h *GroupHandler) GetGroup(c *gin.Context) {
 	req := &pb.GetGroupReq{GroupId: c.Param("id")}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetGroup(ctx, req)
@@ -138,7 +141,8 @@ func (h *GroupHandler) InviteUserToGroup(c *gin.Context) {
 		return
 	}
 	req.GroupId = c.Param("id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.OpUserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.InviteUserToGroup(ctx, &req)
@@ -153,10 +157,11 @@ func (h *GroupHandler) InviteUserToGroup(c *gin.Context) {
 // KickGroupMember DELETE /groups/:id/members/:user_id
 func (h *GroupHandler) KickGroupMember(c *gin.Context) {
 	req := &pb.KickGroupMemberReq{
-		GroupId: c.Param("id"),
-		UserId:  c.Param("user_id"),
+		GroupId:  c.Param("id"),
+		OpUserId: userIDFromCtx(c),
+		UserId:   c.Param("user_id"),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.KickGroupMember(ctx, req)
@@ -176,7 +181,8 @@ func (h *GroupHandler) QuitGroup(c *gin.Context) {
 		return
 	}
 	req.GroupId = c.Param("id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.UserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.QuitGroup(ctx, &req)
@@ -195,7 +201,7 @@ func (h *GroupHandler) GetGroupMembers(c *gin.Context) {
 		Offset:  parseInt32(c.Query("offset"), 0),
 		Limit:   parseInt32(c.Query("limit"), 20),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetGroupMembers(ctx, req)
@@ -210,11 +216,11 @@ func (h *GroupHandler) GetGroupMembers(c *gin.Context) {
 // GetJoinedGroups GET /groups/joined?user_id=&offset=0&limit=20
 func (h *GroupHandler) GetJoinedGroups(c *gin.Context) {
 	req := &pb.GetJoinedGroupsReq{
-		UserId: firstNonEmpty(c.Query("user_id"), userIDFromCtx(c)),
+		UserId: userIDFromCtx(c),
 		Offset: parseInt32(c.Query("offset"), 0),
 		Limit:  parseInt32(c.Query("limit"), 20),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetJoinedGroups(ctx, req)
@@ -234,7 +240,8 @@ func (h *GroupHandler) SetGroupMute(c *gin.Context) {
 		return
 	}
 	req.GroupId = c.Param("id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.OpUserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.SetGroupMute(ctx, &req)
@@ -255,7 +262,8 @@ func (h *GroupHandler) SetMemberMute(c *gin.Context) {
 	}
 	req.GroupId = c.Param("id")
 	req.UserId = c.Param("user_id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.OpUserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.SetMemberMute(ctx, &req)
@@ -275,7 +283,9 @@ func (h *GroupHandler) ApplyToJoinGroup(c *gin.Context) {
 		return
 	}
 	req.GroupId = c.Param("id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.UserId = userIDFromCtx(c)
+	req.InviterUserId = ""
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.ApplyToJoinGroup(ctx, &req)
@@ -290,11 +300,12 @@ func (h *GroupHandler) ApplyToJoinGroup(c *gin.Context) {
 // GetPendingApplications GET /groups/:id/applications?offset=0&limit=20
 func (h *GroupHandler) GetPendingApplications(c *gin.Context) {
 	req := &pb.GetPendingApplicationsReq{
-		GroupId: c.Param("id"),
-		Offset:  parseInt32(c.Query("offset"), 0),
-		Limit:   parseInt32(c.Query("limit"), 20),
+		GroupId:  c.Param("id"),
+		OpUserId: userIDFromCtx(c),
+		Offset:   parseInt32(c.Query("offset"), 0),
+		Limit:    parseInt32(c.Query("limit"), 20),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetPendingApplications(ctx, req)
@@ -309,11 +320,11 @@ func (h *GroupHandler) GetPendingApplications(c *gin.Context) {
 // GetUserApplications GET /groups/applications/mine?offset=0&limit=20
 func (h *GroupHandler) GetUserApplications(c *gin.Context) {
 	req := &pb.GetUserApplicationsReq{
-		UserId: firstNonEmpty(c.Query("user_id"), userIDFromCtx(c)),
+		UserId: userIDFromCtx(c),
 		Offset: parseInt32(c.Query("offset"), 0),
 		Limit:  parseInt32(c.Query("limit"), 20),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetUserApplications(ctx, req)
@@ -332,7 +343,8 @@ func (h *GroupHandler) HandleApplication(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.OpUserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.HandleApplication(ctx, &req)
@@ -349,7 +361,7 @@ func (h *GroupHandler) GetUnhandledApplicationCount(c *gin.Context) {
 	req := &pb.GetUnhandledApplicationCountReq{
 		GroupId: c.Query("group_id"),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetUnhandledApplicationCount(ctx, req)

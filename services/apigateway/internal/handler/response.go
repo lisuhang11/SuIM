@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -9,8 +10,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
+
+// authenticatedGRPCContext 将已由网关验证的原始令牌转发给后端服务再次校验。
+func authenticatedGRPCContext(c *gin.Context) context.Context {
+	ctx := c.Request.Context()
+	token := middleware.GetToken(c)
+	if token == "" {
+		return ctx
+	}
+	return metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+}
 
 // gRPCError 将 gRPC status error 映射为 HTTP 状态码和可读消息。
 type gRPCError struct {

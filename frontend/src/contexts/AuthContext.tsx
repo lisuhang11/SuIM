@@ -8,6 +8,7 @@ import type { User, LoginRequest, RegisterRequest } from "@/types";
 import * as api from "@/services/api";
 import * as storage from "@/services/storage";
 import { wsManager } from "@/services/websocket";
+import { isMockMode, mockCurrentUser } from "@/services/mock-data";
 
 interface AuthState {
   user: User | null;
@@ -36,6 +37,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 启动时检查本地是否有缓存的 token
   useEffect(() => {
     const init = async () => {
+      if (isMockMode) {
+        setState({
+          user: mockCurrentUser,
+          isLoading: false,
+          isAuthenticated: true,
+          error: null,
+        });
+        return;
+      }
+
       const token = storage.getToken();
       if (!token) {
         // 没有 token，清除可能的脏数据
@@ -73,6 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (data: LoginRequest) => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
+    if (isMockMode) {
+      setState({ user: mockCurrentUser, isLoading: false, isAuthenticated: true, error: null });
+      return;
+    }
     try {
       // 联调模式：直接调用真实 API（dev 模式下也走真实请求）
       const res = await api.login(data);
@@ -94,6 +109,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = useCallback(async (data: RegisterRequest) => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
+    if (isMockMode) {
+      setState({
+        user: { ...mockCurrentUser, username: data.username, displayName: data.displayName || data.username, email: data.email },
+        isLoading: false,
+        isAuthenticated: true,
+        error: null,
+      });
+      return;
+    }
     try {
       // 联调模式：直接调用真实 API
       const res = await api.register(data);
@@ -135,6 +159,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    if (isMockMode) {
+      setState({ user: mockCurrentUser, isLoading: false, isAuthenticated: true, error: null });
+      return;
+    }
     try {
       await api.logout();
     } catch {

@@ -17,8 +17,8 @@ import (
 	"group/internal/repository"
 	"group/internal/service"
 
-	pb "SuIM/proto/grouppb"
 	"SuIM/pkg/discovery"
+	pb "SuIM/proto/grouppb"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -57,13 +57,32 @@ func main() {
 	}
 	defer userConn.Close()
 	userVerifier := client.NewUserVerifier(userConn)
+	conversationConn, err := grpc.NewClient(
+		discovery.TargetURL("conversation"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to conversation service: %v", err))
+	}
+	defer conversationConn.Close()
+	messageConn, err := grpc.NewClient(
+		discovery.TargetURL("message"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to message service: %v", err))
+	}
+	defer messageConn.Close()
+	eventPublisher := client.NewGroupEventPublisher(conversationConn, messageConn)
 
 	// 组合根：将按功能聚合的仓库和 user 校验器注入到服务层。
 	groupRepo := repository.NewGroupRepository(db)
-	groupSvc := service.NewGroupService(groupRepo, userVerifier)
+	groupSvc := service.NewGroupService(groupRepo, userVerifier, eventPublisher)
 
 	grpcSvr := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor()),
+		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor(userVerifier)),
 	)
 	pb.RegisterGroupServiceServer(grpcSvr, handler.NewGroupHandler(groupSvc))
 	reflection.Register(grpcSvr) // 启用 grpcurl 等调试工具

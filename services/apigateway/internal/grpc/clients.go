@@ -9,12 +9,13 @@ import (
 
 	"apigateway/internal/config"
 
-	pbUser "SuIM/proto/userpb"
-	pbRel "SuIM/proto/relationpb"
-	pbGroup "SuIM/proto/grouppb"
-	pbConv "SuIM/proto/conversationpb"
-	pbMsg "SuIM/proto/messagepb"
 	"SuIM/pkg/discovery"
+	pbConv "SuIM/proto/conversationpb"
+	pbFile "SuIM/proto/filepb"
+	pbGroup "SuIM/proto/grouppb"
+	pbMsg "SuIM/proto/messagepb"
+	pbRel "SuIM/proto/relationpb"
+	pbUser "SuIM/proto/userpb"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -28,6 +29,7 @@ type Clients struct {
 	Group        pbGroup.GroupServiceClient
 	Conversation pbConv.ConversationClient
 	Message      pbMsg.MessageClient
+	File         pbFile.FileServiceClient
 
 	mu    sync.RWMutex
 	conns map[string]*grpc.ClientConn
@@ -49,6 +51,7 @@ func NewClients(cfg *config.GatewayConfig) (*Clients, error) {
 		{"group", func(c *Clients, conn *grpc.ClientConn) { c.Group = pbGroup.NewGroupServiceClient(conn) }},
 		{"conversation", func(c *Clients, conn *grpc.ClientConn) { c.Conversation = pbConv.NewConversationClient(conn) }},
 		{"message", func(c *Clients, conn *grpc.ClientConn) { c.Message = pbMsg.NewMessageClient(conn) }},
+		{"file", func(c *Clients, conn *grpc.ClientConn) { c.File = pbFile.NewFileServiceClient(conn) }},
 	}
 
 	for _, b := range backends {
@@ -92,6 +95,7 @@ func (c *Clients) Reload(ctx context.Context, newCfg *config.GatewayConfig) erro
 		{"group", func(c *Clients, conn *grpc.ClientConn) { c.Group = pbGroup.NewGroupServiceClient(conn) }},
 		{"conversation", func(c *Clients, conn *grpc.ClientConn) { c.Conversation = pbConv.NewConversationClient(conn) }},
 		{"message", func(c *Clients, conn *grpc.ClientConn) { c.Message = pbMsg.NewMessageClient(conn) }},
+		{"file", func(c *Clients, conn *grpc.ClientConn) { c.File = pbFile.NewFileServiceClient(conn) }},
 	}
 
 	for _, b := range backends {
@@ -111,6 +115,7 @@ func (c *Clients) Reload(ctx context.Context, newCfg *config.GatewayConfig) erro
 	c.Group = newClients.Group
 	c.Conversation = newClients.Conversation
 	c.Message = newClients.Message
+	c.File = newClients.File
 	c.conns = newClients.conns
 	c.mu.Unlock()
 

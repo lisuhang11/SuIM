@@ -24,11 +24,11 @@ type ConfigWatcher struct {
 	key      string
 	callback OnConfigChange
 
-	mu       sync.RWMutex
-	curCfg   *config.GatewayConfig
-	cancel   context.CancelFunc
-	done     chan struct{}
-	isReady  bool
+	mu      sync.RWMutex
+	curCfg  *config.GatewayConfig
+	cancel  context.CancelFunc
+	done    chan struct{}
+	isReady bool
 }
 
 // NewConfigWatcher 创建配置监听器并自动开始 watch。

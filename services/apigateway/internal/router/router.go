@@ -18,17 +18,17 @@ func NewEngine(cfg *config.GatewayConfig, clients *grpc.Clients, authMW *middlew
 
 	// ---- 全局中间件（按优先级排列）----
 	engine.Use(
-		middleware.Recovery(),       // 1. panic 恢复
-		middleware.RequestID(),      // 2. 请求 ID
-		middleware.MetricsInFlight(),// 3. 并发计数
-		middleware.Metrics(),        // 4. Prometheus 指标
-		middleware.Logging(),        // 5. 结构化日志
-		middleware.CompressBody(),   // 6. 缓冲请求体（供限流/日志复用）
+		middleware.Recovery(),              // 1. panic 恢复
+		middleware.RequestID(),             // 2. 请求 ID
+		middleware.MetricsInFlight(),       // 3. 并发计数
+		middleware.Metrics(),               // 4. Prometheus 指标
+		middleware.Logging(),               // 5. 结构化日志
+		middleware.CompressBody(),          // 6. 缓冲请求体（供限流/日志复用）
 		gzip.Gzip(gzip.DefaultCompression), // 7. gzip 压缩
 		middleware.CORS(cfg.CORSOrigins),   // 8. CORS
-		rateLimiter.Handler(),       // 9. 限流
-		authMW.Handler(),            // 10. JWT 鉴权
-		middleware.BodyLogger(),     // 11. 调试请求体日志
+		rateLimiter.Handler(),              // 9. 限流
+		authMW.Handler(),                   // 10. JWT 鉴权
+		middleware.BodyLogger(),            // 11. 调试请求体日志
 	)
 
 	// ---- 指标端点 ----
@@ -64,8 +64,13 @@ func NewEngine(cfg *config.GatewayConfig, clients *grpc.Clients, authMW *middlew
 
 	// message 服务
 	if clients.Message != nil {
-		msgHandler := handler.NewMessageHandler(clients.Message)
+		msgHandler := handler.NewMessageHandler(clients.Message, clients.File)
 		msgHandler.RegisterRoutes(api.Group("/messages"))
+	}
+
+	if clients.File != nil {
+		fileHandler := handler.NewFileHandler(clients.File)
+		fileHandler.RegisterRoutes(api.Group("/files"))
 	}
 
 	return engine

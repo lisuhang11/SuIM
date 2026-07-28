@@ -65,6 +65,16 @@ export interface Conversation {
 export type MessageType = "text" | "image" | "file" | "system";
 export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed";
 
+export interface FileAttachment {
+  fileId: string;
+  name: string;
+  contentType: string;
+  size: number;
+  sha256?: string;
+  category: "image" | "video" | "audio" | "document" | "other";
+  expiresAt: string;
+}
+
 export interface Message {
   messageId: string;
   conversationId: string;
@@ -77,6 +87,7 @@ export interface Message {
   createdAt: string; // ISO 8601
   replyTo?: string; // 引用回复的消息 ID
   mentions?: string[]; // @提及的用户 ID 列表
+  file?: FileAttachment;
 }
 
 export interface SendMessageRequest {
@@ -85,6 +96,7 @@ export interface SendMessageRequest {
   type: MessageType;
   replyTo?: string;
   mentions?: string[];
+  file?: FileAttachment;
 }
 
 // ---------- 联系人 ----------

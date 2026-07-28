@@ -23,6 +23,14 @@ import type {
 import { useAuth } from "./AuthContext";
 import { wsManager } from "@/services/websocket";
 import * as storage from "@/services/storage";
+import { toMessage } from "@/services/api";
+import {
+  isMockMode,
+  mockContacts,
+  mockConversations,
+  mockGroups,
+  mockMessages,
+} from "@/services/mock-data";
 
 interface ChatState {
   conversations: Conversation[];
@@ -80,6 +88,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const loadData = async () => {
       setState((s) => ({ ...s, isLoading: true }));
+      if (isMockMode) {
+        setState((s) => ({
+          ...s,
+          conversations: mockConversations,
+          messages: mockMessages,
+          contacts: mockContacts,
+          groups: mockGroups,
+          activeConversationId: s.activeConversationId || mockConversations[0].conversationId,
+          wsConnected: true,
+          friendRequestBadge: 2,
+          isLoading: false,
+        }));
+        return;
+      }
       try {
         // 尝试从真实 API 加载数据
         const api = await import("@/services/api");
@@ -116,6 +138,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // ---------- WebSocket 消息监听 ----------
   useEffect(() => {
     const unsubs: (() => void)[] = [];
+
+    if (isMockMode) return;
 
     if (user) {
       // 监听新消息
@@ -166,8 +190,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   // ---------- 处理新消息 ----------
   const handleNewMessage = useCallback((wsMsg: WsMessage) => {
-    const payload = wsMsg.payload as { message: Message };
-    const newMsg = payload.message;
+    const payload = wsMsg.payload as { message: Message & Record<string, unknown> };
+    const rawMessage = payload.message;
+    const newMsg = rawMessage && ("content_type" in rawMessage || "server_msg_id" in rawMessage)
+      ? toMessage(rawMessage)
+      : rawMessage;
+    if (!newMsg) return;
 
     // 系统消息（content_type 1000~1099 好友通知）自动刷新好友请求 badge
     if (newMsg.type === "system") {
@@ -282,6 +310,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
         replyTo: req.replyTo,
         mentions: req.mentions,
+        file: req.file,
       };
 
       // 乐观更新：立即添加到消息列表
@@ -302,22 +331,64 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       }));
 
       // 尝试通过 HTTP REST API 发送消息
+      if (isMockMode) {
+        await new Promise((resolve) => setTimeout(resolve, 280));
+        setState((prev) => ({
+          ...prev,
+          messages: {
+            ...prev.messages,
+            [req.conversationId]: prev.messages[req.conversationId].map((m) =>
+              m.messageId === localMsg.messageId ? { ...m, status: "sent" as const } : m
+            ),
+          },
+        }));
+        return { ...localMsg, status: "sent" };
+      }
+
       try {
-        const api = await import("@/services/api");
-        // 使用消息 API 发送
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:9000/api/v1"}/messages`, {
+        const conversation = state.conversations.find((item) => item.conversationId === req.conversationId);
+        const content = req.file ? JSON.stringify({
+          file_id: req.file.fileId,
+          name: req.file.name,
+          content_type: req.file.contentType,
+          size: req.file.size,
+          sha256: req.file.sha256,
+          category: req.file.category,
+          expires_at: req.file.expiresAt,
+        }) : req.content;
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "/api/v1"}/messages`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${localStorage.getItem("suim_token") || ""}`,
           },
           body: JSON.stringify({
-            conversation_id: req.conversationId,
-            content_type: req.type === "image" ? 1 : 0,
-            content: req.content,
+            msg_data: {
+              client_msg_id: localMsg.messageId,
+              conversation_id: req.conversationId,
+              session_type: conversation?.type === "group" ? 2 : 1,
+              group_id: conversation?.type === "group" ? req.conversationId : "",
+              recv_id: conversation?.type === "private" ? conversation.members.find((member) => member.userId !== user?.userId)?.userId || "" : "",
+              recv_user_ids: conversation?.members.filter((member) => member.userId !== user?.userId).map((member) => member.userId) || [],
+              content_type: req.type === "image" ? 1 : req.type === "file" ? 2 : 0,
+              content,
+              sender_nickname: user?.displayName || user?.username || "",
+              sender_face_url: user?.avatar || "",
+            },
           }),
         });
-      } catch {
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({ message: response.statusText }));
+          throw new Error(body.message || "消息发送失败");
+        }
+      } catch (error) {
+        if (req.file) {
+          setState((prev) => ({
+            ...prev,
+            messages: { ...prev.messages, [req.conversationId]: prev.messages[req.conversationId].map((message) => message.messageId === localMsg.messageId ? { ...message, status: "failed" } : message) },
+          }));
+          throw error;
+        }
         // HTTP API 不可用，尝试通过 WebSocket 发送
         wsManager.send("message.new" as never, { message: localMsg });
       }
@@ -336,7 +407,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       return { ...localMsg, status: finalStatus };
     },
-    [user]
+    [state.conversations, user]
   );
 
   // ---------- 发送正在输入状态 ----------
@@ -366,7 +437,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const addConversation = useCallback((conv: Conversation) => {
     setState((prev) => ({
       ...prev,
-      conversations: [conv, ...prev.conversations],
+      conversations: prev.conversations.some((item) => item.conversationId === conv.conversationId)
+        ? prev.conversations.map((item) => item.conversationId === conv.conversationId ? conv : item)
+        : [conv, ...prev.conversations],
     }));
   }, []);
 
@@ -398,6 +471,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   // ---------- 加载消息 ----------
   const loadMessages = useCallback(async (conversationId: string) => {
+    if (isMockMode) return;
     try {
       const { getMessages } = await import("@/services/api");
       const msgs = await getMessages(conversationId, { limit: 50 });
@@ -432,6 +506,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     ): Promise<Conversation | null> => {
       // 尝试通过真实 API 创建群组
       try {
+        if (isMockMode) throw new Error("mock mode");
         const api = await import("@/services/api");
         const conv = await api.createGroupConversation({ name, memberIds });
         setState((prev) => ({
@@ -502,6 +577,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   // ---------- 刷新群组列表 ----------
   const refreshGroups = useCallback(async () => {
+    if (isMockMode) return;
     try {
       const api = await import("@/services/api");
       const groups = await api.getGroups();
@@ -515,6 +591,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   // ---------- 刷新好友请求 badge（WS 推送后调用）----------
   const refreshFriendRequestBadge = useCallback(async () => {
+    if (isMockMode) {
+      setState((prev) => ({ ...prev, friendRequestBadge: 2 }));
+      return;
+    }
     try {
       const api = await import("@/services/api");
       const count = await api.getUnhandledRequestCount();

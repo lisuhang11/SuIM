@@ -17,6 +17,7 @@ import type {
   GroupMemberInfo,
   GroupApplication,
   UpdateGroupRequest,
+  FileAttachment,
 } from "@/types";
 
 // 开发/联调时通过 Next.js rewrites 代理到 Docker 后端，避免跨域和网络不通问题
@@ -26,7 +27,8 @@ const REQUEST_TIMEOUT = 10_000; // 10 秒超时
 // ---------- 通用请求（带超时） ----------
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs = REQUEST_TIMEOUT
 ): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -38,7 +40,7 @@ async function request<T>(
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   const fullUrl = `${API_BASE}${endpoint}`;
   console.log(`[API] ${options.method || "GET"} ${fullUrl}`);
@@ -112,19 +114,40 @@ function toConversation(raw: Record<string, unknown>): Conversation {
 }
 
 // 后端消息响应 -> 前端 Message
-function toMessage(raw: Record<string, unknown>): Message {
+export function toMessage(raw: Record<string, unknown>): Message {
+  const contentType = Number(raw.content_type ?? 0);
+  let content = String(raw.content ?? "");
+  let file: FileAttachment | undefined;
+  if (contentType === 1 || contentType === 2) {
+    try {
+      const parsed = JSON.parse(content) as Record<string, unknown>;
+      file = {
+        fileId: String(parsed.file_id ?? ""),
+        name: String(parsed.name ?? ""),
+        contentType: String(parsed.content_type ?? "application/octet-stream"),
+        size: Number(parsed.size ?? 0),
+        sha256: parsed.sha256 ? String(parsed.sha256) : undefined,
+        category: String(parsed.category ?? "other") as FileAttachment["category"],
+        expiresAt: String(parsed.expires_at ?? ""),
+      };
+      content = file.name;
+    } catch {
+      // Keep legacy content intact.
+    }
+  }
   return {
     messageId: String(raw.server_msg_id ?? raw.messageId ?? ""),
     conversationId: String(raw.conversation_id ?? raw.conversationId ?? ""),
     senderId: String(raw.send_id ?? raw.senderId ?? ""),
     senderName: String(raw.sender_nickname ?? raw.senderName ?? ""),
     senderAvatar: String(raw.sender_face_url ?? raw.senderAvatar ?? ""),
-    content: String(raw.content ?? ""),
-    type: (Number(raw.content_type) === 1 ? "image" : "text") as Message["type"],
+    content,
+    type: (contentType === 1 ? "image" : contentType === 2 ? "file" : "text") as Message["type"],
     status: (raw.is_read ? "read" : "delivered") as Message["status"],
     createdAt: raw.send_time
       ? new Date(Number(raw.send_time)).toISOString()
       : String(raw.createdAt ?? new Date().toISOString()),
+    file,
   };
 }
 
@@ -647,22 +670,51 @@ function toGroupApplication(raw: Record<string, unknown>): GroupApplication {
   };
 }
 
-// ---------- 上传 ----------
-export async function uploadFile(file: File): Promise<{ url: string }> {
-  const formData = new FormData();
-  formData.append("file", file);
-  const token = getToken();
+// ---------- 文件 ----------
+type BackendFile = {
+  file_id: string; name: string; content_type: string; size: number;
+  sha256?: string; category: FileAttachment["category"]; expires_at: number;
+};
 
-  const res = await fetch(`${API_BASE}/upload`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body: formData,
+function toAttachment(file: BackendFile): FileAttachment {
+  return { fileId: file.file_id, name: file.name, contentType: file.content_type,
+    size: Number(file.size), sha256: file.sha256, category: file.category,
+    expiresAt: new Date(Number(file.expires_at)).toISOString() };
+}
+
+async function sha256(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function putFile(url: string, file: File, headers: Record<string, string>, onProgress?: (value: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    Object.entries(headers || {}).forEach(([key, value]) => xhr.setRequestHeader(key, value));
+    xhr.upload.onprogress = (event) => event.lengthComputable && onProgress?.(Math.round((event.loaded / event.total) * 100));
+    xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`));
+    xhr.onerror = () => reject(new Error("Upload connection failed"));
+    xhr.send(file);
   });
+}
 
-  if (!res.ok) {
-    throw new Error("Upload failed");
+export async function uploadFile(file: File, onProgress?: (value: number) => void): Promise<FileAttachment> {
+  const hash = await sha256(file);
+  const initiated = await request<ApiResponse<{ file: BackendFile; upload_url: string; headers: Record<string, string>; already_uploaded: boolean }>>("/files/initiate", {
+    method: "POST",
+    body: JSON.stringify({ name: file.name, content_type: file.type || "application/octet-stream", size: file.size, sha256: hash }),
+  });
+  if (!initiated.data.already_uploaded) {
+    await putFile(initiated.data.upload_url, file, initiated.data.headers, onProgress);
+    const completed = await request<ApiResponse<{ file: BackendFile }>>(`/files/${initiated.data.file.file_id}/complete`, { method: "POST" }, 60_000);
+    return toAttachment(completed.data.file);
   }
+  onProgress?.(100);
+  return toAttachment(initiated.data.file);
+}
 
-  const json = await res.json() as ApiResponse<{ url: string }>;
-  return json.data;
+export async function getFileDownloadURL(fileId: string): Promise<string> {
+  const res = await request<ApiResponse<{ download_url: string }>>(`/files/${fileId}/download`);
+  return res.data.download_url;
 }

@@ -14,6 +14,22 @@ type UserVerifier interface {
 	UserExists(ctx context.Context, userID string) (bool, error)
 	// UsersExist 批量检查用户 ID 集合，返回每个 ID 的存在状态。
 	UsersExist(ctx context.Context, userIDs []string) (map[string]bool, error)
+	// Authenticate 校验访问令牌并返回令牌绑定的用户 ID。
+	Authenticate(ctx context.Context, token string) (userID string, err error)
+}
+
+// GroupEvent 描述已提交的群领域变更，供会话和消息服务消费。
+type GroupEvent struct {
+	Type             string
+	GroupID          string
+	OperatorUserID   string
+	SubjectUserIDs   []string
+	RecipientUserIDs []string
+}
+
+// GroupEventPublisher 在数据库事务提交后联动会话和系统消息。
+type GroupEventPublisher interface {
+	Publish(ctx context.Context, event GroupEvent) error
 }
 
 // GroupService 定义群组业务逻辑的接口契约。
@@ -38,7 +54,7 @@ type GroupService interface {
 	// QuitGroup 退出群组，群主需先转让后方可退出。
 	QuitGroup(ctx context.Context, groupID, userID string) error
 	// GetGroupMembers 分页获取群成员列表。
-	GetGroupMembers(ctx context.Context, groupID string, offset, limit int) (members []*types.GroupMember, total int, err error)
+	GetGroupMembers(ctx context.Context, groupID, opUserID string, offset, limit int) (members []*types.GroupMember, total int, err error)
 	// GetJoinedGroups 分页获取用户已加入的群组列表。
 	GetJoinedGroups(ctx context.Context, userID string, offset, limit int) (groups []*types.Group, total int, err error)
 
@@ -58,12 +74,14 @@ type GroupService interface {
 	// HandleApplication 处理入群申请（同意/拒绝），同意时添加成员。
 	HandleApplication(ctx context.Context, in *types.HandleInput) error
 	// GetUnhandledApplicationCount 统计群组待处理的入群申请数量。
-	GetUnhandledApplicationCount(ctx context.Context, groupID string) (int, error)
+	GetUnhandledApplicationCount(ctx context.Context, groupID, opUserID string) (int, error)
 }
 
 // GroupRepository 聚合所有群组数据访问（群组、成员、入群请求）于一个接口。
 // 存储细节封装在此层，不得泄露到服务层。
 type GroupRepository interface {
+	// WithinTransaction 在同一个数据库事务中执行完整业务操作。
+	WithinTransaction(ctx context.Context, fn func(GroupRepository) error) error
 	// ----- 群组 -----
 	// CreateGroup 持久化群组记录。
 	CreateGroup(ctx context.Context, g *types.Group) error

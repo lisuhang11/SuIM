@@ -3,6 +3,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 
 	"group/internal/types/interfaces"
 
@@ -44,4 +45,16 @@ func (c *userGRPCClient) UsersExist(ctx context.Context, userIDs []string) (map[
 		out[id] = ok
 	}
 	return out, nil
+}
+
+// Authenticate 通过 user 服务验证访问令牌，避免 group 服务信任客户端声明的用户 ID。
+func (c *userGRPCClient) Authenticate(ctx context.Context, token string) (string, error) {
+	res, err := c.cli.ValidateToken(ctx, &pb.ValidateTokenReq{Token: token})
+	if err != nil {
+		return "", err
+	}
+	if !res.Valid || res.User == nil || res.User.UserId == "" {
+		return "", fmt.Errorf("invalid access token")
+	}
+	return res.User.UserId, nil
 }

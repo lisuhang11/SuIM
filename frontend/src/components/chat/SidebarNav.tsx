@@ -1,22 +1,11 @@
 "use client";
 
-// ============================================================
-// SidebarNav — 纵向图标导航栏
-// 三个栏目：会话 | 好友 | 群聊
-// ============================================================
-import React, { useEffect, useState } from "react";
-import {
-  MessageSquare,
-  Users,
-  UserPlus,
-  LogOut,
-} from "lucide-react";
+import React from "react";
+import { Bell, LogOut, MessageCircle, Settings, UserRound, UsersRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChat } from "@/contexts/ChatContext";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import UserAvatar from "../shared/UserAvatar";
-import { wsManager } from "@/services/websocket";
 
 export type NavSection = "chats" | "friends" | "groups";
 
@@ -27,122 +16,67 @@ interface SidebarNavProps {
 
 export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProps) {
   const { user, logout } = useAuth();
-  const { friendRequestBadge } = useChat();
-  const router = useRouter();
-  const [groupBadge, setGroupBadge] = useState(0);
-  const [wsConnected, setWsConnected] = useState(false);
-
-  // 监听 WebSocket 连接状态
-  useEffect(() => {
-    const unsub = wsManager.onStatusChange(setWsConnected);
-    return unsub;
-  }, []);
-
-  // 首次加载 + 定期拉取群 badge（群推送暂未实现，保留轮询作为过渡）
-  useEffect(() => {
-    const fetchGroupBadge = async () => {
-      try {
-        const api = await import("@/services/api");
-        const count = await api.getUnhandledGroupApplicationCount();
-        setGroupBadge(count);
-      } catch { /* ignore */ }
-    };
-    fetchGroupBadge();
-    const timer = setInterval(fetchGroupBadge, 30000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const navItems: {
-    id: NavSection;
-    icon: React.ElementType;
-    label: string;
-    badge?: number;
-  }[] = [
-    { id: "chats", icon: MessageSquare, label: "会话" },
-    { id: "friends", icon: Users, label: "好友", badge: friendRequestBadge },
-    { id: "groups", icon: UserPlus, label: "群聊", badge: groupBadge },
+  const { friendRequestBadge, conversations } = useChat();
+  const unread = conversations.reduce((sum, item) => sum + item.unreadCount, 0);
+  const items = [
+    { id: "chats" as const, label: "消息", icon: MessageCircle, badge: unread },
+    { id: "friends" as const, label: "通讯录", icon: UserRound, badge: friendRequestBadge },
+    { id: "groups" as const, label: "群组", icon: UsersRound, badge: 1 },
   ];
 
-  const handleLogout = async () => {
-    await logout();
-    router.push("/login");
-  };
-
   return (
-    <div className="h-full w-16 flex flex-col items-center bg-gray-900 text-gray-300 py-3 gap-1 flex-shrink-0 select-none">
-      {/* 用户头像 + WS 状态指示 */}
+    <aside className="z-30 flex h-16 w-full flex-shrink-0 items-center border-t border-slate-800 bg-[#172033] px-3 text-slate-300 md:h-full md:w-[76px] md:flex-col md:border-r md:border-t-0 md:px-0 md:py-4">
       <button
         onClick={() => onNavigate("chats")}
-        className="mb-2 relative"
-        title={user?.displayName || user?.username || "用户"}
+        className="hidden h-11 w-11 items-center justify-center rounded-lg bg-emerald-400 text-lg font-bold text-[#172033] md:flex"
+        title="SuIM"
       >
-        <UserAvatar
-          name={user?.displayName || user?.username || ""}
-          size="sm"
-          className="ring-2 ring-gray-700 hover:ring-indigo-400 transition-all"
-        />
-        {/* WebSocket 连接状态指示器 */}
-        <span
-          className={cn(
-            "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900 transition-colors",
-            wsConnected ? "bg-green-400" : "bg-red-400"
-          )}
-          title={wsConnected ? "实时连接正常" : "实时连接断开"}
-        />
+        S
       </button>
 
-      {/* 分割线 */}
-      <div className="w-8 h-px bg-gray-700 my-1" />
+      <nav className="flex flex-1 items-center justify-around md:mt-7 md:w-full md:flex-none md:flex-col md:gap-2">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => onNavigate(item.id)}
+            className={cn(
+              "relative flex h-14 min-w-[64px] flex-col items-center justify-center gap-1 rounded-md text-[11px] transition-colors md:h-14 md:w-[60px] md:min-w-0",
+              activeSection === item.id
+                ? "bg-white/10 text-white"
+                : "text-slate-400 hover:bg-white/5 hover:text-white"
+            )}
+            title={item.label}
+          >
+            {activeSection === item.id && <span className="absolute left-0 hidden h-6 w-[3px] rounded-r bg-emerald-400 md:block" />}
+            <item.icon className="h-5 w-5" />
+            <span>{item.label}</span>
+            {item.badge > 0 && (
+              <span className="absolute right-2 top-1 min-w-[17px] rounded-full bg-rose-500 px-1 text-center text-[10px] font-semibold leading-[17px] text-white md:right-1">
+                {item.badge > 99 ? "99+" : item.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
 
-      {/* 导航图标 */}
-      {navItems.map((item) => (
-        <button
-          key={item.id}
-          onClick={() => onNavigate(item.id)}
-          className={cn(
-            "relative w-11 h-11 flex items-center justify-center rounded-xl transition-all duration-200 group",
-            activeSection === item.id
-              ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30"
-              : "text-gray-400 hover:text-gray-200 hover:bg-gray-800"
-          )}
-          title={item.label}
-        >
-          <item.icon className="w-5 h-5" />
-          {/* 激活指示条 */}
-          {activeSection === item.id && (
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-white rounded-r-full" />
-          )}
-          {/* 徽章 */}
-          {item.badge !== undefined && item.badge > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center
-              px-1 text-[10px] font-bold text-white bg-red-500 rounded-full ring-2 ring-gray-900">
-              {item.badge > 99 ? "99+" : item.badge}
-            </span>
-          )}
-          {/* 悬停提示 */}
-          <div className="absolute left-full ml-3 px-2 py-1 bg-gray-800 text-white text-xs rounded-md
-            opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-            {item.label}
-          </div>
+      <div className="hidden flex-1 md:block" />
+      <div className="hidden flex-col items-center gap-2 md:flex">
+        <button className="relative flex h-10 w-10 items-center justify-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white" title="通知中心">
+          <Bell className="h-5 w-5" />
+          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-500" />
         </button>
-      ))}
-
-      {/* 底部操作 — 退出登录 */}
-      <div className="mt-auto flex flex-col items-center gap-1 pb-2">
-        <button
-          onClick={handleLogout}
-          className="w-11 h-11 flex items-center justify-center rounded-xl
-            text-gray-300 hover:text-red-400 hover:bg-red-500/20 transition-all duration-200 group relative"
-          title="退出登录"
-        >
-          <LogOut className="w-5 h-5" />
-          {/* 悬停提示 */}
-          <div className="absolute left-full ml-3 px-2 py-1 bg-red-600 text-white text-xs rounded-md
-            opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-            退出登录
-          </div>
+        <button className="flex h-10 w-10 items-center justify-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white" title="设置">
+          <Settings className="h-5 w-5" />
+        </button>
+        <div className="my-1 h-px w-8 bg-white/10" />
+        <div className="group relative">
+          <UserAvatar src={user?.avatar} name={user?.displayName || "我"} size="md" className="ring-2 ring-white/20" />
+          <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#172033] bg-emerald-400" />
+        </div>
+        <button onClick={logout} className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-rose-500/10 hover:text-rose-400" title="退出登录">
+          <LogOut className="h-4 w-4" />
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

@@ -9,40 +9,58 @@ import (
 	apperrors "group/internal/errors"
 	"group/internal/logger"
 	"group/internal/types"
+	"group/internal/types/interfaces"
 )
 
 // InviteUserToGroup 邀请用户加入群组，opUserID 必须是群主或管理员。
 func (s *groupService) InviteUserToGroup(ctx context.Context, in *types.InviteInput) error {
 	logger.Info(ctx, "[group] invite members", "group", in.GroupID, "op", in.OpUserID, "count", len(in.UserIDs))
-	if _, _, err := s.authMember(ctx, in.GroupID, in.OpUserID, types.GroupMemberRoleAdmin); err != nil {
-		return err
+	if len(in.UserIDs) == 0 {
+		return apperrors.NewValidationError("user_ids is required")
 	}
-
 	exist, err := s.userVerifier.UsersExist(ctx, in.UserIDs)
 	if err != nil {
 		return apperrors.NewInternalError("verify users failed").WithDetails(err)
 	}
-	now := time.Now()
+	seen := make(map[string]struct{}, len(in.UserIDs))
 	for _, uid := range in.UserIDs {
-		if !exist[uid] {
+		if uid == "" || !exist[uid] {
 			return apperrors.NewUserNotExistError().WithDetails(fmt.Errorf("user %s not found", uid))
 		}
-		// 幂等处理：已是成员则跳过。
-		if ok, _ := s.repo.MemberExists(ctx, in.GroupID, uid); ok {
-			continue
+		if _, duplicate := seen[uid]; duplicate {
+			return apperrors.NewValidationError("user_ids contains duplicates")
 		}
-		m := &types.GroupMember{
-			GroupID:        in.GroupID,
-			UserID:         uid,
-			RoleLevel:      types.GroupMemberRoleNormal,
-			JoinTime:       now,
-			JoinSource:     0,
-			InviterUserID:  in.OpUserID,
-			OperatorUserID: in.OpUserID,
+		seen[uid] = struct{}{}
+	}
+	now := time.Now()
+	var joined, recipients []string
+	err = s.repo.WithinTransaction(ctx, func(repo interfaces.GroupRepository) error {
+		if _, _, err := authMemberWithRepo(ctx, repo, in.GroupID, in.OpUserID, types.GroupMemberRoleAdmin); err != nil {
+			return err
 		}
-		if err := s.repo.CreateMember(ctx, m); err != nil {
-			return apperrors.NewInternalError("add member failed").WithDetails(err)
+		for _, uid := range in.UserIDs {
+			alreadyMember, err := repo.MemberExists(ctx, in.GroupID, uid)
+			if err != nil {
+				return apperrors.NewInternalError("check member failed").WithDetails(err)
+			}
+			if alreadyMember {
+				continue
+			}
+			m := &types.GroupMember{GroupID: in.GroupID, UserID: uid, RoleLevel: types.GroupMemberRoleNormal, JoinTime: now, JoinSource: 0, InviterUserID: in.OpUserID, OperatorUserID: in.OpUserID}
+			if err := repo.CreateMember(ctx, m); err != nil {
+				return apperrors.NewInternalError("add member failed").WithDetails(err)
+			}
+			joined = append(joined, uid)
 		}
+		var err error
+		recipients, err = memberIDs(ctx, repo, in.GroupID)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	if len(joined) > 0 {
+		s.publish(ctx, interfaces.GroupEvent{Type: "group.members_joined", GroupID: in.GroupID, OperatorUserID: in.OpUserID, SubjectUserIDs: joined, RecipientUserIDs: recipients})
 	}
 	return nil
 }
@@ -50,42 +68,63 @@ func (s *groupService) InviteUserToGroup(ctx context.Context, in *types.InviteIn
 // KickGroupMember 踢出群成员，opUserID 角色必须高于目标成员。
 func (s *groupService) KickGroupMember(ctx context.Context, groupID, opUserID, targetUserID string) error {
 	logger.Info(ctx, "[group] kick member", "group", groupID, "op", opUserID, "target", targetUserID)
-	_, op, err := s.authMember(ctx, groupID, opUserID, types.GroupMemberRoleAdmin)
+	var recipients []string
+	err := s.repo.WithinTransaction(ctx, func(repo interfaces.GroupRepository) error {
+		_, op, err := authMemberWithRepo(ctx, repo, groupID, opUserID, types.GroupMemberRoleAdmin)
+		if err != nil {
+			return err
+		}
+		target, err := repo.GetMember(ctx, groupID, targetUserID)
+		if err != nil {
+			return apperrors.NewMemberNotFoundError().WithDetails(err)
+		}
+		if op.RoleLevel <= target.RoleLevel {
+			return apperrors.NewCannotKickRoleError()
+		}
+		if err := repo.DeleteMember(ctx, groupID, targetUserID); err != nil {
+			return apperrors.NewInternalError("kick member failed").WithDetails(err)
+		}
+		recipients, err = memberIDs(ctx, repo, groupID)
+		return err
+	})
 	if err != nil {
 		return err
 	}
-	target, err := s.repo.GetMember(ctx, groupID, targetUserID)
-	if err != nil {
-		return apperrors.NewMemberNotFoundError().WithDetails(err)
-	}
-	// 不能踢出同级或更高级别的成员（群主/同级管理员）。
-	if op.RoleLevel <= target.RoleLevel {
-		return apperrors.NewCannotKickRoleError()
-	}
-	if err := s.repo.DeleteMember(ctx, groupID, targetUserID); err != nil {
-		return apperrors.NewInternalError("kick member failed").WithDetails(err)
-	}
+	s.publish(ctx, interfaces.GroupEvent{Type: "group.member_kicked", GroupID: groupID, OperatorUserID: opUserID, SubjectUserIDs: []string{targetUserID}, RecipientUserIDs: recipients})
 	return nil
 }
 
 // QuitGroup 退出群组，群主需先转让群主后方可退出。
 func (s *groupService) QuitGroup(ctx context.Context, groupID, userID string) error {
 	logger.Info(ctx, "[group] quit group", "group", groupID, "user", userID)
-	m, err := s.repo.GetMember(ctx, groupID, userID)
+	var recipients []string
+	err := s.repo.WithinTransaction(ctx, func(repo interfaces.GroupRepository) error {
+		m, err := repo.GetMember(ctx, groupID, userID)
+		if err != nil {
+			return apperrors.NewMemberNotFoundError().WithDetails(err)
+		}
+		if m.RoleLevel == types.GroupMemberRoleOwner {
+			return apperrors.NewCannotQuitAsOwnerError()
+		}
+		if err := repo.DeleteMember(ctx, groupID, userID); err != nil {
+			return apperrors.NewInternalError("quit group failed").WithDetails(err)
+		}
+		recipients, err = memberIDs(ctx, repo, groupID)
+		return err
+	})
 	if err != nil {
-		return apperrors.NewMemberNotFoundError().WithDetails(err)
+		return err
 	}
-	if m.RoleLevel == types.GroupMemberRoleOwner {
-		return apperrors.NewCannotQuitAsOwnerError()
-	}
-	if err := s.repo.DeleteMember(ctx, groupID, userID); err != nil {
-		return apperrors.NewInternalError("quit group failed").WithDetails(err)
-	}
+	s.publish(ctx, interfaces.GroupEvent{Type: "group.member_quit", GroupID: groupID, OperatorUserID: userID, SubjectUserIDs: []string{userID}, RecipientUserIDs: recipients})
 	return nil
 }
 
 // GetGroupMembers 分页获取群成员列表。
-func (s *groupService) GetGroupMembers(ctx context.Context, groupID string, offset, limit int) ([]*types.GroupMember, int, error) {
+
+func (s *groupService) GetGroupMembers(ctx context.Context, groupID, opUserID string, offset, limit int) ([]*types.GroupMember, int, error) {
+	if _, _, err := s.authMember(ctx, groupID, opUserID, types.GroupMemberRoleNormal); err != nil {
+		return nil, 0, err
+	}
 	members, total, err := s.repo.ListMembers(ctx, groupID, offset, limit)
 	if err != nil {
 		return nil, 0, apperrors.NewInternalError("list members failed").WithDetails(err)

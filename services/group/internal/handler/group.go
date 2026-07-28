@@ -6,6 +6,7 @@ import (
 
 	apperrors "group/internal/errors"
 	"group/internal/logger"
+	"group/internal/middleware"
 	"group/internal/types"
 	"group/internal/types/interfaces"
 
@@ -14,6 +15,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func authenticatedUserID(ctx context.Context) (string, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return "", status.Error(codes.Unauthenticated, "authenticated user is missing")
+	}
+	return userID, nil
+}
 
 // groupHandler 实现 pb.GroupServiceServer，将请求委托给领域 GroupService。
 type groupHandler struct {
@@ -129,8 +138,12 @@ func requestToProto(req *types.GroupRequest) *pb.GroupRequestInfo {
 
 // CreateGroup 创建群组。
 func (h *groupHandler) CreateGroup(ctx context.Context, req *pb.CreateGroupReq) (*pb.CreateGroupResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	groupID, g, err := h.svc.CreateGroup(ctx, &types.CreateGroupInput{
-		CreatorUserID:     req.CreatorUserId,
+		CreatorUserID:     userID,
 		GroupName:         req.GroupName,
 		Notification:      req.Notification,
 		Introduction:      req.Introduction,
@@ -151,7 +164,11 @@ func (h *groupHandler) CreateGroup(ctx context.Context, req *pb.CreateGroupReq) 
 
 // DismissGroup 解散群组。
 func (h *groupHandler) DismissGroup(ctx context.Context, req *pb.DismissGroupReq) (*pb.DismissGroupResp, error) {
-	if err := h.svc.DismissGroup(ctx, req.GroupId, req.OpUserId); err != nil {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	if err := h.svc.DismissGroup(ctx, req.GroupId, userID); err != nil {
 		logger.Error(ctx, "dismiss group failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
@@ -160,7 +177,11 @@ func (h *groupHandler) DismissGroup(ctx context.Context, req *pb.DismissGroupReq
 
 // TransferGroupOwner 转让群主。
 func (h *groupHandler) TransferGroupOwner(ctx context.Context, req *pb.TransferGroupOwnerReq) (*pb.TransferGroupOwnerResp, error) {
-	if err := h.svc.TransferGroupOwner(ctx, req.GroupId, req.OpUserId, req.NewOwnerUserId); err != nil {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	if err := h.svc.TransferGroupOwner(ctx, req.GroupId, userID, req.NewOwnerUserId); err != nil {
 		logger.Error(ctx, "transfer owner failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
@@ -169,25 +190,29 @@ func (h *groupHandler) TransferGroupOwner(ctx context.Context, req *pb.TransferG
 
 // UpdateGroupInfo 更新群组信息。
 func (h *groupHandler) UpdateGroupInfo(ctx context.Context, req *pb.UpdateGroupInfoReq) (*pb.UpdateGroupInfoResp, error) {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
 	in := &types.UpdateGroupInfoInput{
 		GroupID:      req.GroupId,
-		OpUserID:     req.OpUserId,
+		OpUserID:     userID,
 		GroupName:    req.GroupName,
 		Notification: req.Notification,
 		Introduction: req.Introduction,
 		FaceURL:      req.FaceUrl,
 		Ex:           req.Ex,
 	}
-	if req.NeedVerification != 0 {
-		v := int(req.NeedVerification)
+	if req.NeedVerification != nil {
+		v := int(*req.NeedVerification)
 		in.NeedVerification = &v
 	}
-	if req.LookMemberInfo != 0 {
-		v := int(req.LookMemberInfo)
+	if req.LookMemberInfo != nil {
+		v := int(*req.LookMemberInfo)
 		in.LookMemberInfo = &v
 	}
-	if req.ApplyMemberFriend != 0 {
-		v := int(req.ApplyMemberFriend)
+	if req.ApplyMemberFriend != nil {
+		v := int(*req.ApplyMemberFriend)
 		in.ApplyMemberFriend = &v
 	}
 	g, err := h.svc.UpdateGroupInfo(ctx, in)
@@ -210,9 +235,13 @@ func (h *groupHandler) GetGroup(ctx context.Context, req *pb.GetGroupReq) (*pb.G
 
 // InviteUserToGroup 邀请用户加入群组。
 func (h *groupHandler) InviteUserToGroup(ctx context.Context, req *pb.InviteUserToGroupReq) (*pb.InviteUserToGroupResp, error) {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
 	if err := h.svc.InviteUserToGroup(ctx, &types.InviteInput{
 		GroupID:  req.GroupId,
-		OpUserID: req.OpUserId,
+		OpUserID: userID,
 		UserIDs:  req.UserIds,
 		Reason:   req.Reason,
 	}); err != nil {
@@ -224,7 +253,11 @@ func (h *groupHandler) InviteUserToGroup(ctx context.Context, req *pb.InviteUser
 
 // KickGroupMember 踢出群成员。
 func (h *groupHandler) KickGroupMember(ctx context.Context, req *pb.KickGroupMemberReq) (*pb.KickGroupMemberResp, error) {
-	if err := h.svc.KickGroupMember(ctx, req.GroupId, req.OpUserId, req.UserId); err != nil {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	if err := h.svc.KickGroupMember(ctx, req.GroupId, userID, req.UserId); err != nil {
 		logger.Error(ctx, "kick member failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
@@ -233,7 +266,11 @@ func (h *groupHandler) KickGroupMember(ctx context.Context, req *pb.KickGroupMem
 
 // QuitGroup 退出群组。
 func (h *groupHandler) QuitGroup(ctx context.Context, req *pb.QuitGroupReq) (*pb.QuitGroupResp, error) {
-	if err := h.svc.QuitGroup(ctx, req.GroupId, req.UserId); err != nil {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	if err := h.svc.QuitGroup(ctx, req.GroupId, userID); err != nil {
 		logger.Error(ctx, "quit group failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
@@ -242,7 +279,11 @@ func (h *groupHandler) QuitGroup(ctx context.Context, req *pb.QuitGroupReq) (*pb
 
 // GetGroupMembers 获取群成员列表。
 func (h *groupHandler) GetGroupMembers(ctx context.Context, req *pb.GetGroupMembersReq) (*pb.GetGroupMembersResp, error) {
-	members, total, err := h.svc.GetGroupMembers(ctx, req.GroupId, int(req.Offset), int(req.Limit))
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	members, total, err := h.svc.GetGroupMembers(ctx, req.GroupId, userID, int(req.Offset), int(req.Limit))
 	if err != nil {
 		return nil, appErrorToStatus(err)
 	}
@@ -255,7 +296,11 @@ func (h *groupHandler) GetGroupMembers(ctx context.Context, req *pb.GetGroupMemb
 
 // GetJoinedGroups 获取用户已加入的群组列表。
 func (h *groupHandler) GetJoinedGroups(ctx context.Context, req *pb.GetJoinedGroupsReq) (*pb.GetJoinedGroupsResp, error) {
-	groups, total, err := h.svc.GetJoinedGroups(ctx, req.UserId, int(req.Offset), int(req.Limit))
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	groups, total, err := h.svc.GetJoinedGroups(ctx, userID, int(req.Offset), int(req.Limit))
 	if err != nil {
 		return nil, appErrorToStatus(err)
 	}
@@ -268,7 +313,11 @@ func (h *groupHandler) GetJoinedGroups(ctx context.Context, req *pb.GetJoinedGro
 
 // SetGroupMute 设置群全员禁言。
 func (h *groupHandler) SetGroupMute(ctx context.Context, req *pb.SetGroupMuteReq) (*pb.SetGroupMuteResp, error) {
-	if err := h.svc.SetGroupMute(ctx, req.GroupId, req.OpUserId, req.IsMuted); err != nil {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	if err := h.svc.SetGroupMute(ctx, req.GroupId, userID, req.IsMuted); err != nil {
 		logger.Error(ctx, "set group mute failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
@@ -277,7 +326,11 @@ func (h *groupHandler) SetGroupMute(ctx context.Context, req *pb.SetGroupMuteReq
 
 // SetMemberMute 设置单个成员禁言。
 func (h *groupHandler) SetMemberMute(ctx context.Context, req *pb.SetMemberMuteReq) (*pb.SetMemberMuteResp, error) {
-	if err := h.svc.SetMemberMute(ctx, req.GroupId, req.OpUserId, req.UserId, req.MuteEndTime); err != nil {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	if err := h.svc.SetMemberMute(ctx, req.GroupId, userID, req.UserId, req.MuteEndTime); err != nil {
 		logger.Error(ctx, "set member mute failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
@@ -286,12 +339,16 @@ func (h *groupHandler) SetMemberMute(ctx context.Context, req *pb.SetMemberMuteR
 
 // ApplyToJoinGroup 申请加入群组。
 func (h *groupHandler) ApplyToJoinGroup(ctx context.Context, req *pb.ApplyToJoinGroupReq) (*pb.ApplyToJoinGroupResp, error) {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
 	if err := h.svc.ApplyToJoinGroup(ctx, &types.ApplyInput{
 		GroupID:       req.GroupId,
-		UserID:        req.UserId,
+		UserID:        userID,
 		ReqMsg:        req.ReqMsg,
 		JoinSource:    int(req.JoinSource),
-		InviterUserID: req.InviterUserId,
+		InviterUserID: "",
 	}); err != nil {
 		logger.Error(ctx, "apply to join failed", "error", err)
 		return nil, appErrorToStatus(err)
@@ -301,7 +358,11 @@ func (h *groupHandler) ApplyToJoinGroup(ctx context.Context, req *pb.ApplyToJoin
 
 // GetPendingApplications 获取待处理的入群申请。
 func (h *groupHandler) GetPendingApplications(ctx context.Context, req *pb.GetPendingApplicationsReq) (*pb.GetPendingApplicationsResp, error) {
-	reqs, total, err := h.svc.GetPendingApplications(ctx, req.GroupId, req.OpUserId, int(req.Offset), int(req.Limit))
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	reqs, total, err := h.svc.GetPendingApplications(ctx, req.GroupId, userID, int(req.Offset), int(req.Limit))
 	if err != nil {
 		return nil, appErrorToStatus(err)
 	}
@@ -314,7 +375,11 @@ func (h *groupHandler) GetPendingApplications(ctx context.Context, req *pb.GetPe
 
 // GetUserApplications 获取用户的入群申请记录。
 func (h *groupHandler) GetUserApplications(ctx context.Context, req *pb.GetUserApplicationsReq) (*pb.GetUserApplicationsResp, error) {
-	reqs, total, err := h.svc.GetUserApplications(ctx, req.UserId, int(req.Offset), int(req.Limit))
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	reqs, total, err := h.svc.GetUserApplications(ctx, userID, int(req.Offset), int(req.Limit))
 	if err != nil {
 		return nil, appErrorToStatus(err)
 	}
@@ -327,10 +392,14 @@ func (h *groupHandler) GetUserApplications(ctx context.Context, req *pb.GetUserA
 
 // HandleApplication 处理入群申请（同意/拒绝）。
 func (h *groupHandler) HandleApplication(ctx context.Context, req *pb.HandleApplicationReq) (*pb.HandleApplicationResp, error) {
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
 	if err := h.svc.HandleApplication(ctx, &types.HandleInput{
 		GroupID:      req.GroupId,
 		UserID:       req.UserId,
-		OpUserID:     req.OpUserId,
+		OpUserID:     userID,
 		HandleResult: int(req.HandleResult),
 		HandledMsg:   req.HandledMsg,
 	}); err != nil {
@@ -342,7 +411,11 @@ func (h *groupHandler) HandleApplication(ctx context.Context, req *pb.HandleAppl
 
 // GetUnhandledApplicationCount 获取未处理的入群申请数量。
 func (h *groupHandler) GetUnhandledApplicationCount(ctx context.Context, req *pb.GetUnhandledApplicationCountReq) (*pb.GetUnhandledApplicationCountResp, error) {
-	count, err := h.svc.GetUnhandledApplicationCount(ctx, req.GroupId)
+	userID, authErr := authenticatedUserID(ctx)
+	if authErr != nil {
+		return nil, authErr
+	}
+	count, err := h.svc.GetUnhandledApplicationCount(ctx, req.GroupId, userID)
 	if err != nil {
 		return nil, appErrorToStatus(err)
 	}

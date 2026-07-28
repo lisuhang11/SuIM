@@ -126,15 +126,15 @@ message TransferGroupOwnerResp {
 // --------------- UpdateGroupInfo ---------------
 message UpdateGroupInfoReq {
   string group_id = 1;
-  string op_user_id = 2;          // 群主/管理员
-  string group_name = 3;
-  string notification = 4;
-  string introduction = 5;
-  string face_url = 6;
-  int32  need_verification = 7;
-  int32  look_member_info = 8;
-  int32  apply_member_friend = 9;
-  string ex = 10;
+  string op_user_id = 2;          // deprecated: 服务端使用认证上下文中的用户
+  optional string group_name = 3;
+  optional string notification = 4;
+  optional string introduction = 5;
+  optional string face_url = 6;
+  optional int32  need_verification = 7;
+  optional int32  look_member_info = 8;
+  optional int32  apply_member_friend = 9;
+  optional string ex = 10;
 }
 message UpdateGroupInfoResp {
   bool success = 1;

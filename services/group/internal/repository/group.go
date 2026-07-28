@@ -36,6 +36,13 @@ func NewGroupRepository(db *gorm.DB) interfaces.GroupRepository {
 	return &groupRepository{db: db}
 }
 
+// WithinTransaction 将回调中的所有仓储操作绑定到同一个 GORM 事务。
+func (r *groupRepository) WithinTransaction(ctx context.Context, fn func(interfaces.GroupRepository) error) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(&groupRepository{db: tx})
+	})
+}
+
 // CreateGroup 持久化群组记录。
 func (r *groupRepository) CreateGroup(ctx context.Context, g *types.Group) error {
 	return r.db.WithContext(ctx).Create(g).Error

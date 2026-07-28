@@ -3,7 +3,7 @@
 // ============================================================
 // UserAvatar — 用户头像组件（首字母 Fallback）
 // ============================================================
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface UserAvatarProps {
@@ -45,22 +45,17 @@ export default function UserAvatar({
   className,
 }: UserAvatarProps) {
   const sizeClass = sizeMap[size];
+  const [failed, setFailed] = useState(false);
 
-  if (src) {
+  useEffect(() => setFailed(false), [src]);
+
+  if (src && !failed) {
     return (
       <img
         src={src}
         alt={name}
         className={cn(sizeClass, "rounded-full object-cover flex-shrink-0", className)}
-        onError={(e) => {
-          // Fallback: 隐藏图片，显示文字头像
-          (e.target as HTMLImageElement).style.display = "none";
-          const parent = (e.target as HTMLImageElement).parentElement;
-          if (parent) {
-            const fallback = parent.querySelector("[data-fallback]") as HTMLElement;
-            if (fallback) fallback.style.display = "flex";
-          }
-        }}
+        onError={() => setFailed(true)}
       />
     );
   }

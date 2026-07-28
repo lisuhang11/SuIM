@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -59,11 +58,11 @@ func ValidatePasswordPolicy(password string) error {
 	return nil
 }
 
-// getJwtSecret 获取 JWT 密钥，优先使用环境变量 JWT_SECRET，否则生成随机密钥。
-func getJwtSecret() string {
+// getJwtSecret 获取 JWT 密钥，优先使用配置中的 JWTSecret，否则生成随机密钥。
+func (s *userService) getJwtSecret() string {
 	jwtSecretOnce.Do(func() {
-		if envSecret := strings.TrimSpace(os.Getenv("JWT_SECRET")); envSecret != "" {
-			jwtSecret = envSecret
+		if s.config.JWTSecret != "" {
+			jwtSecret = s.config.JWTSecret
 			return
 		}
 		randomBytes := make([]byte, 32)
@@ -272,7 +271,7 @@ func (s *userService) GenerateTokens(
 		"iat":     now.Unix(),
 		"exp":     accessExpireAt.Unix(),
 	}
-	accessToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString([]byte(getJwtSecret()))
+	accessToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString([]byte(s.getJwtSecret()))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign access token: %w", err)
 	}
@@ -284,7 +283,7 @@ func (s *userService) GenerateTokens(
 		"iat":     now.Unix(),
 		"exp":     refreshExpireAt.Unix(),
 	}
-	refreshToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(getJwtSecret()))
+	refreshToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(s.getJwtSecret()))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign refresh token: %w", err)
 	}
@@ -321,7 +320,7 @@ func (s *userService) ValidateToken(ctx context.Context, tokenString string) (*t
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(getJwtSecret()), nil
+		return []byte(s.getJwtSecret()), nil
 	})
 	if err != nil || !token.Valid {
 		return nil, errors.New("invalid token")
@@ -365,12 +364,12 @@ func isRefreshTokenClaims(claims jwt.MapClaims) bool {
 }
 
 // userIDFromSignedToken 从已签名的 JWT 中提取 user_id（不做完整校验）。
-func userIDFromSignedToken(tokenString string) (string, error) {
+func (s *userService) userIDFromSignedToken(tokenString string) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(getJwtSecret()), nil
+		return []byte(s.getJwtSecret()), nil
 	}, jwt.WithoutClaimsValidation())
 	if err != nil || token == nil || !token.Valid {
 		return "", errors.New("invalid token")
@@ -397,7 +396,7 @@ func (s *userService) RefreshToken(
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(getJwtSecret()), nil
+		return []byte(s.getJwtSecret()), nil
 	})
 	if err != nil || !token.Valid {
 		return "", "", errors.New("invalid refresh token")
@@ -442,7 +441,7 @@ func (s *userService) RefreshToken(
 
 // Logout 吊销指定用户的所有令牌以实现登出。
 func (s *userService) Logout(ctx context.Context, tokenString string) error {
-	userID, err := userIDFromSignedToken(tokenString)
+	userID, err := s.userIDFromSignedToken(tokenString)
 	if err != nil {
 		return err
 	}

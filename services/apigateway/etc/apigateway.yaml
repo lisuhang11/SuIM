@@ -1,0 +1,17 @@
+# API Gateway 配置文件
+listen_addr: ":9000"
+metrics_addr: ":9090"
+jwt_secret: "change-me-in-production"
+service_addr: "127.0.0.1:9000"
+rate_limit:
+  enabled: true
+  rate: 100.0
+  burst: 200
+cors_origins:
+  - "*"
+etcd_endpoints:
+  - "127.0.0.1:2379"
+etcd_username: ""
+etcd_password: ""
+etcd_dial_timeout: 5s
+etcd_config_key: "/suim/gateway/config"

@@ -1,0 +1,32 @@
+# ===== 前端 (Next.js) =====
+frontend/node_modules/
+frontend/.next/
+frontend/.env*.local
+frontend/out/
+frontend/.turbo/
+
+# ===== Go =====
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== 通用 =====
+*.log
+.env
+.env.local

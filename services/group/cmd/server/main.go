@@ -1,8 +1,9 @@
 // Package main 提供 group gRPC 服务的入口，负责初始化群组管理、成员和入群请求等模块并启动服务。
-// 同时连接 user 服务用于用户存在性校验。
+// 通过 etcd 服务发现连接 user 服务进行用户存在性校验。
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log/slog"
 	"net"
@@ -17,26 +18,42 @@ import (
 	"group/internal/service"
 
 	pb "SuIM/proto/grouppb"
+	"SuIM/pkg/discovery"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 )
 
-// main 是服务入口，依次初始化配置、数据库、user 服务客户端、仓库、服务、gRPC 服务器并开始监听。
+// main 是服务入口，依次初始化配置、注册 etcd、连接数据库、通过 etcd 发现 user 服务、启动 gRPC 服务器。
 func main() {
 	// 初始化结构化 JSON 日志。
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})))
 
-	cfg := config.Load()
+	configPath := flag.String("config", "etc/group.yaml", "config file path")
+	flag.Parse()
+	cfg := config.LoadFromFile(*configPath)
+
+	// 注册到 etcd 服务发现。
+	discovery.SetEndpoints(cfg.EtcdEndpoints)
+	registry, err := discovery.NewRegistry("group", cfg.ServiceAddr, cfg.EtcdEndpoints)
+	if err != nil {
+		panic(fmt.Sprintf("failed to register with etcd: %v", err))
+	}
+	defer registry.Deregister()
+
 	db := database.MustOpen(cfg)
 
-	// 连接 user 服务进行用户存在性校验（非阻塞连接）。
-	userConn, err := grpc.NewClient(cfg.UserServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// 通过 etcd 服务发现连接 user 服务进行用户存在性校验。
+	userConn, err := grpc.NewClient(
+		discovery.TargetURL("user"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+	)
 	if err != nil {
-		panic(fmt.Sprintf("failed to connect to user service: %v", err))
+		panic(fmt.Sprintf("failed to connect to user service via etcd: %v", err))
 	}
 	defer userConn.Close()
 	userVerifier := client.NewUserVerifier(userConn)

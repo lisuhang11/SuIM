@@ -2,6 +2,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log/slog"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"user/internal/service"
 
 	pb "SuIM/proto/userpb"
+	"SuIM/pkg/discovery"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -25,7 +27,18 @@ func main() {
 		Level: slog.LevelInfo,
 	})))
 
-	cfg := config.Load()
+	configPath := flag.String("config", "etc/user.yaml", "config file path")
+	flag.Parse()
+	cfg := config.LoadFromFile(*configPath)
+
+	// 注册到 etcd 服务发现。
+	discovery.SetEndpoints(cfg.EtcdEndpoints)
+	registry, err := discovery.NewRegistry("user", cfg.ServiceAddr, cfg.EtcdEndpoints)
+	if err != nil {
+		panic(fmt.Sprintf("failed to register with etcd: %v", err))
+	}
+	defer registry.Deregister()
+
 	db := database.MustOpen(cfg)
 
 	userRepo := repository.NewUserRepository(db)

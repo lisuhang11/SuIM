@@ -61,12 +61,28 @@ export default function GroupsPanel() {
     (g) => !search.trim() || g.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleOpenChat = (group: Group) => {
+  const handleOpenChat = async (group: Group) => {
     const existing = conversations.find(
       (c) => c.type === "group" && c.conversationId === group.groupId
     );
     if (existing) {
       setActiveConversation(existing.conversationId);
+      return;
+    }
+
+    // 自动创建群聊会话
+    try {
+      const api = await import("@/services/api");
+      const conv = await api.createGroupConversation({
+        name: group.name,
+        memberIds: [],
+      });
+      refreshConversations();
+      if (conv?.conversationId) {
+        setActiveConversation(conv.conversationId);
+      }
+    } catch {
+      refreshConversations();
     }
   };
 

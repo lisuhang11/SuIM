@@ -76,11 +76,13 @@ function toUser(info: Record<string, unknown>): User {
 }
 
 // 后端会话响应 -> 前端 Conversation
+// 注意: 后端 conversation_type: 1 = 私聊(single), 2 = 群聊(group)
 function toConversation(raw: Record<string, unknown>): Conversation {
+  const rawType = raw.conversation_type !== undefined ? Number(raw.conversation_type) : undefined;
   return {
     conversationId: String(raw.conversation_id ?? raw.conversationId ?? ""),
-    type: (raw.conversation_type !== undefined
-      ? (Number(raw.conversation_type) === 1 ? "group" : "private")
+    type: (rawType !== undefined
+      ? (rawType === 2 ? "group" : "private")  // 1=single, 2=group
       : String(raw.type || "private")) as Conversation["type"],
     title: String(raw.title || raw.group_name || ""),
     avatar: String(raw.face_url ?? raw.avatar ?? ""),
@@ -252,45 +254,73 @@ export async function getMessages(
 
 // ---------- 联系人 ----------
 // 网关路径: GET /api/v1/relations/friends
+// 后端返回 { friend_ids: [...], total: N }，需要批量获取用户信息
 export async function getContacts(): Promise<Contact[]> {
-  const res = await request<ApiResponse<Record<string, unknown>[] | { friends: unknown[] }>>(
+  const res = await request<ApiResponse<{ friend_ids?: string[] }>>(
     "/relations/friends"
   );
-  const data = res.data;
-  if (!data) return [];
-  const list = Array.isArray(data)
-    ? data
-    : (data as { friends?: unknown[] }).friends || [];
-  return list.map((item) => ({
-    userId: String((item as Record<string, unknown>).user_id ?? (item as Record<string, unknown>).userId ?? ""),
-    displayName: String((item as Record<string, unknown>).nickname ?? (item as Record<string, unknown>).displayName ?? ""),
-    username: String((item as Record<string, unknown>).nickname ?? (item as Record<string, unknown>).username ?? ""),
-    avatar: String((item as Record<string, unknown>).avatar_url ?? (item as Record<string, unknown>).avatar ?? ""),
-    status: "offline" as const,
-    isFriend: true,
-  }));
+  const friendIds = res.data?.friend_ids;
+  if (!friendIds || friendIds.length === 0) return [];
+
+  // 批量获取用户信息
+  try {
+    const users = await getUsersBatch(friendIds);
+    return users.map((u) => ({
+      userId: u.userId,
+      displayName: u.displayName,
+      username: u.username,
+      avatar: u.avatar,
+      status: "offline" as const,
+      isFriend: true,
+    }));
+  } catch {
+    // 回退：仅返回 ID
+    return friendIds.map((id) => ({
+      userId: id,
+      displayName: id,
+      username: id,
+      avatar: "",
+      status: "offline" as const,
+      isFriend: true,
+    }));
+  }
+}
+
+// 网关路径: GET /api/v1/users/batch?ids=1,2,3
+// 后端返回 { users: [...] }，需传入已认证身份
+async function getUsersBatch(userIds: string[]): Promise<User[]> {
+  const params = userIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&");
+  const res = await request<ApiResponse<{ users: Record<string, unknown>[] }>>(
+    `/users/batch?${params}`
+  );
+  const users = res.data?.users;
+  if (!users) return [];
+  return users.map((item) => toUser(item));
 }
 
 // 网关路径: GET /api/v1/users/search?keyword=
+// 后端返回 { users: [...], total: N }
 export async function searchUsers(query: string): Promise<User[]> {
-  const res = await request<ApiResponse<Record<string, unknown>[]>>(
+  const res = await request<ApiResponse<{ users: Record<string, unknown>[] }>>(
     `/users/search?keyword=${encodeURIComponent(query)}`
   );
   const data = res.data;
-  if (!data || !Array.isArray(data)) return [];
-  return data.map((item) => toUser(item));
+  if (!data) return [];
+  const list = (data as { users?: Record<string, unknown>[] }).users || [];
+  return list.map((item) => toUser(item));
 }
 
 // ---------- 好友请求 ----------
 // POST /api/v1/relations/friend-requests
 // body: { from_user_id, to_user_id, message }
 export async function sendFriendRequest(
+  fromUserId: string,
   toUserId: string,
   message: string = ""
 ): Promise<void> {
   await request("/relations/friend-requests", {
     method: "POST",
-    body: JSON.stringify({ to_user_id: toUserId, message }),
+    body: JSON.stringify({ from_user_id: fromUserId, to_user_id: toUserId, message }),
   });
 }
 

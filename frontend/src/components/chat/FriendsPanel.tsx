@@ -52,7 +52,8 @@ export default function FriendsPanel() {
     fetchBadge();
   }, [fetchBadge]);
 
-  const handleStartChat = (contact: Contact) => {
+  const handleStartChat = async (contact: Contact) => {
+    // 查找已有私聊会话
     const existing = conversations.find(
       (c) =>
         c.type === "private" &&
@@ -60,6 +61,20 @@ export default function FriendsPanel() {
     );
     if (existing) {
       setActiveConversation(existing.conversationId);
+      return;
+    }
+
+    // 自动创建私聊会话
+    try {
+      const api = await import("@/services/api");
+      const conv = await api.createPrivateConversation(contact.userId);
+      refreshConversations();
+      if (conv?.conversationId) {
+        setActiveConversation(conv.conversationId);
+      }
+    } catch {
+      // 回退：尝试再次刷新会话列表
+      refreshConversations();
     }
   };
 
@@ -256,7 +271,7 @@ function SearchAndAdd({ onBack, currentUser }: { onBack: () => void; currentUser
     setFeedback(null);
     try {
       const api = await import("@/services/api");
-      await api.sendFriendRequest(targetUser.userId, "");
+      await api.sendFriendRequest(currentUser.userId, targetUser.userId, "");
     } catch { /* fallback */ }
     setSentSet((prev) => new Set(prev).add(targetUser.userId));
     setFeedback({ type: "success", message: `已向 ${targetUser.displayName} 发送好友请求` });

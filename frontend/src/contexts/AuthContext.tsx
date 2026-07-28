@@ -105,6 +105,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // 联调模式：直接调用真实 API
       const res = await api.register(data);
+      // 注册后自动登录以获取 token（后端注册接口不返回 token）
+      if (!res.token) {
+        try {
+          const loginRes = await api.login({
+            username: data.email,
+            password: data.password,
+          });
+          storage.setToken(loginRes.token);
+          storage.setCachedUser(loginRes.user);
+          setState({
+            user: loginRes.user,
+            isLoading: false,
+            isAuthenticated: true,
+            error: null,
+          });
+          wsManager.connect();
+          return;
+        } catch {
+          // 登录失败，但注册已成功，使用注册返回的用户信息
+        }
+      }
       if (res.token) storage.setToken(res.token);
       storage.setCachedUser(res.user);
       setState({

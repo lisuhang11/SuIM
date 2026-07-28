@@ -13,14 +13,14 @@ import { cn } from "@/lib/utils";
 export default function LoginForm() {
   const router = useRouter();
   const { login, isLoading, error, clearError } = useAuth();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login({ username, password });
+      await login({ username: email, password });
       router.push("/chat");
     } catch {
       // error is set in context
@@ -48,18 +48,18 @@ export default function LoginForm() {
             </div>
           )}
 
-          {/* Username */}
+          {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">用户名 / 邮箱</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">邮箱</label>
             <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="请输入用户名或邮箱"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="请输入邮箱地址"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400
                 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
               required
-              autoComplete="username"
+              autoComplete="email"
             />
           </div>
 

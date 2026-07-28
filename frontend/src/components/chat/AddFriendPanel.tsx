@@ -53,13 +53,13 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
   }, [currentUser?.userId, sentSet]);
 
   const handleSendRequest = useCallback(async (targetUser: User) => {
-    if (sendingId) return;
+    if (sendingId || !currentUser) return;
     setSendingId(targetUser.userId);
     setFeedback(null);
 
     try {
       const api = await import("@/services/api");
-      await api.sendFriendRequest(targetUser.userId, "");
+      await api.sendFriendRequest(currentUser.userId, targetUser.userId, "");
       setSentSet((prev) => new Set(prev).add(targetUser.userId));
       setFeedback({ type: "success", message: `已向 ${targetUser.displayName} 发送好友请求` });
       // 更新结果列表
@@ -73,7 +73,7 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
     } finally {
       setSendingId(null);
     }
-  }, [sendingId]);
+  }, [sendingId, currentUser]);
 
   return (
     <div className={embedded ? "h-full flex flex-col bg-white" : "h-full flex flex-col bg-white"}>

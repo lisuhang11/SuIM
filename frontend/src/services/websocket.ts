@@ -29,28 +29,20 @@ class WebSocketManager {
       return;
     }
 
-    // 断开已有连接（切换账号时）
-    if (this.ws) {
-      this.shouldReconnect = false;
-      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
-        this.ws.close(1000, "Reconnect");
-      }
-      this.ws = null;
-      this.setConnected(false);
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      return; // 已连接
     }
 
     this.shouldReconnect = true;
 
     try {
-      const url = `${WS_BASE}?token=${encodeURIComponent(token)}`;
-      console.log("[WS] Connecting...");
-      this.ws = new WebSocket(url);
+      this.ws = new WebSocket(`${WS_BASE}?token=${token}`);
       this.ws.onopen = this.onOpen.bind(this);
       this.ws.onmessage = this.onMessage.bind(this);
       this.ws.onclose = this.onClose.bind(this);
       this.ws.onerror = this.onError.bind(this);
     } catch (err) {
-      console.error("[WS] Constructor error:", err);
+      console.error("[WS] Failed to connect:", err);
       this.scheduleReconnect();
     }
   }
@@ -158,14 +150,8 @@ class WebSocketManager {
     }
   }
 
-  private onError(event: Event): void {
-    const ws = this.ws;
-    const readyState = ws?.readyState;
-    const states = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
-    console.error(
-      `[WS] Error (readyState=${readyState != null ? states[readyState] ?? readyState : "null"})`,
-      event
-    );
+  private onError(): void {
+    console.error("[WS] Error");
     // onClose will be called after onError
   }
 

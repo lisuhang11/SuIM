@@ -2,22 +2,23 @@
 
 // ============================================================
 // SidebarNav — 纵向图标导航栏
-// 三个栏目：会话 | 好友 | 群聊
+// 类似 Slack/Discord/QQ 桌面端的左侧图标栏
 // ============================================================
-import React, { useEffect, useState, useCallback } from "react";
+import React from "react";
 import {
   MessageSquare,
   Users,
-  UserPlus,
+  Bell,
+  Settings,
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import UserAvatar from "../shared/UserAvatar";
-import { wsManager } from "@/services/websocket";
+import { mockIncomingRequests } from "@/data/mock";
 
-export type NavSection = "chats" | "friends" | "groups";
+export type NavSection = "chats" | "contacts" | "requests" | "settings";
 
 interface SidebarNavProps {
   activeSection: NavSection;
@@ -27,36 +28,7 @@ interface SidebarNavProps {
 export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [friendBadge, setFriendBadge] = useState(0);
-  const [groupBadge, setGroupBadge] = useState(0);
-  const [wsConnected, setWsConnected] = useState(false);
-
-  // 监听 WebSocket 连接状态
-  useEffect(() => {
-    const unsub = wsManager.onStatusChange(setWsConnected);
-    return unsub;
-  }, []);
-
-  // 定期拉取未处理的好友请求数 & 入群申请数
-  const fetchBadges = useCallback(async () => {
-    try {
-      const api = await import("@/services/api");
-      const [friendCount, groupCount] = await Promise.allSettled([
-        api.getUnhandledRequestCount(),
-        api.getUnhandledGroupApplicationCount(),
-      ]);
-      if (friendCount.status === "fulfilled") setFriendBadge(friendCount.value);
-      if (groupCount.status === "fulfilled") setGroupBadge(groupCount.value);
-    } catch {
-      // 忽略，使用 mock badge
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchBadges();
-    const timer = setInterval(fetchBadges, 30000); // 30s 轮询
-    return () => clearInterval(timer);
-  }, [fetchBadges]);
+  const incomingCount = mockIncomingRequests.length;
 
   const navItems: {
     id: NavSection;
@@ -64,9 +36,10 @@ export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProp
     label: string;
     badge?: number;
   }[] = [
-    { id: "chats", icon: MessageSquare, label: "会话" },
-    { id: "friends", icon: Users, label: "好友", badge: friendBadge },
-    { id: "groups", icon: UserPlus, label: "群聊", badge: groupBadge },
+    { id: "chats", icon: MessageSquare, label: "聊天" },
+    { id: "contacts", icon: Users, label: "联系人" },
+    { id: "requests", icon: Bell, label: "好友请求", badge: incomingCount },
+    { id: "settings", icon: Settings, label: "设置" },
   ];
 
   const handleLogout = async () => {
@@ -76,24 +49,16 @@ export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProp
 
   return (
     <div className="h-full w-16 flex flex-col items-center bg-gray-900 text-gray-300 py-3 gap-1 flex-shrink-0 select-none">
-      {/* 用户头像 + WS 状态指示 */}
+      {/* 用户头像 */}
       <button
         onClick={() => onNavigate("chats")}
-        className="mb-2 relative"
+        className="mb-2"
         title={user?.displayName || user?.username || "用户"}
       >
         <UserAvatar
           name={user?.displayName || user?.username || ""}
           size="sm"
           className="ring-2 ring-gray-700 hover:ring-indigo-400 transition-all"
-        />
-        {/* WebSocket 连接状态指示器 */}
-        <span
-          className={cn(
-            "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900 transition-colors",
-            wsConnected ? "bg-green-400" : "bg-red-400"
-          )}
-          title={wsConnected ? "实时连接正常" : "实时连接断开"}
         />
       </button>
 
@@ -133,17 +98,16 @@ export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProp
         </button>
       ))}
 
-      {/* 底部操作 — 退出登录 */}
+      {/* 底部操作 */}
       <div className="mt-auto flex flex-col items-center gap-1 pb-2">
         <button
           onClick={handleLogout}
           className="w-11 h-11 flex items-center justify-center rounded-xl
-            text-gray-300 hover:text-red-400 hover:bg-red-500/20 transition-all duration-200 group relative"
+            text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-all duration-200 group"
           title="退出登录"
         >
           <LogOut className="w-5 h-5" />
-          {/* 悬停提示 */}
-          <div className="absolute left-full ml-3 px-2 py-1 bg-red-600 text-white text-xs rounded-md
+          <div className="absolute left-full ml-3 px-2 py-1 bg-gray-800 text-white text-xs rounded-md
             opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
             退出登录
           </div>

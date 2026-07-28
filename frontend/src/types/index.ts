@@ -7,6 +7,7 @@ export type UserStatus = "online" | "offline" | "away" | "busy";
 
 export interface User {
   userId: string;
+  suid: string;
   username: string;
   displayName: string;
   avatar: string;
@@ -87,6 +88,13 @@ export interface SendMessageRequest {
   mentions?: string[];
 }
 
+// ---------- 搜索用户（带好友关系状态）----------
+export interface SearchedUser extends User {
+  isFriend: boolean;
+  hasSentRequest: boolean;
+  hasIncomingRequest: boolean;
+}
+
 // ---------- 联系人 ----------
 export interface Contact {
   userId: string;
@@ -99,25 +107,34 @@ export interface Contact {
 }
 
 // ---------- 好友请求 ----------
-export type FriendRequestStatus = "pending" | "accepted" | "rejected";
+export type FriendRequestStatus = "pending" | "accepted" | "declined";
 
 export interface FriendRequest {
   requestId: string;
   fromUserId: string;
+  fromUsername: string;
+  fromDisplayName: string;
+  fromAvatar: string;
   toUserId: string;
-  fromUser?: User;
-  toUser?: User;
   message: string;
   status: FriendRequestStatus;
   createdAt: string;
-  updatedAt: string;
+  fromUser?: User;
+  toUser?: User;
+  updatedAt?: string;
 }
 
-// 前端专用：搜索用户结果（含好友状态）
-export interface SearchedUser extends User {
-  isFriend: boolean;
-  hasSentRequest: boolean;
-  hasIncomingRequest: boolean;
+// ---------- 通知 ----------
+export type NotificationType = "friend_request" | "group_invite" | "mention" | "system";
+
+export interface Notification {
+  notificationId: string;
+  type: NotificationType;
+  title: string;
+  content: string;
+  isRead: boolean;
+  refId?: string; // 关联 ID（会话/请求/群组等）
+  createdAt: string;
 }
 
 // ---------- 群组 ----------
@@ -133,50 +150,7 @@ export interface Group {
   avatar: string;
   ownerId: string;
   memberCount: number;
-  introduction?: string;
-  notification?: string;
-  needVerification?: boolean;
-  isMuted?: boolean;
   createdAt: string;
-}
-
-// 群成员
-export interface GroupMemberInfo {
-  userId: string;
-  groupId: string;
-  displayName: string;
-  username: string;
-  avatar: string;
-  roleLevel: number; // 0=普通成员, 1=管理员, 2=群主
-  muteEndTime: number; // Unix 时间戳毫秒，0 表示未禁言
-  joinedAt: string;
-}
-
-// 入群申请
-export type GroupApplicationStatus = "pending" | "accepted" | "rejected";
-
-export interface GroupApplication {
-  applicationId: string;
-  groupId: string;
-  userId: string;
-  user?: User;
-  groupName?: string;
-  message: string;
-  status: GroupApplicationStatus;
-  handleUserId?: string;
-  handleMsg?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// 群信息更新
-export interface UpdateGroupRequest {
-  groupId: string;
-  name?: string;
-  avatar?: string;
-  introduction?: string;
-  notification?: string;
-  needVerification?: boolean;
 }
 
 // ---------- WebSocket 消息协议 ----------

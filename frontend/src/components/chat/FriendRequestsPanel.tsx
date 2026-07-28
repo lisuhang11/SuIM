@@ -9,14 +9,21 @@ import { useChat } from "@/contexts/ChatContext";
 import UserAvatar from "../shared/UserAvatar";
 import { cn } from "@/lib/utils";
 import type { FriendRequest } from "@/types";
+import {
+  mockIncomingRequests,
+  mockOutgoingRequests,
+  mockUsers,
+  mockSentRequestUserIds,
+  mockIncomingRequestUserIds,
+} from "@/data/mock";
 
 type TabType = "incoming" | "outgoing";
 
 export default function FriendRequestsPanel() {
   const { refreshConversations } = useChat();
   const [tab, setTab] = useState<TabType>("incoming");
-  const [incomingReqs, setIncomingReqs] = useState<FriendRequest[]>([]);
-  const [outgoingReqs, setOutgoingReqs] = useState<FriendRequest[]>([]);
+  const [incomingReqs, setIncomingReqs] = useState<FriendRequest[]>(mockIncomingRequests);
+  const [outgoingReqs, setOutgoingReqs] = useState<FriendRequest[]>(mockOutgoingRequests);
   const [loading, setLoading] = useState(false);
   const [handlingId, setHandlingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -27,13 +34,25 @@ export default function FriendRequestsPanel() {
     try {
       const api = await import("@/services/api");
       const [incomingRes, outgoingRes] = await Promise.allSettled([
-        api.getIncomingRequests({ handleResults: [0] }),
-        api.getOutgoingRequests({ handleResults: [0] }),
+        api.getIncomingFriendRequests(20, 0),
+        api.getOutgoingRequests(20, 0, [0]),
       ]);
-      if (incomingRes.status === "fulfilled") setIncomingReqs(incomingRes.value);
-      if (outgoingRes.status === "fulfilled") setOutgoingReqs(outgoingRes.value);
+      if (incomingRes.status === "fulfilled" && incomingRes.value.length > 0) {
+        const enriched = incomingRes.value.map((req) => ({
+          ...req,
+          fromUser: mockUsers.find((u) => u.userId === req.fromUserId),
+        })) as unknown as FriendRequest[];
+        setIncomingReqs(enriched);
+      }
+      if (outgoingRes.status === "fulfilled" && outgoingRes.value.length > 0) {
+        const enriched = outgoingRes.value.map((req) => ({
+          ...req,
+          toUser: mockUsers.find((u) => u.userId === req.toUserId),
+        })) as unknown as FriendRequest[];
+        setOutgoingReqs(enriched);
+      }
     } catch {
-      // API 不可用
+      // 使用 mock 数据
     } finally {
       setLoading(false);
     }
@@ -70,7 +89,7 @@ export default function FriendRequestsPanel() {
           refreshConversations();
         }
       } catch {
-        // API 不可用
+        // mock 回退
         setIncomingReqs((prev) => prev.filter((r) => r.requestId !== request.requestId));
         setFeedback({
           type: "success",

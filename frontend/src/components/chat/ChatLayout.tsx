@@ -1,36 +1,59 @@
 "use client";
 
 // ============================================================
-// ChatLayout — 3 栏布局：图标导航 | 面板 | 聊天区域
-// 三个栏目：会话 | 好友 | 群聊
+// ChatLayout — 聊天页面主布局（可拖拽调整面板宽度）
 // ============================================================
-import React, { useState, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChat } from "@/contexts/ChatContext";
 import { useRouter } from "next/navigation";
-import SidebarNav from "./SidebarNav";
-import type { NavSection } from "./SidebarNav";
+import { cn } from "@/lib/utils";
 import ConversationList from "./ConversationList";
-import FriendsPanel from "./FriendsPanel";
-import GroupsPanel from "./GroupsPanel";
 import ChatArea from "./ChatArea";
 import EmptyChat from "./EmptyChat";
+import { getConversationById, getMessagesByConversationId } from "@/data/mock";
+
+const MIN_PANEL_W = 140;
+const MAX_PANEL_W = 600;
+const DEFAULT_PANEL_W = 320;
 
 export default function ChatLayout() {
   const { user, isLoading } = useAuth();
-  const { activeConversationId, messages, conversations } = useChat();
+  const { activeConversationId, messages } = useChat();
   const router = useRouter();
-  const [navSection, setNavSection] = useState<NavSection>("chats");
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_W);
+  const [dragging, setDragging] = useState(false);
+  const dragStartX = useRef(0);
+  const dragStartW = useRef(DEFAULT_PANEL_W);
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    setDragging(true);
+    dragStartX.current = e.clientX;
+    dragStartW.current = panelWidth;
+    e.preventDefault();
+  }, [panelWidth]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const handleMove = (e: MouseEvent) => {
+      const delta = e.clientX - dragStartX.current;
+      const newW = Math.min(MAX_PANEL_W, Math.max(MIN_PANEL_W, dragStartW.current + delta));
+      setPanelWidth(newW);
+    };
+    const handleUp = () => setDragging(false);
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [dragging]);
 
   React.useEffect(() => {
     if (!isLoading && !user && process.env.NODE_ENV !== "development") {
       router.replace("/login");
     }
   }, [user, isLoading, router]);
-
-  const handleNavigate = useCallback((section: NavSection) => {
-    setNavSection(section);
-  }, []);
 
   if (isLoading) {
     return (
@@ -41,34 +64,37 @@ export default function ChatLayout() {
   }
 
   const activeConversation = activeConversationId
-    ? conversations.find((c) => c.conversationId === activeConversationId) ?? null
+    ? getConversationById(activeConversationId)
     : null;
   const activeMessages = activeConversationId
-    ? messages[activeConversationId] || []
+    ? messages[activeConversationId] || getMessagesByConversationId(activeConversationId)
     : [];
 
   return (
-    <div className="h-screen flex bg-gray-50 overflow-hidden">
-      {/* 栏 1: 图标导航 (64px) — 会话 | 好友 | 群聊 */}
-      <SidebarNav activeSection={navSection} onNavigate={handleNavigate} />
-
-      {/* 栏 2: 内容面板 (280px) — 桌面端始终可见 */}
-      <div className="hidden md:flex w-72 flex-shrink-0 border-r border-gray-200 bg-white">
-        {navSection === "chats" && <ConversationList />}
-        {navSection === "friends" && <FriendsPanel />}
-        {navSection === "groups" && <GroupsPanel />}
+    <div className={cn("h-screen flex bg-white overflow-hidden", dragging && "select-none cursor-col-resize")}>
+      {/* ConversationList 自带垂直导航栏 + 内容面板 */}
+      <div style={{ width: panelWidth }} className="flex-shrink-0 border-r border-gray-100">
+        <ConversationList panelWidth={panelWidth} />
       </div>
 
-      {/* 栏 3: 聊天区域 — flex-1 */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white">
+      {/* 拖拽手柄 */}
+      <div
+        onMouseDown={handleDragStart}
+        className={cn(
+          "w-1.5 flex-shrink-0 cursor-col-resize relative z-30",
+          "hover:bg-indigo-400/30 active:bg-indigo-400/50 transition-colors",
+          dragging && "bg-indigo-400/50"
+        )}
+      >
+        <div className="absolute inset-y-0 -left-1 -right-1" />
+      </div>
+
+      {/* 右侧聊天区 */}
+      <div className="flex-1 flex flex-col min-w-0">
         {activeConversation ? (
-          <ChatArea
-            conversation={activeConversation}
-            messages={activeMessages}
-            onBack={() => {}}
-          />
+          <ChatArea conversation={activeConversation} messages={activeMessages} />
         ) : (
-          <EmptyChat />
+          <div className="hidden md:flex flex-1"><EmptyChat /></div>
         )}
       </div>
     </div>

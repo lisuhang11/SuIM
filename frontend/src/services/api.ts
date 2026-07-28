@@ -11,19 +11,39 @@ import type {
   Conversation,
   Message,
   Contact,
-  FriendRequest,
   CreateGroupRequest,
   Group,
-  GroupMemberInfo,
-  GroupApplication,
-  UpdateGroupRequest,
+  FriendRequest,
 } from "@/types";
 
-// 开发/联调时通过 Next.js rewrites 代理到 Docker 后端，避免跨域和网络不通问题
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
-const REQUEST_TIMEOUT = 10_000; // 10 秒超时
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9000/api/v1";
 
-// ---------- 通用请求（带超时） ----------
+// ---------- 通用请求 ----------
+const ERROR_ZH: Record<string, string> = {
+  // 认证
+  "missing or invalid authorization header": "缺少或无效的认证头",
+  "empty token": "令牌为空",
+  "invalid or expired token": "令牌无效或已过期",
+  "token missing user identity": "令牌缺少用户标识",
+  "not authenticated": "未登录",
+  // 用户
+  "user not found": "用户不存在",
+  "user already exists": "该用户已存在",
+  "invalid password": "密码错误",
+  "password must be 8-32 characters with at least one letter and one number": "密码需8-32位，包含字母和数字",
+  "account is disabled": "账号已被禁用",
+  "invalid email format": "邮箱格式不正确",
+  "username, email and password are required": "用户名、邮箱和密码为必填项",
+  "email and password are required": "邮箱和密码为必填项",
+  "failed to create user": "创建用户失败",
+  // 通用
+  "internal server error": "服务器内部错误",
+  "too many requests": "请求过于频繁，请稍后再试",
+};
+function translateError(msg: string): string {
+  return ERROR_ZH[msg] || msg;
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -37,67 +57,52 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers,
+  });
 
-  const fullUrl = `${API_BASE}${endpoint}`;
-  console.log(`[API] ${options.method || "GET"} ${fullUrl}`);
-
-  try {
-    const res = await fetch(fullUrl, {
-      ...options,
-      headers,
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: res.statusText }));
-      console.error(`[API] ${options.method || "GET"} ${fullUrl} → ${res.status}`, err);
-      // 401 时清除本地认证状态，下次刷新页面会跳转登录
-      if (res.status === 401) {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("suim_token");
-          localStorage.removeItem("suim_user");
-        }
-      }
-      throw new Error(err.message || `HTTP ${res.status}`);
-    }
-
-    console.log(`[API] ${options.method || "GET"} ${fullUrl} → ${res.status} OK`);
-    return res.json();
-  } catch (err) {
-    console.error(`[API] ${options.method || "GET"} ${fullUrl} → FAILED`, err);
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    const rawMsg = err.message || `HTTP ${res.status}`;
+    throw new Error(translateError(rawMsg));
   }
+
+  return res.json();
 }
 
 // ---------- 数据类型转换 ----------
-// 后端 UserInfo -> 前端 User
+// 后端 proto UserInfo → 前端 User
+// UserInfo: user_id, nickname, email, avatar_url, create_time, updated_at
+// RegisterReq.username 被存储为 UserInfo.nickname（显示昵称）
+// email 即登录标识，无独立 username 字段
 function toUser(info: Record<string, unknown>): User {
+  const userId = String(info.user_id ?? "");
+  const email = String(info.email ?? "");
+  const nickname = String(info.nickname ?? "");
   return {
-    userId: String(info.user_id ?? info.userId ?? ""),
-    username: String(info.nickname ?? info.username ?? ""),
-    displayName: String(info.nickname ?? info.displayName ?? ""),
-    avatar: String(info.avatar_url ?? info.avatar ?? ""),
-    email: String(info.email ?? ""),
-    status: (info.status as User["status"]) || "offline",
-    lastSeen: info.last_seen ? String(info.last_seen) : undefined,
-    createdAt: info.create_time
+    userId,
+    suid: userId,
+    username: email,               // email 作为登录标识
+    displayName: nickname || email.split("@")[0] || userId,
+    avatar: String(info.avatar_url ?? ""),
+    email,
+    status: "offline",
+    lastSeen: undefined,
+    createdAt: info.create_time && Number(info.create_time) > 0
       ? new Date(Number(info.create_time)).toISOString()
-      : String(info.updated_at ?? info.createdAt ?? new Date().toISOString()),
+      : info.updated_at && Number(info.updated_at) > 0
+        ? new Date(Number(info.updated_at)).toISOString()
+        : new Date().toISOString(),
   };
 }
 
 // 后端会话响应 -> 前端 Conversation
-// 注意: 后端 conversation_type: 1 = 私聊(single), 2 = 群聊(group)
 function toConversation(raw: Record<string, unknown>): Conversation {
-  const rawType = raw.conversation_type !== undefined ? Number(raw.conversation_type) : undefined;
   return {
     conversationId: String(raw.conversation_id ?? raw.conversationId ?? ""),
-    type: (rawType !== undefined
-      ? (rawType === 2 ? "group" : "private")  // 1=single, 2=group
+    type: (raw.conversation_type !== undefined
+      ? (Number(raw.conversation_type) === 1 ? "group" : "private")
       : String(raw.type || "private")) as Conversation["type"],
     title: String(raw.title || raw.group_name || ""),
     avatar: String(raw.face_url ?? raw.avatar ?? ""),
@@ -105,7 +110,7 @@ function toConversation(raw: Record<string, unknown>): Conversation {
     members: Array.isArray(raw.members) ? raw.members : [],
     isPinned: Boolean(raw.is_pinned ?? raw.isPinned ?? false),
     isMuted: Boolean(raw.is_muted ?? raw.isMuted ?? false),
-    lastMessage: (raw.last_message && typeof raw.last_message === "object" ? raw.last_message : raw.lastMessage && typeof raw.lastMessage === "object" ? raw.lastMessage : undefined) as Message | undefined,
+    lastMessage: (raw.last_message || raw.lastMessage || undefined) as Message | undefined,
     createdAt: String(raw.create_time ?? raw.createdAt ?? ""),
     updatedAt: String(raw.updated_at ?? raw.updatedAt ?? ""),
   };
@@ -174,7 +179,7 @@ export async function register(data: RegisterRequest): Promise<AuthResponse> {
 export async function getCurrentUser(): Promise<User> {
   const res = await request<ApiResponse<Record<string, unknown>>>("/users/me");
   const d = res.data || ({} as Record<string, unknown>);
-  return toUser((d.user as Record<string, unknown>) ?? d);
+  return toUser((d.user ?? d) as Record<string, unknown>);
 }
 
 // 网关路径: POST /api/v1/users/logout
@@ -269,28 +274,33 @@ export async function getMessages(
 
 // ---------- 联系人 ----------
 // 网关路径: GET /api/v1/relations/friends
-// 后端返回 { friend_ids: [...], total: N }，需要批量获取用户信息
+// GetFriendsResp: { friend_ids: string[], total: int32 }
 export async function getContacts(): Promise<Contact[]> {
-  const res = await request<ApiResponse<{ friend_ids?: string[] }>>(
+  const res = await request<ApiResponse<{ friend_ids: string[]; total: number }>>(
     "/relations/friends"
   );
-  const friendIds = res.data?.friend_ids;
-  if (!friendIds || friendIds.length === 0) return [];
-
-  // 批量获取用户信息
+  const data = res.data;
+  if (!data?.friend_ids || data.friend_ids.length === 0) return [];
+  // 批量查询用户信息以获取昵称等
   try {
-    const users = await getUsersBatch(friendIds);
-    return users.map((u) => ({
-      userId: u.userId,
-      displayName: u.displayName,
-      username: u.username,
-      avatar: u.avatar,
-      status: "offline" as const,
-      isFriend: true,
-    }));
+    const usersRes = await request<ApiResponse<{ users: Record<string, Record<string, unknown>> }>>(
+      `/users/batch?ids=${data.friend_ids.join(",")}`
+    );
+    const users = usersRes.data?.users || {};
+    return data.friend_ids.map((id) => {
+      const info = users[id] || {};
+      return {
+        userId: id,
+        displayName: String(info.nickname ?? id),
+        username: String(info.email ?? id),
+        avatar: String(info.avatar_url ?? ""),
+        status: "offline" as const,
+        isFriend: true,
+      };
+    });
   } catch {
-    // 回退：仅返回 ID
-    return friendIds.map((id) => ({
+    // batch 查询失败，用 ID 作为显示名
+    return data.friend_ids.map((id) => ({
       userId: id,
       displayName: id,
       username: id,
@@ -301,33 +311,20 @@ export async function getContacts(): Promise<Contact[]> {
   }
 }
 
-// 网关路径: GET /api/v1/users/batch?ids=1,2,3
-// 后端返回 { users: [...] }，需传入已认证身份
-async function getUsersBatch(userIds: string[]): Promise<User[]> {
-  const params = userIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&");
-  const res = await request<ApiResponse<{ users: Record<string, unknown>[] }>>(
-    `/users/batch?${params}`
-  );
-  const users = res.data?.users;
-  if (!users) return [];
-  return users.map((item) => toUser(item));
-}
-
 // 网关路径: GET /api/v1/users/search?keyword=
-// 后端返回 { users: [...], total: N }
+// SearchUsersResp: { users: UserInfo[] }
 export async function searchUsers(query: string): Promise<User[]> {
   const res = await request<ApiResponse<{ users: Record<string, unknown>[] }>>(
     `/users/search?keyword=${encodeURIComponent(query)}`
   );
   const data = res.data;
-  if (!data) return [];
-  const list = (data as { users?: Record<string, unknown>[] }).users || [];
-  return list.map((item) => toUser(item));
+  if (!data?.users || !Array.isArray(data.users)) return [];
+  return data.users.map((item) => toUser(item));
 }
 
-// ---------- 好友请求 ----------
-// POST /api/v1/relations/friend-requests
-// body: { from_user_id, to_user_id, message }
+// ---------- 好友关系 ----------
+// 发送好友请求 POST /api/v1/relations/friend-requests
+// SendFriendRequestReq: { from_user_id, to_user_id, message }
 export async function sendFriendRequest(
   fromUserId: string,
   toUserId: string,
@@ -339,12 +336,11 @@ export async function sendFriendRequest(
   });
 }
 
-// PUT /api/v1/relations/friend-requests/:id/respond
-// body: { from_user_id, to_user_id, handle_result, handle_msg }
+// 响应好友请求 PUT /api/v1/relations/friend-requests/:id/respond
 export async function respondFriendRequest(
   fromUserId: string,
   toUserId: string,
-  handleResult: number,
+  handleResult: 1 | -1,
   handleMsg?: string
 ): Promise<void> {
   await request(`/relations/friend-requests/${fromUserId}/respond`, {
@@ -358,74 +354,56 @@ export async function respondFriendRequest(
   });
 }
 
-// GET /api/v1/relations/incoming-applies?handle_results=0&offset=0&limit=20
-export async function getIncomingRequests(
-  params?: { handleResults?: number[]; offset?: number; limit?: number }
+// 获取收到的好友请求 GET /api/v1/relations/incoming-applies
+// GetIncomingApplyToResp: { requests: FriendRequestInfo[], total: int32 }
+// FriendRequestInfo: { from_user_id, to_user_id, message, handle_msg, status, created_at, updated_at }
+export async function getIncomingFriendRequests(
+  limit: number = 20,
+  offset: number = 0
 ): Promise<FriendRequest[]> {
-  const query = new URLSearchParams();
-  if (params?.handleResults?.length) {
-    query.set("handle_results", params.handleResults.join(","));
-  }
-  if (params?.offset !== undefined) query.set("offset", String(params.offset));
-  if (params?.limit !== undefined) query.set("limit", String(params.limit));
-  const res = await request<ApiResponse<Record<string, unknown>[] | { requests: unknown[] }>>(
-    `/relations/incoming-applies?${query.toString()}`
+  const res = await request<ApiResponse<{ requests: Record<string, unknown>[]; total: number }>>(
+    `/relations/incoming-applies?limit=${limit}&offset=${offset}&handle_results=0`
   );
   const data = res.data;
-  if (!data) return [];
-  const list = Array.isArray(data) ? data : (data as { requests?: unknown[] }).requests || [];
-  return list.map((item) => toFriendRequest(item as Record<string, unknown>));
+  if (!data?.requests) return [];
+  return data.requests.map((item) => ({
+    requestId: `${item.from_user_id ?? ""}_${item.to_user_id ?? ""}`,
+    fromUserId: String(item.from_user_id ?? ""),
+    fromUsername: "",
+    fromDisplayName: String(item.from_user_id ?? ""), // 暂时用 ID，后续可通过 batch 查
+    fromAvatar: "",
+    toUserId: String(item.to_user_id ?? ""),
+    message: String(item.message ?? ""),
+    status: (
+      Number(item.status) === 1 ? "accepted" :
+      Number(item.status) === -1 ? "declined" :
+      "pending"
+    ) as FriendRequest["status"],
+    createdAt: item.created_at && Number(item.created_at) > 0
+      ? new Date(Number(item.created_at)).toISOString()
+      : new Date().toISOString(),
+  }));
 }
 
-// GET /api/v1/relations/outgoing-applies?handle_results=0&offset=0&limit=20
+// 获取发出的好友请求 GET /api/v1/relations/outgoing-applies
 export async function getOutgoingRequests(
-  params?: { handleResults?: number[]; offset?: number; limit?: number }
-): Promise<FriendRequest[]> {
-  const query = new URLSearchParams();
-  if (params?.handleResults?.length) {
-    query.set("handle_results", params.handleResults.join(","));
-  }
-  if (params?.offset !== undefined) query.set("offset", String(params.offset));
-  if (params?.limit !== undefined) query.set("limit", String(params.limit));
-  const res = await request<ApiResponse<Record<string, unknown>[] | { requests: unknown[] }>>(
-    `/relations/outgoing-applies?${query.toString()}`
+  limit: number = 20,
+  offset: number = 0,
+  handleResults: number[] = [0]
+): Promise<{ toUserId: string; toNickname: string; message: string; status: number; createdAt: string }[]> {
+  const handleResultParam = handleResults.map((r) => `handle_results=${r}`).join("&");
+  const res = await request<ApiResponse<{ requests?: unknown[]; total?: number }>>(
+    `/relations/outgoing-applies?limit=${limit}&offset=${offset}&${handleResultParam}`
   );
   const data = res.data;
-  if (!data) return [];
-  const list = Array.isArray(data) ? data : (data as { requests?: unknown[] }).requests || [];
-  return list.map((item) => toFriendRequest(item as Record<string, unknown>));
-}
-
-// GET /api/v1/relations/unhandled-count
-export async function getUnhandledRequestCount(): Promise<number> {
-  const res = await request<ApiResponse<{ count: number }>>(
-    "/relations/unhandled-count"
-  );
-  const count = res.data?.count ?? 0;
-  return count;
-}
-
-// DELETE /api/v1/relations/friends/:friend_id
-export async function deleteFriend(friendId: string): Promise<void> {
-  await request(`/relations/friends/${friendId}`, {
-    method: "DELETE",
-  });
-}
-
-// 后端 FriendRequestInfo (proto) -> 前端 FriendRequest
-function toFriendRequest(raw: Record<string, unknown>): FriendRequest {
-  const statusNum = Number(raw.status ?? raw.handle_result ?? 0);
-  const createdAtMs = Number(raw.created_at ?? raw.create_time ?? 0);
-  const updatedAtMs = Number(raw.updated_at ?? raw.handle_time ?? 0);
-  return {
-    requestId: String(raw.request_id || (raw.from_user_id + "_" + raw.to_user_id)),
-    fromUserId: String(raw.from_user_id ?? raw.fromUserId ?? ""),
-    toUserId: String(raw.to_user_id ?? raw.toUserId ?? ""),
-    message: String(raw.message ?? raw.req_msg ?? ""),
-    status: statusNum === 1 ? "accepted" : statusNum === -1 ? "rejected" : "pending",
-    createdAt: createdAtMs > 0 ? new Date(createdAtMs).toISOString() : "",
-    updatedAt: updatedAtMs > 0 ? new Date(updatedAtMs).toISOString() : "",
-  };
+  if (!data?.requests) return [];
+  return (data.requests as Record<string, unknown>[]).map((item) => ({
+    toUserId: String(item.to_user_id ?? ""),
+    toNickname: String(item.nickname ?? item.to_nickname ?? ""),
+    message: String(item.message ?? ""),
+    status: Number(item.status ?? 0),
+    createdAt: String(item.created_at ?? item.create_time ?? ""),
+  }));
 }
 
 // ---------- 群组 ----------
@@ -439,202 +417,14 @@ export async function getGroups(): Promise<Group[]> {
   const list = Array.isArray(data)
     ? data
     : (data as { groups?: unknown[] }).groups || [];
-  return list.map((item) => ({
-    groupId: String((item as Record<string, unknown>).group_id ?? (item as Record<string, unknown>).groupId ?? ""),
-    name: String((item as Record<string, unknown>).group_name ?? (item as Record<string, unknown>).name ?? ""),
-    avatar: String((item as Record<string, unknown>).face_url ?? (item as Record<string, unknown>).avatar ?? ""),
-    ownerId: String((item as Record<string, unknown>).creator_user_id ?? (item as Record<string, unknown>).ownerId ?? ""),
-    memberCount: Number((item as Record<string, unknown>).member_count ?? (item as Record<string, unknown>).memberCount ?? 0),
-    introduction: String((item as Record<string, unknown>).introduction ?? ""),
-    notification: String((item as Record<string, unknown>).notification ?? ""),
-    needVerification: Boolean((item as Record<string, unknown>).need_verification ?? false),
-    createdAt: String((item as Record<string, unknown>).create_time ?? (item as Record<string, unknown>).createdAt ?? ""),
-  }));
-}
-
-// 网关路径: GET /api/v1/groups/:id
-export async function getGroupInfo(groupId: string): Promise<Group> {
-  const res = await request<ApiResponse<Record<string, unknown>>>(
-    `/groups/${groupId}`
-  );
-  const item = res.data || {};
-  return {
-    groupId: String(item.group_id ?? item.groupId ?? groupId),
+  return (list as Record<string, unknown>[]).map((item: Record<string, unknown>) => ({
+    groupId: String(item.group_id ?? item.groupId ?? ""),
     name: String(item.group_name ?? item.name ?? ""),
     avatar: String(item.face_url ?? item.avatar ?? ""),
     ownerId: String(item.creator_user_id ?? item.ownerId ?? ""),
     memberCount: Number(item.member_count ?? item.memberCount ?? 0),
-    introduction: String(item.introduction ?? ""),
-    notification: String(item.notification ?? ""),
-    needVerification: Boolean(item.need_verification ?? false),
     createdAt: String(item.create_time ?? item.createdAt ?? ""),
-  };
-}
-
-// 网关路径: PUT /api/v1/groups/:id
-export async function updateGroupInfo(data: UpdateGroupRequest): Promise<void> {
-  const body: Record<string, unknown> = {};
-  if (data.name !== undefined) body.group_name = data.name;
-  if (data.avatar !== undefined) body.face_url = data.avatar;
-  if (data.introduction !== undefined) body.introduction = data.introduction;
-  if (data.notification !== undefined) body.notification = data.notification;
-  if (data.needVerification !== undefined) body.need_verification = data.needVerification;
-  await request(`/groups/${data.groupId}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
-
-// 网关路径: DELETE /api/v1/groups/:id
-export async function dismissGroup(groupId: string): Promise<void> {
-  await request(`/groups/${groupId}`, { method: "DELETE" });
-}
-
-// 网关路径: PUT /api/v1/groups/:id/owner
-export async function transferGroupOwner(groupId: string, newOwnerId: string): Promise<void> {
-  await request(`/groups/${groupId}/owner`, {
-    method: "PUT",
-    body: JSON.stringify({ new_owner_id: newOwnerId }),
-  });
-}
-
-// 网关路径: POST /api/v1/groups/:id/members
-export async function inviteToGroup(groupId: string, userIds: string[]): Promise<void> {
-  await request(`/groups/${groupId}/members`, {
-    method: "POST",
-    body: JSON.stringify({ member_ids: userIds }),
-  });
-}
-
-// 网关路径: DELETE /api/v1/groups/:id/members/:userId
-export async function kickGroupMember(groupId: string, userId: string): Promise<void> {
-  await request(`/groups/${groupId}/members/${userId}`, { method: "DELETE" });
-}
-
-// 网关路径: POST /api/v1/groups/:id/quit
-export async function quitGroup(groupId: string): Promise<void> {
-  await request(`/groups/${groupId}/quit`, { method: "POST" });
-}
-
-// 网关路径: GET /api/v1/groups/:id/members?offset=&limit=
-export async function getGroupMembers(
-  groupId: string,
-  params?: { offset?: number; limit?: number }
-): Promise<GroupMemberInfo[]> {
-  const query = new URLSearchParams();
-  if (params?.offset !== undefined) query.set("offset", String(params.offset));
-  if (params?.limit !== undefined) query.set("limit", String(params.limit));
-  else query.set("limit", "100");
-  const res = await request<ApiResponse<Record<string, unknown>[] | { members: unknown[] }>>(
-    `/groups/${groupId}/members?${query.toString()}`
-  );
-  const data = res.data;
-  if (!data) return [];
-  const list = Array.isArray(data) ? data : (data as { members?: unknown[] }).members || [];
-  return list.map((item) => ({
-    userId: String((item as Record<string, unknown>).user_id ?? (item as Record<string, unknown>).userId ?? ""),
-    groupId: String((item as Record<string, unknown>).group_id ?? (item as Record<string, unknown>).groupId ?? groupId),
-    displayName: String((item as Record<string, unknown>).nickname ?? (item as Record<string, unknown>).displayName ?? ""),
-    username: String((item as Record<string, unknown>).nickname ?? (item as Record<string, unknown>).username ?? ""),
-    avatar: String((item as Record<string, unknown>).face_url ?? (item as Record<string, unknown>).avatar ?? ""),
-    roleLevel: Number((item as Record<string, unknown>).role_level ?? (item as Record<string, unknown>).roleLevel ?? 0),
-    muteEndTime: Number((item as Record<string, unknown>).mute_end_time ?? (item as Record<string, unknown>).muteEndTime ?? 0),
-    joinedAt: String((item as Record<string, unknown>).join_time ?? (item as Record<string, unknown>).joinedAt ?? ""),
   }));
-}
-
-// 网关路径: PUT /api/v1/groups/:id/mute
-export async function setGroupMute(groupId: string, isMuted: boolean): Promise<void> {
-  await request(`/groups/${groupId}/mute`, {
-    method: "PUT",
-    body: JSON.stringify({ is_muted: isMuted }),
-  });
-}
-
-// 网关路径: PUT /api/v1/groups/:id/members/:userId/mute
-export async function setMemberMute(
-  groupId: string,
-  userId: string,
-  muteEndTime: number
-): Promise<void> {
-  await request(`/groups/${groupId}/members/${userId}/mute`, {
-    method: "PUT",
-    body: JSON.stringify({ mute_end_time: muteEndTime }),
-  });
-}
-
-// ---------- 入群申请 ----------
-// 网关路径: POST /api/v1/groups/:id/apply
-export async function applyToJoinGroup(groupId: string, message?: string): Promise<void> {
-  await request(`/groups/${groupId}/apply`, {
-    method: "POST",
-    body: JSON.stringify({ message: message || "" }),
-  });
-}
-
-// 网关路径: GET /api/v1/groups/:id/applications
-export async function getPendingApplications(groupId: string): Promise<GroupApplication[]> {
-  const res = await request<ApiResponse<Record<string, unknown>[] | { applications: unknown[] }>>(
-    `/groups/${groupId}/applications`
-  );
-  const data = res.data;
-  if (!data) return [];
-  const list = Array.isArray(data) ? data : (data as { applications?: unknown[] }).applications || [];
-  return list.map((item) => toGroupApplication(item as Record<string, unknown>));
-}
-
-// 网关路径: GET /api/v1/groups/applications/mine
-export async function getMyApplications(): Promise<GroupApplication[]> {
-  const res = await request<ApiResponse<Record<string, unknown>[] | { applications: unknown[] }>>(
-    "/groups/applications/mine"
-  );
-  const data = res.data;
-  if (!data) return [];
-  const list = Array.isArray(data) ? data : (data as { applications?: unknown[] }).applications || [];
-  return list.map((item) => toGroupApplication(item as Record<string, unknown>));
-}
-
-// 网关路径: PUT /api/v1/groups/applications/:id
-export async function handleApplication(
-  applicationId: string,
-  accept: boolean,
-  handleMsg?: string
-): Promise<void> {
-  await request(`/groups/applications/${applicationId}`, {
-    method: "PUT",
-    body: JSON.stringify({
-      handle_result: accept ? 1 : -1,
-      handle_msg: handleMsg || "",
-    }),
-  });
-}
-
-// 网关路径: GET /api/v1/groups/unhandled-application-count
-export async function getUnhandledGroupApplicationCount(): Promise<number> {
-  try {
-    const res = await request<ApiResponse<{ count: number }>>(
-      "/groups/unhandled-application-count"
-    );
-    return res.data?.count ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-function toGroupApplication(raw: Record<string, unknown>): GroupApplication {
-  const statusNum = Number(raw.status ?? raw.handle_result ?? 0);
-  return {
-    applicationId: String(raw.application_id ?? raw.request_id ?? raw.applicationId ?? ""),
-    groupId: String(raw.group_id ?? raw.groupId ?? ""),
-    userId: String(raw.user_id ?? raw.userId ?? ""),
-    groupName: String(raw.group_name ?? raw.groupName ?? ""),
-    message: String(raw.req_msg ?? raw.message ?? ""),
-    status: statusNum === 1 ? "accepted" : statusNum === -1 ? "rejected" : "pending",
-    handleUserId: raw.handle_user_id ? String(raw.handle_user_id) : undefined,
-    handleMsg: raw.handle_msg ? String(raw.handle_msg) : undefined,
-    createdAt: String(raw.create_time ?? raw.created_at ?? raw.createdAt ?? ""),
-    updatedAt: String(raw.updated_at ?? raw.handle_time ?? raw.updatedAt ?? ""),
-  };
 }
 
 // ---------- 上传 ----------

@@ -16,8 +16,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import type { Conversation, User } from "@/types";
-import { useAuth } from "@/contexts/AuthContext";
-import { getStatusText } from "@/lib/status";
+import { getUserById } from "@/data/mock";
+import { getStatusText } from "@/data/mock";
 import UserAvatar from "../shared/UserAvatar";
 import OnlineBadge from "../shared/OnlineBadge";
 import { cn } from "@/lib/utils";
@@ -35,17 +35,19 @@ export default function ChatHeader({
   onToggleMute,
   onTogglePin,
 }: ChatHeaderProps) {
-  const { user: currentUser } = useAuth();
   const [showInfo, setShowInfo] = useState(false);
 
   // 私聊显示对方信息
   const otherMember = conversation.type === "private"
-    ? conversation.members.find((m) => m.userId !== currentUser?.userId)
+    ? conversation.members.find((m) => m.userId !== "u_1001")
     : null;
+  const otherUser = otherMember ? getUserById(otherMember.userId) : undefined;
 
   const statusText = conversation.type === "group"
     ? `${conversation.members.length} 名成员`
-    : getStatusText("offline");
+    : getStatusText(otherUser?.status || "offline");
+
+  const online = otherUser?.status === "online";
 
   return (
     <>
@@ -68,13 +70,13 @@ export default function ChatHeader({
           >
             <div className="relative flex-shrink-0">
               <UserAvatar
-              src={conversation.avatar}
-              name={conversation.title}
+                src={conversation.avatar || otherUser?.avatar}
+                name={conversation.title}
                 size="md"
               />
-              {conversation.type === "private" && otherMember && (
+              {conversation.type === "private" && otherUser && (
                 <OnlineBadge
-                  status="offline"
+                  status={otherUser.status}
                   size="sm"
                   className="absolute -bottom-0.5 -right-0.5"
                 />
@@ -149,20 +151,23 @@ export default function ChatHeader({
             </button>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
-            {conversation.members.map((m) => (
-              <div
-                key={m.userId}
-                className="flex items-center gap-1.5 bg-white rounded-lg px-2 py-1 shadow-sm"
-              >
-                <UserAvatar name={m.userId} size="sm" />
-                <span className="text-xs text-gray-700">{m.userId}</span>
-                {conversation.type === "group" && m.role !== "member" && (
-                  <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1 rounded">
-                    {m.role === "owner" ? "群主" : "管理"}
-                  </span>
-                )}
-              </div>
-            ))}
+            {conversation.members.map((m) => {
+              const u = getUserById(m.userId);
+              return u ? (
+                <div
+                  key={m.userId}
+                  className="flex items-center gap-1.5 bg-white rounded-lg px-2 py-1 shadow-sm"
+                >
+                  <UserAvatar name={u.displayName} size="sm" />
+                  <span className="text-xs text-gray-700">{u.displayName}</span>
+                  {conversation.type === "group" && m.role !== "member" && (
+                    <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1 rounded">
+                      {m.role === "owner" ? "群主" : "管理"}
+                    </span>
+                  )}
+                </div>
+              ) : null;
+            })}
           </div>
         </div>
       )}

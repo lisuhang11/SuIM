@@ -38,8 +38,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const init = async () => {
       const token = storage.getToken();
       if (!token) {
-        // 没有 token，清除可能的脏数据
-        storage.removeCachedUser();
         setState((s) => ({ ...s, isLoading: false }));
         return;
       }
@@ -67,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           wsManager.connect();
         }
       } catch {
-        // Token 过期或无效 — 清除并回到未登录状态
+        // Token 过期或无效
         storage.clearAll();
         setState({
           user: null,
@@ -84,7 +82,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (data: LoginRequest) => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
-      // 联调模式：直接调用真实 API（dev 模式下也走真实请求）
       const res = await api.login(data);
       storage.setToken(res.token);
       storage.setCachedUser(res.user);
@@ -96,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       wsManager.connect();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "登录失败，请检查后端服务";
+      const message = err instanceof Error ? err.message : "登录失败";
       setState((s) => ({ ...s, isLoading: false, error: message }));
       throw err;
     }
@@ -105,40 +102,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (data: RegisterRequest) => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
     try {
-      // 联调模式：直接调用真实 API
-      const res = await api.register(data);
-      // 注册后自动登录以获取 token（后端注册接口不返回 token）
-      if (!res.token) {
-        const loginRes = await api.login({
-          username: data.email,
-          password: data.password,
-        });
-        if (loginRes.token) {
-          storage.setToken(loginRes.token);
-          storage.setCachedUser(loginRes.user);
-          setState({
-            user: loginRes.user,
-            isLoading: false,
-            isAuthenticated: true,
-            error: null,
-          });
-          wsManager.connect();
-          return;
-        }
-        // auto-login 没拿到 token，强制回登录页
-        throw new Error("注册成功但登录失败，请手动登录");
-      }
-      if (res.token) storage.setToken(res.token);
-      storage.setCachedUser(res.user);
+      // 1. 注册账号
+      await api.register(data);
+      // 2. 注册成功但无 token，自动登录获取 token
+      const loginRes = await api.login({ username: data.email, password: data.password });
+      storage.setToken(loginRes.token);
+      storage.setCachedUser(loginRes.user);
       setState({
-        user: res.user,
+        user: loginRes.user,
         isLoading: false,
         isAuthenticated: true,
         error: null,
       });
       wsManager.connect();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "注册失败，请检查后端服务";
+      const message = err instanceof Error ? err.message : "注册失败";
       setState((s) => ({ ...s, isLoading: false, error: message }));
       throw err;
     }

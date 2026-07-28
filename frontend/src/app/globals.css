@@ -46,3 +46,10 @@
     display: none;
   }
 }
+
+/* 回弹动画 — 利落按压 */
+@keyframes recoil {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.955); }
+  100% { transform: scale(1); }
+}

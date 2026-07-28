@@ -5,8 +5,9 @@
 // ============================================================
 import React from "react";
 import { Pin, BellOff, CheckCheck, Check } from "lucide-react";
-import type { Conversation } from "@/types";
+import type { Conversation, User } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserById, getStatusColor } from "@/data/mock";
 import { cn, formatConvTime, truncate } from "@/lib/utils";
 import UserAvatar from "../shared/UserAvatar";
 import OnlineBadge from "../shared/OnlineBadge";
@@ -28,6 +29,7 @@ export default function ConversationItem({
   const otherMember = conversation.type === "private"
     ? conversation.members.find((m) => m.userId !== user?.userId)
     : null;
+  const otherUser = otherMember ? getUserById(otherMember.userId) : undefined;
 
   const lastMsg = conversation.lastMessage;
   const isMyLastMsg = lastMsg?.senderId === user?.userId;
@@ -52,13 +54,13 @@ export default function ConversationItem({
       {/* 头像 */}
       <div className="relative flex-shrink-0">
         <UserAvatar
-          src={conversation.avatar}
+          src={conversation.avatar || otherUser?.avatar}
           name={conversation.title}
           size="md"
         />
-        {conversation.type === "private" && otherMember && (
+        {conversation.type === "private" && otherUser && (
           <OnlineBadge
-            status="offline"
+            status={otherUser.status}
             size="sm"
             className="absolute -bottom-0.5 -right-0.5"
           />

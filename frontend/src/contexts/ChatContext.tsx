@@ -18,11 +18,21 @@ import type {
   User,
   Contact,
   Group,
+  FriendRequest,
+  Notification,
   WsMessage,
 } from "@/types";
 import { useAuth } from "./AuthContext";
 import { wsManager } from "@/services/websocket";
 import * as storage from "@/services/storage";
+import {
+  mockConversations,
+  mockMessages,
+  mockContacts,
+  mockGroups,
+  mockIncomingRequests,
+  getUserById,
+} from "@/data/mock";
 
 interface ChatState {
   conversations: Conversation[];
@@ -30,6 +40,9 @@ interface ChatState {
   messages: Record<string, Message[]>; // conversationId -> messages
   contacts: Contact[];
   groups: Group[];
+  friendRequests: FriendRequest[];
+  notifications: Notification[];
+  unreadNotificationCount: number;
   typingUsers: Record<string, string[]>; // conversationId -> userId[]
   wsConnected: boolean;
   isLoading: boolean;
@@ -43,10 +56,13 @@ interface ChatContextValue extends ChatState {
   addConversation: (conv: Conversation) => void;
   removeConversation: (id: string) => void;
   refreshConversations: () => Promise<void>;
-  refreshGroups: () => Promise<void>;
   loadMessages: (conversationId: string) => Promise<void>;
   searchContacts: (query: string) => Contact[];
   createGroup: (name: string, memberIds: string[]) => Promise<Conversation | null>;
+  acceptFriendRequest: (requestId: string) => Promise<void>;
+  declineFriendRequest: (requestId: string) => Promise<void>;
+  markNotificationRead: (notificationId: string) => void;
+  markAllNotificationsRead: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -61,6 +77,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     messages: {},
     contacts: [],
     groups: [],
+    friendRequests: [],
+    notifications: [],
+    unreadNotificationCount: 0,
     typingUsers: {},
     wsConnected: false,
     isLoading: true,
@@ -69,7 +88,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // ---------- 初始化：从后端 API 加载数据 ----------
+  // ---------- 初始化：加载数据（优先真实 API，回退 mock）----------
   useEffect(() => {
     if (!user) return;
 
@@ -78,28 +97,33 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       try {
         // 尝试从真实 API 加载数据
         const api = await import("@/services/api");
-        const [convRes, contactRes, groupRes] = await Promise.allSettled([
+        const [convRes, contactRes, groupRes, friendReqRes] = await Promise.allSettled([
           api.getConversations(),
           api.getContacts(),
           api.getGroups(),
+          api.getIncomingFriendRequests(20, 0),
         ]);
 
         setState((s) => ({
           ...s,
-          conversations: convRes.status === "fulfilled" ? convRes.value : [],
-          messages: {},
-          contacts: contactRes.status === "fulfilled" ? contactRes.value : [],
-          groups: groupRes.status === "fulfilled" ? groupRes.value : [],
+          conversations: convRes.status === "fulfilled" ? convRes.value : mockConversations,
+          messages: mockMessages, // 消息按会话懒加载
+          contacts: contactRes.status === "fulfilled" ? contactRes.value : mockContacts,
+          groups: groupRes.status === "fulfilled" ? groupRes.value : mockGroups,
+          friendRequests: friendReqRes.status === "fulfilled"
+            ? friendReqRes.value
+            : mockIncomingRequests,
           isLoading: false,
         }));
       } catch {
-        // API 不可用，使用空数据
+        // 回退到 mock 数据
         setState((s) => ({
           ...s,
-          conversations: [],
-          messages: {},
-          contacts: [],
-          groups: [],
+          conversations: mockConversations,
+          messages: mockMessages,
+          contacts: mockContacts,
+          groups: mockGroups,
+          friendRequests: mockIncomingRequests,
           isLoading: false,
         }));
       }
@@ -322,6 +346,42 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [user]
   );
 
+  // ---------- 接受好友请求 ----------
+  const acceptFriendRequest = useCallback(async (requestId: string) => {
+    try {
+      const api = await import("@/services/api");
+      const req = stateRef.current.friendRequests.find((r) => r.requestId === requestId);
+      if (req) {
+        await api.respondFriendRequest(req.fromUserId, req.toUserId, 1, "已同意");
+      }
+    } catch {
+      // mock 回退
+    }
+    setState((prev) => ({
+      ...prev,
+      friendRequests: prev.friendRequests.map((r) =>
+        r.requestId === requestId ? { ...r, status: "accepted" as const } : r
+      ),
+    }));
+  }, []);
+
+  // ---------- 拒绝好友请求 ----------
+  const declineFriendRequest = useCallback(async (requestId: string) => {
+    try {
+      const api = await import("@/services/api");
+      const req = stateRef.current.friendRequests.find((r) => r.requestId === requestId);
+      if (req) {
+        await api.respondFriendRequest(req.fromUserId, req.toUserId, -1, "");
+      }
+    } catch {
+      // mock 回退
+    }
+    setState((prev) => ({
+      ...prev,
+      friendRequests: prev.friendRequests.filter((r) => r.requestId !== requestId),
+    }));
+  }, []);
+
   // ---------- 发送正在输入状态 ----------
   const sendTyping = useCallback(
     (conversationId: string, isTyping: boolean) => {
@@ -389,7 +449,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         messages: { ...prev.messages, [conversationId]: msgs },
       }));
     } catch {
-      // API 不可用，保持当前数据
+      // API 不可用时，保持 mock 数据
     }
   }, []);
 
@@ -483,17 +543,28 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [user]
   );
 
-  // ---------- 刷新群组列表 ----------
-  const refreshGroups = useCallback(async () => {
-    try {
-      const api = await import("@/services/api");
-      const groups = await api.getGroups();
-      if (groups.length > 0) {
-        setState((prev) => ({ ...prev, groups }));
-      }
-    } catch {
-      // API 不可用，保持当前数据
-    }
+  // ---------- 标记通知已读 ----------
+  const markNotificationRead = useCallback((notificationId: string) => {
+    setState((prev) => ({
+      ...prev,
+      notifications: prev.notifications.map((n) =>
+        n.notificationId === notificationId ? { ...n, isRead: true } : n
+      ),
+      unreadNotificationCount: Math.max(
+        0,
+        prev.unreadNotificationCount -
+          (prev.notifications.find((n) => n.notificationId === notificationId && !n.isRead) ? 1 : 0)
+      ),
+    }));
+  }, []);
+
+  // ---------- 全部标记已读 ----------
+  const markAllNotificationsRead = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      notifications: prev.notifications.map((n) => ({ ...n, isRead: true })),
+      unreadNotificationCount: 0,
+    }));
   }, []);
 
   return (
@@ -507,10 +578,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         addConversation,
         removeConversation,
         refreshConversations,
-        refreshGroups,
         loadMessages,
         searchContacts,
         createGroup,
+        acceptFriendRequest,
+        declineFriendRequest,
+        markNotificationRead,
+        markAllNotificationsRead,
       }}
     >
       {children}

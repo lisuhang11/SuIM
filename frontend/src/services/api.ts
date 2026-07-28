@@ -40,8 +40,11 @@ async function request<T>(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
+  const fullUrl = `${API_BASE}${endpoint}`;
+  console.log(`[API] ${options.method || "GET"} ${fullUrl}`);
+
   try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const res = await fetch(fullUrl, {
       ...options,
       headers,
       signal: controller.signal,
@@ -49,10 +52,22 @@ async function request<T>(
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: res.statusText }));
+      console.error(`[API] ${options.method || "GET"} ${fullUrl} → ${res.status}`, err);
+      // 401 时清除本地认证状态，下次刷新页面会跳转登录
+      if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("suim_token");
+          localStorage.removeItem("suim_user");
+        }
+      }
       throw new Error(err.message || `HTTP ${res.status}`);
     }
 
+    console.log(`[API] ${options.method || "GET"} ${fullUrl} → ${res.status} OK`);
     return res.json();
+  } catch (err) {
+    console.error(`[API] ${options.method || "GET"} ${fullUrl} → FAILED`, err);
+    throw err;
   } finally {
     clearTimeout(timeoutId);
   }

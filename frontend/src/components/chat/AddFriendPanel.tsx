@@ -33,9 +33,9 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
 
     setIsSearching(true);
     try {
-      // 先尝试真实 API
       const api = await import("@/services/api");
       const users = await api.searchUsers(query);
+      console.log("[AddFriend] search results:", users.length, users);
       const enriched: SearchedUser[] = users
         .filter((u) => u.userId !== currentUser?.userId)
         .map((u) => ({
@@ -45,7 +45,9 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
           hasIncomingRequest: false,
         }));
       setResults(enriched);
-    } catch {
+    } catch (err) {
+      console.error("[AddFriend] search error:", err);
+      setFeedback({ type: "error", message: "搜索失败，请检查网络连接" });
       setResults([]);
     } finally {
       setIsSearching(false);
@@ -81,7 +83,7 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
       {!embedded && (
         <div className="px-4 py-4 border-b border-gray-100">
           <h3 className="text-base font-semibold text-gray-900">添加好友</h3>
-          <p className="text-xs text-gray-400 mt-0.5">通过用户名搜索并添加好友</p>
+          <p className="text-xs text-gray-400 mt-0.5">通过用户ID搜索并添加好友</p>
         </div>
       )}
 
@@ -93,7 +95,7 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
             type="text"
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder="输入用户名或昵称搜索..."
+            placeholder="输入用户ID搜索..."
             className="w-full pl-10 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200
               rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100
               outline-none transition-all"
@@ -125,7 +127,7 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
         ) : !searchQuery.trim() ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <Search className="w-12 h-12 mb-3 opacity-30" />
-            <p className="text-sm">输入用户名搜索用户</p>
+            <p className="text-sm">输入用户ID搜索用户</p>
           </div>
         ) : results.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">

@@ -100,15 +100,15 @@ func (r *userRepository) ListUsers(ctx context.Context, offset, limit int) ([]*t
 	return users, nil
 }
 
-// SearchUsers 按昵称或邮箱模糊搜索活跃用户。
+// SearchUsers 仅按用户ID匹配活跃用户（添加好友专用）。
 func (r *userRepository) SearchUsers(ctx context.Context, query string, limit int) ([]*types.User, error) {
 	var users []*types.User
 	searchPattern := "%" + query + "%"
 
 	dbQuery := r.db.WithContext(ctx).
-		Where("nickname LIKE ? OR email LIKE ?", searchPattern, searchPattern).
+		Where("user_id LIKE ?", searchPattern).
 		Where("is_active = ?", true).
-		Order("nickname ASC")
+		Order("user_id ASC")
 
 	if limit > 0 {
 		dbQuery = dbQuery.Limit(limit)

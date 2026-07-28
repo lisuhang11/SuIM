@@ -258,7 +258,9 @@ function SearchAndAdd({ onBack, currentUser }: { onBack: () => void; currentUser
             hasSentRequest: sentSet.has(u.userId),
           }))
       );
-    } catch {
+    } catch (err) {
+      console.error("[FriendsPanel] search error:", err);
+      setFeedback({ type: "error", message: "搜索失败，请检查网络连接" });
       setResults([]);
     } finally {
       setIsSearching(false);
@@ -290,7 +292,7 @@ function SearchAndAdd({ onBack, currentUser }: { onBack: () => void; currentUser
             type="text"
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder="输入用户名或昵称搜索..."
+            placeholder="输入用户ID搜索..."
             className="w-full pl-10 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200
               rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100
               outline-none transition-all"

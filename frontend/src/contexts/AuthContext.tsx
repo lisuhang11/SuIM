@@ -38,6 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const init = async () => {
       const token = storage.getToken();
       if (!token) {
+        // 没有 token，清除可能的脏数据
+        storage.removeCachedUser();
         setState((s) => ({ ...s, isLoading: false }));
         return;
       }
@@ -65,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           wsManager.connect();
         }
       } catch {
-        // Token 过期或无效
+        // Token 过期或无效 — 清除并回到未登录状态
         storage.clearAll();
         setState({
           user: null,
@@ -107,11 +109,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await api.register(data);
       // 注册后自动登录以获取 token（后端注册接口不返回 token）
       if (!res.token) {
-        try {
-          const loginRes = await api.login({
-            username: data.email,
-            password: data.password,
-          });
+        const loginRes = await api.login({
+          username: data.email,
+          password: data.password,
+        });
+        if (loginRes.token) {
           storage.setToken(loginRes.token);
           storage.setCachedUser(loginRes.user);
           setState({
@@ -122,9 +124,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
           wsManager.connect();
           return;
-        } catch {
-          // 登录失败，但注册已成功，使用注册返回的用户信息
         }
+        // auto-login 没拿到 token，强制回登录页
+        throw new Error("注册成功但登录失败，请手动登录");
       }
       if (res.token) storage.setToken(res.token);
       storage.setCachedUser(res.user);

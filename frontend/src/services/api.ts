@@ -19,9 +19,11 @@ import type {
   UpdateGroupRequest,
 } from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9000/api/v1";
+// 开发/联调时通过 Next.js rewrites 代理到 Docker 后端，避免跨域和网络不通问题
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+const REQUEST_TIMEOUT = 10_000; // 10 秒超时
 
-// ---------- 通用请求 ----------
+// ---------- 通用请求（带超时） ----------
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -35,17 +37,25 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || `HTTP ${res.status}`);
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message || `HTTP ${res.status}`);
+    }
+
+    return res.json();
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return res.json();
 }
 
 // ---------- 数据类型转换 ----------

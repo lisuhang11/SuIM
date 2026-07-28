@@ -2,6 +2,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log/slog"
 	"net"
@@ -15,6 +16,7 @@ import (
 	"conversation/internal/service"
 
 	pb "SuIM/proto/conversationpb"
+	"SuIM/pkg/discovery"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -26,7 +28,18 @@ func main() {
 		Level: slog.LevelInfo,
 	})))
 
-	cfg := config.Load()
+	configPath := flag.String("config", "etc/conversation.yaml", "config file path")
+	flag.Parse()
+	cfg := config.LoadFromFile(*configPath)
+
+	// 注册到 etcd 服务发现。
+	discovery.SetEndpoints(cfg.EtcdEndpoints)
+	registry, err := discovery.NewRegistry("conversation", cfg.ServiceAddr, cfg.EtcdEndpoints)
+	if err != nil {
+		panic(fmt.Sprintf("failed to register with etcd: %v", err))
+	}
+	defer registry.Deregister()
+
 	db := database.MustOpen(cfg)
 
 	// 组合根：将仓库注入到服务层。

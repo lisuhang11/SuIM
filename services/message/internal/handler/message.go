@@ -133,7 +133,7 @@ func protoToMessage(m *pb.MsgData) *types.Message {
 			Ex:               m.Ex,
 			SenderPlatformID: int(m.SenderPlatformId),
 			SenderNickname:   m.SenderNickname,
-			SenderFaceURL:    m.SenderFaceURL,
+			SenderFaceURL:    m.SenderFaceUrl,
 			Options:          m.Options,
 			AtUserIDList:     atUserIDListJSON(m.AtUserIdList),
 			AttachedInfo:     m.AttachedInfo,

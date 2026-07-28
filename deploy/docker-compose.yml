@@ -7,8 +7,36 @@
 #   docker compose ps                 # check status
 #   docker compose logs -f <service>  # tail logs
 # ============================================================
+#
+# 服务发现：所有微服务通过 etcd 注册与发现，不再使用 IP 直连。
+# 后端服务通过 etcd:///service-name 的 gRPC resolver 自动解析地址。
+# ============================================================
 
 services:
+  # ==========================================================
+  # etcd v3.5 — 服务注册与发现
+  # ==========================================================
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    container_name: suim-etcd
+    restart: unless-stopped
+    environment:
+      ETCD_NAME: suim-etcd
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      ETCD_AUTO_COMPACTION_MODE: periodic
+      ETCD_AUTO_COMPACTION_RETENTION: "1"
+    ports:
+      - "2379:2379"
+    volumes:
+      - etcd-data:/etcd-data
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   # ==========================================================
   # MySQL 8.0
   # ==========================================================
@@ -38,18 +66,19 @@ services:
   user:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        SERVICE: user
+      dockerfile: services/user/Dockerfile
     image: suim-user:latest
     container_name: suim-user
     restart: unless-stopped
     environment:
       SERVER_ADDR: ":8080"
+      SERVICE_ADDR: user:8080
+      ETCD_ENDPOINTS: etcd:2379
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-24h}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-720h}
@@ -58,6 +87,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      etcd:
+        condition: service_healthy
 
   # ==========================================================
   # relation service (:8081)
@@ -65,52 +96,55 @@ services:
   relation:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        SERVICE: relation
+      dockerfile: services/relation/Dockerfile
     image: suim-relation:latest
     container_name: suim-relation
     restart: unless-stopped
     environment:
       SERVER_ADDR: ":8081"
+      SERVICE_ADDR: relation:8081
+      ETCD_ENDPOINTS: etcd:2379
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
     ports:
       - "8081:8081"
     depends_on:
       mysql:
         condition: service_healthy
+      etcd:
+        condition: service_healthy
 
   # ==========================================================
-  # group service (:8082) — depends on user
+  # group service (:8082) — depends on user (via etcd discovery)
   # ==========================================================
   group:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        SERVICE: group
+      dockerfile: services/group/Dockerfile
     image: suim-group:latest
     container_name: suim-group
     restart: unless-stopped
     environment:
       SERVER_ADDR: ":8082"
+      SERVICE_ADDR: group:8082
+      ETCD_ENDPOINTS: etcd:2379
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
-      USER_SERVICE_ADDR: user:8080
     ports:
       - "8082:8082"
     depends_on:
       mysql:
         condition: service_healthy
-      user:
-        condition: service_started
+      etcd:
+        condition: service_healthy
 
   # ==========================================================
   # conversation service (:8083)
@@ -118,52 +152,55 @@ services:
   conversation:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        SERVICE: conversation
+      dockerfile: services/conversation/Dockerfile
     image: suim-conversation:latest
     container_name: suim-conversation
     restart: unless-stopped
     environment:
       SERVER_ADDR: ":8083"
+      SERVICE_ADDR: conversation:8083
+      ETCD_ENDPOINTS: etcd:2379
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
     ports:
       - "8083:8083"
     depends_on:
       mysql:
         condition: service_healthy
+      etcd:
+        condition: service_healthy
 
   # ==========================================================
-  # message service (:8084) — depends on push
+  # message service (:8084) — depends on push (via etcd discovery)
   # ==========================================================
   message:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        SERVICE: message
+      dockerfile: services/message/Dockerfile
     image: suim-message:latest
     container_name: suim-message
     restart: unless-stopped
     environment:
       SERVER_ADDR: ":8084"
+      SERVICE_ADDR: message:8084
+      ETCD_ENDPOINTS: etcd:2379
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
-      PUSH_ADDR: push:8085
     ports:
       - "8084:8084"
     depends_on:
       mysql:
         condition: service_healthy
-      push:
-        condition: service_started
+      etcd:
+        condition: service_healthy
 
   # ==========================================================
   # push service (:8085)
@@ -171,23 +208,26 @@ services:
   push:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        SERVICE: push
+      dockerfile: services/push/Dockerfile
     image: suim-push:latest
     container_name: suim-push
     restart: unless-stopped
     environment:
       SERVER_ADDR: ":8085"
+      SERVICE_ADDR: push:8085
+      ETCD_ENDPOINTS: etcd:2379
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
     ports:
       - "8085:8085"
     depends_on:
       mysql:
+        condition: service_healthy
+      etcd:
         condition: service_healthy
 
   # ==========================================================
@@ -196,17 +236,18 @@ services:
   msggateway:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        SERVICE: msggateway
+      dockerfile: services/msggateway/Dockerfile
     image: suim-msggateway:latest
     container_name: suim-msggateway
     restart: unless-stopped
     environment:
+      ETCD_ENDPOINTS: etcd:2379
+      SERVICE_ADDR: msggateway:9091
       MSGGW_WS_ADDR: ":9001"
       MSGGW_GRPC_ADDR: ":9091"
       MSGGW_METRICS_ADDR: ":9092"
       MSGGW_MAX_CONN_PER_USER: ${MSGGW_MAX_CONN_PER_USER:-10}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       MSGGW_PING_INTERVAL: ${MSGGW_PING_INTERVAL:-30s}
       MSGGW_READ_TIMEOUT: ${MSGGW_READ_TIMEOUT:-60s}
       MSGGW_WRITE_TIMEOUT: ${MSGGW_WRITE_TIMEOUT:-10s}
@@ -216,65 +257,56 @@ services:
       - "${MSGGW_GRPC_PORT:-9091}:9091"
       - "${MSGGW_METRICS_PORT:-9092}:9092"
     depends_on:
-      mysql:
+      etcd:
         condition: service_healthy
 
   # ==========================================================
   # apigateway — HTTP REST API
+  # 后端服务地址通过 etcd 服务发现自动解析。
   # ==========================================================
   apigateway:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
-      args:
-        SERVICE: apigateway
+      dockerfile: services/apigateway/Dockerfile
     image: suim-apigateway:latest
     container_name: suim-apigateway
     restart: unless-stopped
     environment:
+      ETCD_ENDPOINTS: etcd:2379
+      SERVICE_ADDR: apigateway:9000
       GATEWAY_LISTEN_ADDR: ":9000"
       GATEWAY_METRICS_ADDR: ":9090"
-      GATEWAY_JWT_SECRET: ${GATEWAY_JWT_SECRET:-change-me-in-production}
-      GATEWAY_USER_ADDR: user:8080
-      GATEWAY_RELATION_ADDR: relation:8081
-      GATEWAY_GROUP_ADDR: group:8082
-      GATEWAY_CONVERSATION_ADDR: conversation:8083
-      GATEWAY_MESSAGE_ADDR: message:8084
+      GATEWAY_JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       GATEWAY_RATE_LIMIT_ENABLED: ${GATEWAY_RATE_LIMIT_ENABLED:-true}
       GATEWAY_RATE_LIMIT: ${GATEWAY_RATE_LIMIT:-100.0}
       GATEWAY_RATE_BURST: ${GATEWAY_RATE_BURST:-200}
       GATEWAY_CORS_ORIGINS: ${GATEWAY_CORS_ORIGINS:-*}
-      ETCD_ENDPOINTS: ${ETCD_ENDPOINTS:-}
       ETCD_CONFIG_KEY: ${ETCD_CONFIG_KEY:-/suim/gateway/config}
     ports:
       - "${GATEWAY_PORT:-9000}:9000"
       - "${GATEWAY_METRICS_PORT:-9090}:9090"
     depends_on:
-      - user
-      - relation
-      - group
-      - conversation
-      - message
+      etcd:
+        condition: service_healthy
 
   # ==========================================================
-  # etcd (optional — for apigateway dynamic config)
+  # frontend — Next.js 前端应用
   # ==========================================================
-  etcd:
-    image: quay.io/coreos/etcd:v3.5.18
-    container_name: suim-etcd
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    image: suim-frontend:latest
+    container_name: suim-frontend
     restart: unless-stopped
-    profiles:
-      - with-etcd
     environment:
-      ETCD_NAME: suim-etcd
-      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
-      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
-      ETCD_AUTO_COMPACTION_MODE: periodic
-      ETCD_AUTO_COMPACTION_RETENTION: "1"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:9000/api/v1}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:9001/ws}
     ports:
-      - "2379:2379"
-    volumes:
-      - etcd-data:/etcd-data
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - apigateway
+      - msggateway
 
 volumes:
   mysql-data:

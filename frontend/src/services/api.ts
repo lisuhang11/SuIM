@@ -11,6 +11,7 @@ import type {
   Conversation,
   Message,
   Contact,
+  FriendRequest,
   CreateGroupRequest,
   Group,
 } from "@/types";
@@ -74,7 +75,7 @@ function toConversation(raw: Record<string, unknown>): Conversation {
     members: Array.isArray(raw.members) ? raw.members : [],
     isPinned: Boolean(raw.is_pinned ?? raw.isPinned ?? false),
     isMuted: Boolean(raw.is_muted ?? raw.isMuted ?? false),
-    lastMessage: raw.last_message || raw.lastMessage || undefined,
+    lastMessage: (raw.last_message && typeof raw.last_message === "object" ? raw.last_message : raw.lastMessage && typeof raw.lastMessage === "object" ? raw.lastMessage : undefined) as Message | undefined,
     createdAt: String(raw.create_time ?? raw.createdAt ?? ""),
     updatedAt: String(raw.updated_at ?? raw.updatedAt ?? ""),
   };
@@ -143,7 +144,7 @@ export async function register(data: RegisterRequest): Promise<AuthResponse> {
 export async function getCurrentUser(): Promise<User> {
   const res = await request<ApiResponse<Record<string, unknown>>>("/users/me");
   const d = res.data || ({} as Record<string, unknown>);
-  return toUser(d.user ?? d);
+  return toUser((d.user as Record<string, unknown>) ?? d);
 }
 
 // 网关路径: POST /api/v1/users/logout
@@ -247,11 +248,11 @@ export async function getContacts(): Promise<Contact[]> {
   const list = Array.isArray(data)
     ? data
     : (data as { friends?: unknown[] }).friends || [];
-  return list.map((item: Record<string, unknown>) => ({
-    userId: String(item.user_id ?? item.userId ?? ""),
-    displayName: String(item.nickname ?? item.displayName ?? ""),
-    username: String(item.nickname ?? item.username ?? ""),
-    avatar: String(item.avatar_url ?? item.avatar ?? ""),
+  return list.map((item) => ({
+    userId: String((item as Record<string, unknown>).user_id ?? (item as Record<string, unknown>).userId ?? ""),
+    displayName: String((item as Record<string, unknown>).nickname ?? (item as Record<string, unknown>).displayName ?? ""),
+    username: String((item as Record<string, unknown>).nickname ?? (item as Record<string, unknown>).username ?? ""),
+    avatar: String((item as Record<string, unknown>).avatar_url ?? (item as Record<string, unknown>).avatar ?? ""),
     status: "offline" as const,
     isFriend: true,
   }));
@@ -267,6 +268,106 @@ export async function searchUsers(query: string): Promise<User[]> {
   return data.map((item) => toUser(item));
 }
 
+// ---------- 好友请求 ----------
+// POST /api/v1/relations/friend-requests
+// body: { from_user_id, to_user_id, message }
+export async function sendFriendRequest(
+  toUserId: string,
+  message: string = ""
+): Promise<void> {
+  await request("/relations/friend-requests", {
+    method: "POST",
+    body: JSON.stringify({ to_user_id: toUserId, message }),
+  });
+}
+
+// PUT /api/v1/relations/friend-requests/:id/respond
+// body: { from_user_id, to_user_id, handle_result, handle_msg }
+export async function respondFriendRequest(
+  fromUserId: string,
+  toUserId: string,
+  handleResult: number,
+  handleMsg?: string
+): Promise<void> {
+  await request(`/relations/friend-requests/${fromUserId}/respond`, {
+    method: "PUT",
+    body: JSON.stringify({
+      from_user_id: fromUserId,
+      to_user_id: toUserId,
+      handle_result: handleResult,
+      handle_msg: handleMsg || "",
+    }),
+  });
+}
+
+// GET /api/v1/relations/incoming-applies?handle_results=0&offset=0&limit=20
+export async function getIncomingRequests(
+  params?: { handleResults?: number[]; offset?: number; limit?: number }
+): Promise<FriendRequest[]> {
+  const query = new URLSearchParams();
+  if (params?.handleResults?.length) {
+    query.set("handle_results", params.handleResults.join(","));
+  }
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  const res = await request<ApiResponse<Record<string, unknown>[] | { applies: unknown[] }>>(
+    `/relations/incoming-applies?${query.toString()}`
+  );
+  const data = res.data;
+  if (!data) return [];
+  const list = Array.isArray(data) ? data : (data as { applies?: unknown[] }).applies || [];
+  return list.map((item) => toFriendRequest(item as Record<string, unknown>));
+}
+
+// GET /api/v1/relations/outgoing-applies?handle_results=0&offset=0&limit=20
+export async function getOutgoingRequests(
+  params?: { handleResults?: number[]; offset?: number; limit?: number }
+): Promise<FriendRequest[]> {
+  const query = new URLSearchParams();
+  if (params?.handleResults?.length) {
+    query.set("handle_results", params.handleResults.join(","));
+  }
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  const res = await request<ApiResponse<Record<string, unknown>[] | { applies: unknown[] }>>(
+    `/relations/outgoing-applies?${query.toString()}`
+  );
+  const data = res.data;
+  if (!data) return [];
+  const list = Array.isArray(data) ? data : (data as { applies?: unknown[] }).applies || [];
+  return list.map((item) => toFriendRequest(item as Record<string, unknown>));
+}
+
+// GET /api/v1/relations/unhandled-count
+export async function getUnhandledRequestCount(): Promise<number> {
+  const res = await request<ApiResponse<{ count: number }>>(
+    "/relations/unhandled-count"
+  );
+  const count = res.data?.count ?? 0;
+  return count;
+}
+
+// DELETE /api/v1/relations/friends/:friend_id
+export async function deleteFriend(friendId: string): Promise<void> {
+  await request(`/relations/friends/${friendId}`, {
+    method: "DELETE",
+  });
+}
+
+// 后端 FriendRequestInfo -> 前端 FriendRequest
+function toFriendRequest(raw: Record<string, unknown>): FriendRequest {
+  const statusNum = Number(raw.status ?? raw.handle_result ?? 0);
+  return {
+    requestId: String(raw.request_id || (raw.from_user_id + "_" + raw.to_user_id)),
+    fromUserId: String(raw.from_user_id ?? raw.fromUserId ?? ""),
+    toUserId: String(raw.to_user_id ?? raw.toUserId ?? ""),
+    message: String(raw.req_msg ?? raw.message ?? ""),
+    status: statusNum === 1 ? "accepted" : statusNum === -1 ? "rejected" : "pending",
+    createdAt: String(raw.create_time ?? raw.created_at ?? raw.createdAt ?? ""),
+    updatedAt: String(raw.updated_at ?? raw.handle_time ?? raw.updatedAt ?? raw.createdAt ?? ""),
+  };
+}
+
 // ---------- 群组 ----------
 // 网关路径: GET /api/v1/groups/joined
 export async function getGroups(): Promise<Group[]> {
@@ -278,13 +379,13 @@ export async function getGroups(): Promise<Group[]> {
   const list = Array.isArray(data)
     ? data
     : (data as { groups?: unknown[] }).groups || [];
-  return list.map((item: Record<string, unknown>) => ({
-    groupId: String(item.group_id ?? item.groupId ?? ""),
-    name: String(item.group_name ?? item.name ?? ""),
-    avatar: String(item.face_url ?? item.avatar ?? ""),
-    ownerId: String(item.creator_user_id ?? item.ownerId ?? ""),
-    memberCount: Number(item.member_count ?? item.memberCount ?? 0),
-    createdAt: String(item.create_time ?? item.createdAt ?? ""),
+  return list.map((item) => ({
+    groupId: String((item as Record<string, unknown>).group_id ?? (item as Record<string, unknown>).groupId ?? ""),
+    name: String((item as Record<string, unknown>).group_name ?? (item as Record<string, unknown>).name ?? ""),
+    avatar: String((item as Record<string, unknown>).face_url ?? (item as Record<string, unknown>).avatar ?? ""),
+    ownerId: String((item as Record<string, unknown>).creator_user_id ?? (item as Record<string, unknown>).ownerId ?? ""),
+    memberCount: Number((item as Record<string, unknown>).member_count ?? (item as Record<string, unknown>).memberCount ?? 0),
+    createdAt: String((item as Record<string, unknown>).create_time ?? (item as Record<string, unknown>).createdAt ?? ""),
   }));
 }
 

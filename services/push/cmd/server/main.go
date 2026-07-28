@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net"
@@ -16,6 +17,7 @@ import (
 	"push/internal/service"
 
 	pb "SuIM/proto/pushpb"
+	"SuIM/pkg/discovery"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -27,7 +29,18 @@ func main() {
 		Level: slog.LevelInfo,
 	})))
 
-	cfg := config.Load()
+	configPath := flag.String("config", "etc/push.yaml", "config file path")
+	flag.Parse()
+	cfg := config.LoadFromFile(*configPath)
+
+	// 注册到 etcd 服务发现。
+	discovery.SetEndpoints(cfg.EtcdEndpoints)
+	registry, err := discovery.NewRegistry("push", cfg.ServiceAddr, cfg.EtcdEndpoints)
+	if err != nil {
+		panic(fmt.Sprintf("failed to register with etcd: %v", err))
+	}
+	defer registry.Deregister()
+
 	db := database.MustOpen(context.Background(), cfg)
 
 	// 依赖注入：将 repository 注入到 service。

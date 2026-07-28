@@ -15,6 +15,7 @@ import (
 
 	pb "SuIM/proto/pushpb"
 	sdkws "SuIM/proto/sdkws"
+	"SuIM/pkg/discovery"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -35,17 +36,19 @@ type messageService struct {
 }
 
 // NewMessageService 创建消息服务实例。
-// pushAddr 为 push 服务地址，为空字符串则不启用离线推送。
-func NewMessageService(repo interfaces.MessageRepository, pushAddr string) interfaces.MessageService {
+// push 服务地址通过 etcd 服务发现自动解析。
+func NewMessageService(repo interfaces.MessageRepository) interfaces.MessageService {
 	svc := &messageService{repo: repo}
-	if pushAddr != "" {
-		conn, err := grpc.NewClient(pushAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			logger.Warn(context.Background(), "failed to dial push service, offline push disabled",
-				"push_addr", pushAddr, "error", err)
-		} else {
-			svc.pushClient = pb.NewPushMsgServiceClient(conn)
-		}
+	conn, err := grpc.NewClient(
+		discovery.TargetURL("push"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+	)
+	if err != nil {
+		logger.Warn(context.Background(), "failed to connect push service via etcd, offline push disabled",
+			"error", err)
+	} else {
+		svc.pushClient = pb.NewPushMsgServiceClient(conn)
 	}
 	return svc
 }

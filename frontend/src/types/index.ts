@@ -98,6 +98,28 @@ export interface Contact {
   isFriend: boolean;
 }
 
+// ---------- 好友请求 ----------
+export type FriendRequestStatus = "pending" | "accepted" | "rejected";
+
+export interface FriendRequest {
+  requestId: string;
+  fromUserId: string;
+  toUserId: string;
+  fromUser?: User;
+  toUser?: User;
+  message: string;
+  status: FriendRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// 前端专用：搜索用户结果（含好友状态）
+export interface SearchedUser extends User {
+  isFriend: boolean;
+  hasSentRequest: boolean;
+  hasIncomingRequest: boolean;
+}
+
 // ---------- 群组 ----------
 export interface CreateGroupRequest {
   name: string;

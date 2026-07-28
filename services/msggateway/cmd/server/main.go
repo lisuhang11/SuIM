@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 
 	pb "SuIM/proto/msggatewaypb"
+	"SuIM/pkg/discovery"
 	"msggateway/internal/config"
 	"msggateway/internal/connmgr"
 	"msggateway/internal/handler"
@@ -27,7 +29,17 @@ func main() {
 		Level: slog.LevelInfo,
 	})))
 
-	cfg := config.Load()
+	configPath := flag.String("config", "etc/msggateway.yaml", "config file path")
+	flag.Parse()
+	cfg := config.LoadFromFile(*configPath)
+
+	// 注册到 etcd 服务发现（msggateway 注册 gRPC 地址供 push 等服务发现）。
+	discovery.SetEndpoints(cfg.EtcdEndpoints)
+	registry, err := discovery.NewRegistry("msggateway", cfg.ServiceAddr, cfg.EtcdEndpoints)
+	if err != nil {
+		panic(fmt.Sprintf("failed to register with etcd: %v", err))
+	}
+	defer registry.Deregister()
 
 	// -------- 连接管理器 --------
 	connManager := connmgr.New(cfg.MaxConnPerUser)

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	apperrors "message/internal/errors"
 	"message/internal/types"
 	"message/internal/types/interfaces"
 

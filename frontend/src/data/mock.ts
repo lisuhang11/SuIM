@@ -263,6 +263,52 @@ export const mockContacts: Contact[] = mockUsers
     isFriend: true,
   }));
 
+// ---------- 模拟好友请求 ----------
+import type { FriendRequest } from "@/types";
+
+export const mockIncomingRequests: FriendRequest[] = [
+  {
+    requestId: "req_001",
+    fromUserId: "u_1005",
+    toUserId: "u_1001",
+    fromUser: mockUsers[4], // 孙七
+    message: "你好张三，我是孙七，加个好友方便沟通项目进度",
+    status: "pending",
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    requestId: "req_002",
+    fromUserId: "u_1006",
+    toUserId: "u_1001",
+    fromUser: mockUsers[5], // 周八
+    message: "张工好，我是测试组的周八",
+    status: "pending",
+    createdAt: new Date(Date.now() - 7200000).toISOString(),
+    updatedAt: new Date(Date.now() - 7200000).toISOString(),
+  },
+];
+
+export const mockOutgoingRequests: FriendRequest[] = [
+  {
+    requestId: "req_003",
+    fromUserId: "u_1001",
+    toUserId: "u_1004",
+    toUser: mockUsers[3], // 赵六
+    message: "赵六你好，想加你好友讨论一下上次的方案",
+    status: "pending",
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+];
+
+export const mockSentRequestUserIds = new Set(
+  mockOutgoingRequests.map((r) => r.toUserId)
+);
+export const mockIncomingRequestUserIds = new Set(
+  mockIncomingRequests.map((r) => r.fromUserId)
+);
+
 // ---------- 模拟群组 ----------
 export const mockGroups: Group[] = [
   {

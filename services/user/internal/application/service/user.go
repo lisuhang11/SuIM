@@ -124,10 +124,10 @@ func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) 
 		}, nil
 	}
 
-	// Create user.
+	// Create user with 16-char UserID (UUID without dashes, truncated).
 	now := time.Now()
 	user := &types.User{
-		UserID:       uuid.New().String(),
+		UserID:       strings.ReplaceAll(uuid.New().String(), "-", "")[:16],
 		Email:        req.Email,
 		PasswordHash: string(hashedPassword),
 		Nickname:     req.Username,

@@ -16,6 +16,7 @@ import { useChat } from "@/contexts/ChatContext";
 import ConversationItem from "./ConversationItem";
 import CreateGroupDialog from "./CreateGroupDialog";
 import UserAvatar from "../shared/UserAvatar";
+import UserProfilePopover from "../shared/UserProfilePopover";
 
 export default function ConversationList() {
   const { user } = useAuth();
@@ -28,6 +29,7 @@ export default function ConversationList() {
 
   const [search, setSearch] = useState("");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return conversations;
@@ -47,7 +49,10 @@ export default function ConversationList() {
     <div className="h-full flex flex-col bg-white w-full">
       {/* 头部: 标题 + 用户信息 */}
       <div className="h-14 flex items-center justify-between px-4 border-b border-gray-100 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
+        <button
+          onClick={() => setShowProfile(true)}
+          className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+        >
           <UserAvatar
             name={user?.displayName || user?.username || ""}
             size="sm"
@@ -63,7 +68,7 @@ export default function ConversationList() {
               {wsConnected ? "在线" : "离线"}
             </div>
           </div>
-        </div>
+        </button>
         <button
           onClick={() => setShowCreateGroup(true)}
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-indigo-500 transition-colors"
@@ -110,6 +115,10 @@ export default function ConversationList() {
 
       {showCreateGroup && (
         <CreateGroupDialog onClose={() => setShowCreateGroup(false)} />
+      )}
+
+      {showProfile && user && (
+        <UserProfilePopover user={user} onClose={() => setShowProfile(false)} />
       )}
     </div>
   );

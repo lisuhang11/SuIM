@@ -128,10 +128,10 @@ func (s *userService) Register(ctx context.Context, email, username, password st
 		return nil, apperrors.NewInternalError("failed to process password").WithDetails(err)
 	}
 
-	// 创建用户记录。
+	// 创建用户记录，UserID 取 UUID 去横线后截短至 16 位。
 	now := time.Now()
 	user := &types.User{
-		UserID:       uuid.New().String(),
+		UserID:       strings.ReplaceAll(uuid.New().String(), "-", "")[:16],
 		Email:        email,
 		PasswordHash: string(hashedPassword),
 		Nickname:     username,

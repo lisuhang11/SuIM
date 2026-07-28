@@ -1,0 +1,300 @@
+syntax = "proto3";
+
+package conversation;
+
+option go_package = "SuIM/proto/conversationpb";
+
+// Conversation is the per-user view of a chat (single or group). It mirrors the
+// `conversation` table defined in migrations/conversation.sql.
+message Conversation {
+  string owner_user_id           = 1;
+  string conversation_id         = 2;
+  int32  conversation_type       = 3; // 1=single, 2=group, ...
+  string user_id                 = 4; // peer user id (single chat)
+  string group_id                = 5; // group id (group chat)
+  int32  recv_msg_opt            = 6; // 0=receive+notify 1=mute 2=receive no-notify
+  bool   is_pinned               = 7;
+  string attached_info           = 8;
+  bool   is_private_chat         = 9;
+  int32  group_at_type           = 10;
+  string ex                      = 11;
+  int32  burn_duration           = 12; // 阅后即焚时长(秒)
+  int64  min_seq                 = 13;
+  int64  max_seq                 = 14;
+  int64  msg_destruct_time       = 15;
+  int64  latest_msg_destruct_time = 16;
+  bool   is_msg_destruct         = 17;
+  int64  create_time             = 18;
+}
+
+// ConversationReq carries the fields that may be partially updated. Every field
+// is optional so callers can update a single attribute without touching others.
+message ConversationReq {
+  string conversation_id         = 1;
+  int32  conversation_type       = 2;
+  string user_id                 = 3;
+  string group_id                = 4;
+  optional int32  recv_msg_opt   = 5;
+  optional bool   is_pinned      = 6;
+  optional string attached_info  = 7;
+  optional bool   is_private_chat = 8;
+  optional string ex             = 9;
+  optional int32  burn_duration   = 10;
+  optional int64  min_seq        = 11;
+  optional int64  max_seq        = 12;
+  optional int32  group_at_type  = 13;
+  optional int64  msg_destruct_time = 14;
+  optional bool   is_msg_destruct = 15;
+  optional int64  latest_msg_destruct_time = 16;
+}
+
+message ConversationElem {
+  string conversation_id = 1;
+  int32  recv_msg_opt    = 2;
+  int64  unread_count    = 3;
+  bool   is_pinned       = 4;
+}
+
+// --------------- SetConversation ---------------
+message SetConversationReq {
+  Conversation conversation = 1;
+}
+message SetConversationResp {}
+
+// --------------- GetConversation ---------------
+message GetConversationReq {
+  string owner_user_id   = 1;
+  string conversation_id = 2;
+}
+message GetConversationResp {
+  Conversation conversation = 1;
+}
+
+// --------------- GetConversations ---------------
+message GetConversationsReq {
+  string owner_user_id          = 1;
+  repeated string conversation_ids = 2;
+}
+message GetConversationsResp {
+  repeated Conversation conversations = 1;
+}
+
+// --------------- GetAllConversations ---------------
+message GetAllConversationsReq {
+  string owner_user_id = 1;
+}
+message GetAllConversationsResp {
+  repeated Conversation conversations = 1;
+}
+
+// --------------- GetSortedConversationList ---------------
+message GetSortedConversationListReq {
+  string user_id                  = 1;
+  repeated string conversation_ids = 2;
+  int32  offset                   = 3;
+  int32  limit                    = 4;
+}
+message GetSortedConversationListResp {
+  int64 total          = 1;
+  int64 unread_total   = 2;
+  repeated ConversationElem conversation_elems = 3;
+}
+
+// --------------- CreateSingleChatConversations ---------------
+message CreateSingleChatConversationsReq {
+  string send_id          = 1;
+  string recv_id          = 2;
+  string conversation_id  = 3; // optional, generated when empty
+  int32  conversation_type = 4;
+}
+message CreateSingleChatConversationsResp {}
+
+// --------------- CreateGroupChatConversations ---------------
+message CreateGroupChatConversationsReq {
+  string group_id          = 1;
+  repeated string user_ids = 2;
+}
+message CreateGroupChatConversationsResp {}
+
+// --------------- SetConversationMaxSeq ---------------
+message SetConversationMaxSeqReq {
+  string conversation_id = 1;
+  repeated string owner_user_ids = 2;
+  int64  max_seq         = 3;
+}
+message SetConversationMaxSeqResp {}
+
+// --------------- SetConversationMinSeq ---------------
+message SetConversationMinSeqReq {
+  string conversation_id = 1;
+  repeated string owner_user_ids = 2;
+  int64  min_seq         = 3;
+}
+message SetConversationMinSeqResp {}
+
+// --------------- GetConversationIDs ---------------
+message GetConversationIDsReq {
+  string user_id = 1;
+}
+message GetConversationIDsResp {
+  repeated string conversation_ids = 1;
+}
+
+// --------------- SetConversations ---------------
+message SetConversationsReq {
+  repeated string user_ids = 1;
+  Conversation conversation = 2;
+}
+message SetConversationsResp {}
+
+// --------------- UpdateConversation ---------------
+message UpdateConversationReq {
+  string conversation_id = 1;
+  repeated string user_ids = 2;
+  ConversationReq conversation = 3;
+}
+message UpdateConversationResp {}
+
+// --------------- GetConversationsByConversationID ---------------
+message GetConversationsByConversationIDReq {
+  repeated string conversation_ids = 1;
+}
+message GetConversationsByConversationIDResp {
+  repeated Conversation conversations = 1;
+}
+
+// --------------- GetRecvMsgNotNotifyUserIDs ---------------
+message GetRecvMsgNotNotifyUserIDsReq {
+  string group_id = 1;
+}
+message GetRecvMsgNotNotifyUserIDsResp {
+  repeated string user_ids = 1;
+}
+
+// --------------- GetConversationOfflinePushUserIDs ---------------
+message GetConversationOfflinePushUserIDsReq {
+  string conversation_id = 1;
+  repeated string user_ids = 2;
+}
+message GetConversationOfflinePushUserIDsResp {
+  repeated string user_ids = 1;
+}
+
+// --------------- GetConversationNotReceiveMessageUserIDs ---------------
+message GetConversationNotReceiveMessageUserIDsReq {
+  string conversation_id = 1;
+}
+message GetConversationNotReceiveMessageUserIDsResp {
+  repeated string user_ids = 1;
+}
+
+// --------------- GetPinnedConversationIDs ---------------
+message GetPinnedConversationIDsReq {
+  string user_id = 1;
+}
+message GetPinnedConversationIDsResp {
+  repeated string conversation_ids = 1;
+}
+
+// --------------- GetNotNotifyConversationIDs ---------------
+message GetNotNotifyConversationIDsReq {
+  string user_id = 1;
+}
+message GetNotNotifyConversationIDsResp {
+  repeated string conversation_ids = 1;
+}
+
+// --------------- DeleteConversations ---------------
+message DeleteConversationsReq {
+  string owner_user_id          = 1;
+  repeated string conversation_ids = 2;
+}
+message DeleteConversationsResp {}
+
+// --------------- UpdateConversationsByUser ---------------
+message UpdateConversationsByUserReq {
+  string user_id = 1;
+  string ex      = 2;
+}
+message UpdateConversationsByUserResp {}
+
+// --------------- GetUserConversationIDsHash ---------------
+message GetUserConversationIDsHashReq {
+  string owner_user_id = 1;
+}
+message GetUserConversationIDsHashResp {
+  uint64 hash = 1;
+}
+
+// --------------- GetOwnerConversation ---------------
+message GetOwnerConversationReq {
+  string user_id = 1;
+  int32  offset  = 2;
+  int32  limit   = 3;
+}
+message GetOwnerConversationResp {
+  int64 total = 1;
+  repeated Conversation conversations = 2;
+}
+
+// --------------- ClearUserConversationMsg ---------------
+message ClearUserConversationMsgReq {
+  int64 timestamp = 1;
+  int32 limit     = 2;
+}
+message ClearUserConversationMsgResp {
+  int32 count = 1;
+}
+
+// --------------- GetConversationsNeedClearMsg ---------------
+message GetConversationsNeedClearMsgReq {}
+message GetConversationsNeedClearMsgResp {
+  repeated Conversation conversations = 1;
+}
+
+// --------------- GetFullOwnerConversationIDs ---------------
+message GetFullOwnerConversationIDsReq {
+  string user_id = 1;
+}
+message GetFullOwnerConversationIDsResp {
+  repeated string conversation_ids = 1;
+}
+
+// --------------- GetIncrementalConversation ---------------
+message GetIncrementalConversationReq {
+  string user_id = 1;
+}
+message GetIncrementalConversationResp {
+  bool full = 1;
+  repeated Conversation conversations = 2;
+}
+
+// --------------- service ---------------
+service conversation {
+  rpc SetConversation(SetConversationReq) returns (SetConversationResp);
+  rpc GetConversation(GetConversationReq) returns (GetConversationResp);
+  rpc GetConversations(GetConversationsReq) returns (GetConversationsResp);
+  rpc GetAllConversations(GetAllConversationsReq) returns (GetAllConversationsResp);
+  rpc GetSortedConversationList(GetSortedConversationListReq) returns (GetSortedConversationListResp);
+  rpc CreateSingleChatConversations(CreateSingleChatConversationsReq) returns (CreateSingleChatConversationsResp);
+  rpc CreateGroupChatConversations(CreateGroupChatConversationsReq) returns (CreateGroupChatConversationsResp);
+  rpc SetConversationMaxSeq(SetConversationMaxSeqReq) returns (SetConversationMaxSeqResp);
+  rpc SetConversationMinSeq(SetConversationMinSeqReq) returns (SetConversationMinSeqResp);
+  rpc GetConversationIDs(GetConversationIDsReq) returns (GetConversationIDsResp);
+  rpc SetConversations(SetConversationsReq) returns (SetConversationsResp);
+  rpc UpdateConversation(UpdateConversationReq) returns (UpdateConversationResp);
+  rpc GetConversationsByConversationID(GetConversationsByConversationIDReq) returns (GetConversationsByConversationIDResp);
+  rpc GetRecvMsgNotNotifyUserIDs(GetRecvMsgNotNotifyUserIDsReq) returns (GetRecvMsgNotNotifyUserIDsResp);
+  rpc GetConversationOfflinePushUserIDs(GetConversationOfflinePushUserIDsReq) returns (GetConversationOfflinePushUserIDsResp);
+  rpc GetConversationNotReceiveMessageUserIDs(GetConversationNotReceiveMessageUserIDsReq) returns (GetConversationNotReceiveMessageUserIDsResp);
+  rpc GetPinnedConversationIDs(GetPinnedConversationIDsReq) returns (GetPinnedConversationIDsResp);
+  rpc GetNotNotifyConversationIDs(GetNotNotifyConversationIDsReq) returns (GetNotNotifyConversationIDsResp);
+  rpc DeleteConversations(DeleteConversationsReq) returns (DeleteConversationsResp);
+  rpc UpdateConversationsByUser(UpdateConversationsByUserReq) returns (UpdateConversationsByUserResp);
+  rpc GetUserConversationIDsHash(GetUserConversationIDsHashReq) returns (GetUserConversationIDsHashResp);
+  rpc GetOwnerConversation(GetOwnerConversationReq) returns (GetOwnerConversationResp);
+  rpc ClearUserConversationMsg(ClearUserConversationMsgReq) returns (ClearUserConversationMsgResp);
+  rpc GetConversationsNeedClearMsg(GetConversationsNeedClearMsgReq) returns (GetConversationsNeedClearMsgResp);
+  rpc GetFullOwnerConversationIDs(GetFullOwnerConversationIDsReq) returns (GetFullOwnerConversationIDsResp);
+  rpc GetIncrementalConversation(GetIncrementalConversationReq) returns (GetIncrementalConversationResp);
+}

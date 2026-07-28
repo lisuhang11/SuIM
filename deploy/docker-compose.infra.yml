@@ -1,0 +1,62 @@
+# ============================================================
+# SuIM - Infrastructure Docker Compose
+# ============================================================
+# Usage:
+#   docker compose -f deploy/docker-compose.infra.yml up -d
+#   docker compose -f deploy/docker-compose.infra.yml down
+#
+# This file starts infrastructure only (MySQL + etcd).
+# Use docker compose up -d to start all services.
+# ============================================================
+
+services:
+  # ==========================================================
+  # etcd v3.5 — 服务注册与发现
+  # ==========================================================
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.18
+    container_name: suim-etcd
+    restart: unless-stopped
+    environment:
+      ETCD_NAME: suim-etcd
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      ETCD_AUTO_COMPACTION_MODE: periodic
+      ETCD_AUTO_COMPACTION_RETENTION: "1"
+    ports:
+      - "2379:2379"
+    volumes:
+      - etcd-data:/etcd-data
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # ==========================================================
+  # MySQL 8.0
+  # ==========================================================
+  mysql:
+    image: mysql:8.0
+    container_name: suim-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      MYSQL_DATABASE: suim
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-suim123}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  mysql-data:
+  etcd-data:

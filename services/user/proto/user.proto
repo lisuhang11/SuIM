@@ -1,0 +1,148 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "user/proto/userpb";
+
+// UserService provides user management and authentication RPCs.
+service UserService {
+  rpc Register(RegisterReq) returns (RegisterResp);
+  rpc Login(LoginReq) returns (LoginResp);
+  rpc GetUser(GetUserReq) returns (GetUserResp);
+  rpc GetUsersByIDs(GetUsersByIDsReq) returns (GetUsersByIDsResp);
+  rpc UpdateUser(UpdateUserReq) returns (UpdateUserResp);
+  rpc DeleteUser(DeleteUserReq) returns (DeleteUserResp);
+  rpc ChangePassword(ChangePasswordReq) returns (ChangePasswordResp);
+  rpc ValidateToken(ValidateTokenReq) returns (ValidateTokenResp);
+  rpc RefreshToken(RefreshTokenReq) returns (RefreshTokenResp);
+  rpc Logout(LogoutReq) returns (LogoutResp);
+  rpc SearchUsers(SearchUsersReq) returns (SearchUsersResp);
+}
+
+// --------------- User message ---------------
+message UserInfo {
+  string user_id             = 1;
+  string nickname            = 2;
+  string email               = 3;
+  string avatar_url          = 4;
+  string ex                  = 5;
+  int32  app_manger_level    = 6;
+  int32  global_recv_msg_opt = 7;
+  bool   is_active           = 8;
+  int64  create_time         = 9;
+  int64  updated_at          = 10;
+}
+
+// --------------- Register ---------------
+message RegisterReq {
+  string username = 1;
+  string email    = 2;
+  string password = 3;
+}
+
+message RegisterResp {
+  bool     success = 1;
+  string   message = 2;
+  UserInfo user    = 3;
+}
+
+// --------------- Login ---------------
+message LoginReq {
+  string email    = 1;
+  string password = 2;
+}
+
+message LoginResp {
+  bool     success       = 1;
+  string   message       = 2;
+  UserInfo user          = 3;
+  string   access_token  = 4;
+  string   refresh_token = 5;
+}
+
+// --------------- GetUser ---------------
+message GetUserReq {
+  string user_id = 1;
+}
+
+message GetUserResp {
+  UserInfo user = 1;
+}
+
+// --------------- GetUsersByIDs ---------------
+message GetUsersByIDsReq {
+  repeated string user_ids = 1;
+}
+
+message GetUsersByIDsResp {
+  map<string, UserInfo> users = 1;
+}
+
+// --------------- UpdateUser ---------------
+message UpdateUserReq {
+  UserInfo user = 1;
+}
+
+message UpdateUserResp {
+  bool success = 1;
+}
+
+// --------------- DeleteUser ---------------
+message DeleteUserReq {
+  string user_id = 1;
+}
+
+message DeleteUserResp {
+  bool success = 1;
+}
+
+// --------------- ChangePassword ---------------
+message ChangePasswordReq {
+  string user_id      = 1;
+  string old_password = 2;
+  string new_password = 3;
+}
+
+message ChangePasswordResp {
+  bool   success = 1;
+  string message = 2;
+}
+
+// --------------- ValidateToken ---------------
+message ValidateTokenReq {
+  string token = 1;
+}
+
+message ValidateTokenResp {
+  bool     valid = 1;
+  UserInfo user  = 2;
+}
+
+// --------------- RefreshToken ---------------
+message RefreshTokenReq {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResp {
+  string access_token   = 1;
+  string refresh_token  = 2;
+}
+
+// --------------- Logout ---------------
+message LogoutReq {
+  string token = 1;
+}
+
+message LogoutResp {
+  bool success = 1;
+}
+
+// --------------- SearchUsers ---------------
+message SearchUsersReq {
+  string query = 1;
+  int32  limit = 2;
+}
+
+message SearchUsersResp {
+  repeated UserInfo users = 1;
+}

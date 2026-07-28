@@ -50,6 +50,7 @@ interface ChatContextValue extends ChatState {
   addConversation: (conv: Conversation) => void;
   removeConversation: (id: string) => void;
   refreshConversations: () => Promise<void>;
+  refreshGroups: () => Promise<void>;
   loadMessages: (conversationId: string) => Promise<void>;
   searchContacts: (query: string) => Contact[];
   createGroup: (name: string, memberIds: string[]) => Promise<Conversation | null>;
@@ -489,6 +490,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [user]
   );
 
+  // ---------- 刷新群组列表 ----------
+  const refreshGroups = useCallback(async () => {
+    try {
+      const api = await import("@/services/api");
+      const groups = await api.getGroups();
+      if (groups.length > 0) {
+        setState((prev) => ({ ...prev, groups }));
+      }
+    } catch {
+      // API 不可用，保持 mock 数据
+    }
+  }, []);
+
   return (
     <ChatContext.Provider
       value={{
@@ -500,6 +514,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         addConversation,
         removeConversation,
         refreshConversations,
+        refreshGroups,
         loadMessages,
         searchContacts,
         createGroup,

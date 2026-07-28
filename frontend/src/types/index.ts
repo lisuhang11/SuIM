@@ -133,7 +133,50 @@ export interface Group {
   avatar: string;
   ownerId: string;
   memberCount: number;
+  introduction?: string;
+  notification?: string;
+  needVerification?: boolean;
+  isMuted?: boolean;
   createdAt: string;
+}
+
+// 群成员
+export interface GroupMemberInfo {
+  userId: string;
+  groupId: string;
+  displayName: string;
+  username: string;
+  avatar: string;
+  roleLevel: number; // 0=普通成员, 1=管理员, 2=群主
+  muteEndTime: number; // Unix 时间戳毫秒，0 表示未禁言
+  joinedAt: string;
+}
+
+// 入群申请
+export type GroupApplicationStatus = "pending" | "accepted" | "rejected";
+
+export interface GroupApplication {
+  applicationId: string;
+  groupId: string;
+  userId: string;
+  user?: User;
+  groupName?: string;
+  message: string;
+  status: GroupApplicationStatus;
+  handleUserId?: string;
+  handleMsg?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// 群信息更新
+export interface UpdateGroupRequest {
+  groupId: string;
+  name?: string;
+  avatar?: string;
+  introduction?: string;
+  notification?: string;
+  needVerification?: boolean;
 }
 
 // ---------- WebSocket 消息协议 ----------

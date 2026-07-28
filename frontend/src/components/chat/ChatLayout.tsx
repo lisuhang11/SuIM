@@ -2,6 +2,7 @@
 
 // ============================================================
 // ChatLayout — 3 栏布局：图标导航 | 面板 | 聊天区域
+// 三个栏目：会话 | 好友 | 群聊
 // ============================================================
 import React, { useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,9 +11,8 @@ import { useRouter } from "next/navigation";
 import SidebarNav from "./SidebarNav";
 import type { NavSection } from "./SidebarNav";
 import ConversationList from "./ConversationList";
-import ContactsPanel from "./ContactsPanel";
-import AddFriendPanel from "./AddFriendPanel";
-import FriendRequestsPanel from "./FriendRequestsPanel";
+import FriendsPanel from "./FriendsPanel";
+import GroupsPanel from "./GroupsPanel";
 import ChatArea from "./ChatArea";
 import EmptyChat from "./EmptyChat";
 import { getConversationById, getMessagesByConversationId } from "@/data/mock";
@@ -48,25 +48,16 @@ export default function ChatLayout() {
     ? messages[activeConversationId] || getMessagesByConversationId(activeConversationId)
     : [];
 
-  const showPanel = !activeConversation || true; // 桌面端始终显示面板
-
   return (
     <div className="h-screen flex bg-gray-50 overflow-hidden">
-      {/* 栏 1: 图标导航 (64px) */}
+      {/* 栏 1: 图标导航 (64px) — 会话 | 好友 | 群聊 */}
       <SidebarNav activeSection={navSection} onNavigate={handleNavigate} />
 
       {/* 栏 2: 内容面板 (280px) — 桌面端始终可见 */}
-      <div
-        className="hidden md:flex w-72 flex-shrink-0 border-r border-gray-200 bg-white"
-      >
+      <div className="hidden md:flex w-72 flex-shrink-0 border-r border-gray-200 bg-white">
         {navSection === "chats" && <ConversationList />}
-        {navSection === "contacts" && <ContactsPanel />}
-        {navSection === "requests" && <FriendRequestsPanel />}
-        {navSection === "settings" && (
-          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-            设置页面（开发中）
-          </div>
-        )}
+        {navSection === "friends" && <FriendsPanel />}
+        {navSection === "groups" && <GroupsPanel />}
       </div>
 
       {/* 栏 3: 聊天区域 — flex-1 */}
@@ -75,9 +66,7 @@ export default function ChatLayout() {
           <ChatArea
             conversation={activeConversation}
             messages={activeMessages}
-            onBack={() => {
-              // 移动端返回面板
-            }}
+            onBack={() => {}}
           />
         ) : (
           <EmptyChat />

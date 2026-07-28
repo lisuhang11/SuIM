@@ -14,6 +14,9 @@ import type {
   FriendRequest,
   CreateGroupRequest,
   Group,
+  GroupMemberInfo,
+  GroupApplication,
+  UpdateGroupRequest,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9000/api/v1";
@@ -385,8 +388,196 @@ export async function getGroups(): Promise<Group[]> {
     avatar: String((item as Record<string, unknown>).face_url ?? (item as Record<string, unknown>).avatar ?? ""),
     ownerId: String((item as Record<string, unknown>).creator_user_id ?? (item as Record<string, unknown>).ownerId ?? ""),
     memberCount: Number((item as Record<string, unknown>).member_count ?? (item as Record<string, unknown>).memberCount ?? 0),
+    introduction: String((item as Record<string, unknown>).introduction ?? ""),
+    notification: String((item as Record<string, unknown>).notification ?? ""),
+    needVerification: Boolean((item as Record<string, unknown>).need_verification ?? false),
     createdAt: String((item as Record<string, unknown>).create_time ?? (item as Record<string, unknown>).createdAt ?? ""),
   }));
+}
+
+// 网关路径: GET /api/v1/groups/:id
+export async function getGroupInfo(groupId: string): Promise<Group> {
+  const res = await request<ApiResponse<Record<string, unknown>>>(
+    `/groups/${groupId}`
+  );
+  const item = res.data || {};
+  return {
+    groupId: String(item.group_id ?? item.groupId ?? groupId),
+    name: String(item.group_name ?? item.name ?? ""),
+    avatar: String(item.face_url ?? item.avatar ?? ""),
+    ownerId: String(item.creator_user_id ?? item.ownerId ?? ""),
+    memberCount: Number(item.member_count ?? item.memberCount ?? 0),
+    introduction: String(item.introduction ?? ""),
+    notification: String(item.notification ?? ""),
+    needVerification: Boolean(item.need_verification ?? false),
+    createdAt: String(item.create_time ?? item.createdAt ?? ""),
+  };
+}
+
+// 网关路径: PUT /api/v1/groups/:id
+export async function updateGroupInfo(data: UpdateGroupRequest): Promise<void> {
+  const body: Record<string, unknown> = {};
+  if (data.name !== undefined) body.group_name = data.name;
+  if (data.avatar !== undefined) body.face_url = data.avatar;
+  if (data.introduction !== undefined) body.introduction = data.introduction;
+  if (data.notification !== undefined) body.notification = data.notification;
+  if (data.needVerification !== undefined) body.need_verification = data.needVerification;
+  await request(`/groups/${data.groupId}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+// 网关路径: DELETE /api/v1/groups/:id
+export async function dismissGroup(groupId: string): Promise<void> {
+  await request(`/groups/${groupId}`, { method: "DELETE" });
+}
+
+// 网关路径: PUT /api/v1/groups/:id/owner
+export async function transferGroupOwner(groupId: string, newOwnerId: string): Promise<void> {
+  await request(`/groups/${groupId}/owner`, {
+    method: "PUT",
+    body: JSON.stringify({ new_owner_id: newOwnerId }),
+  });
+}
+
+// 网关路径: POST /api/v1/groups/:id/members
+export async function inviteToGroup(groupId: string, userIds: string[]): Promise<void> {
+  await request(`/groups/${groupId}/members`, {
+    method: "POST",
+    body: JSON.stringify({ member_ids: userIds }),
+  });
+}
+
+// 网关路径: DELETE /api/v1/groups/:id/members/:userId
+export async function kickGroupMember(groupId: string, userId: string): Promise<void> {
+  await request(`/groups/${groupId}/members/${userId}`, { method: "DELETE" });
+}
+
+// 网关路径: POST /api/v1/groups/:id/quit
+export async function quitGroup(groupId: string): Promise<void> {
+  await request(`/groups/${groupId}/quit`, { method: "POST" });
+}
+
+// 网关路径: GET /api/v1/groups/:id/members?offset=&limit=
+export async function getGroupMembers(
+  groupId: string,
+  params?: { offset?: number; limit?: number }
+): Promise<GroupMemberInfo[]> {
+  const query = new URLSearchParams();
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  else query.set("limit", "100");
+  const res = await request<ApiResponse<Record<string, unknown>[] | { members: unknown[] }>>(
+    `/groups/${groupId}/members?${query.toString()}`
+  );
+  const data = res.data;
+  if (!data) return [];
+  const list = Array.isArray(data) ? data : (data as { members?: unknown[] }).members || [];
+  return list.map((item) => ({
+    userId: String((item as Record<string, unknown>).user_id ?? (item as Record<string, unknown>).userId ?? ""),
+    groupId: String((item as Record<string, unknown>).group_id ?? (item as Record<string, unknown>).groupId ?? groupId),
+    displayName: String((item as Record<string, unknown>).nickname ?? (item as Record<string, unknown>).displayName ?? ""),
+    username: String((item as Record<string, unknown>).nickname ?? (item as Record<string, unknown>).username ?? ""),
+    avatar: String((item as Record<string, unknown>).face_url ?? (item as Record<string, unknown>).avatar ?? ""),
+    roleLevel: Number((item as Record<string, unknown>).role_level ?? (item as Record<string, unknown>).roleLevel ?? 0),
+    muteEndTime: Number((item as Record<string, unknown>).mute_end_time ?? (item as Record<string, unknown>).muteEndTime ?? 0),
+    joinedAt: String((item as Record<string, unknown>).join_time ?? (item as Record<string, unknown>).joinedAt ?? ""),
+  }));
+}
+
+// 网关路径: PUT /api/v1/groups/:id/mute
+export async function setGroupMute(groupId: string, isMuted: boolean): Promise<void> {
+  await request(`/groups/${groupId}/mute`, {
+    method: "PUT",
+    body: JSON.stringify({ is_muted: isMuted }),
+  });
+}
+
+// 网关路径: PUT /api/v1/groups/:id/members/:userId/mute
+export async function setMemberMute(
+  groupId: string,
+  userId: string,
+  muteEndTime: number
+): Promise<void> {
+  await request(`/groups/${groupId}/members/${userId}/mute`, {
+    method: "PUT",
+    body: JSON.stringify({ mute_end_time: muteEndTime }),
+  });
+}
+
+// ---------- 入群申请 ----------
+// 网关路径: POST /api/v1/groups/:id/apply
+export async function applyToJoinGroup(groupId: string, message?: string): Promise<void> {
+  await request(`/groups/${groupId}/apply`, {
+    method: "POST",
+    body: JSON.stringify({ message: message || "" }),
+  });
+}
+
+// 网关路径: GET /api/v1/groups/:id/applications
+export async function getPendingApplications(groupId: string): Promise<GroupApplication[]> {
+  const res = await request<ApiResponse<Record<string, unknown>[] | { applications: unknown[] }>>(
+    `/groups/${groupId}/applications`
+  );
+  const data = res.data;
+  if (!data) return [];
+  const list = Array.isArray(data) ? data : (data as { applications?: unknown[] }).applications || [];
+  return list.map((item) => toGroupApplication(item as Record<string, unknown>));
+}
+
+// 网关路径: GET /api/v1/groups/applications/mine
+export async function getMyApplications(): Promise<GroupApplication[]> {
+  const res = await request<ApiResponse<Record<string, unknown>[] | { applications: unknown[] }>>(
+    "/groups/applications/mine"
+  );
+  const data = res.data;
+  if (!data) return [];
+  const list = Array.isArray(data) ? data : (data as { applications?: unknown[] }).applications || [];
+  return list.map((item) => toGroupApplication(item as Record<string, unknown>));
+}
+
+// 网关路径: PUT /api/v1/groups/applications/:id
+export async function handleApplication(
+  applicationId: string,
+  accept: boolean,
+  handleMsg?: string
+): Promise<void> {
+  await request(`/groups/applications/${applicationId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      handle_result: accept ? 1 : -1,
+      handle_msg: handleMsg || "",
+    }),
+  });
+}
+
+// 网关路径: GET /api/v1/groups/unhandled-application-count
+export async function getUnhandledGroupApplicationCount(): Promise<number> {
+  try {
+    const res = await request<ApiResponse<{ count: number }>>(
+      "/groups/unhandled-application-count"
+    );
+    return res.data?.count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+function toGroupApplication(raw: Record<string, unknown>): GroupApplication {
+  const statusNum = Number(raw.status ?? raw.handle_result ?? 0);
+  return {
+    applicationId: String(raw.application_id ?? raw.request_id ?? raw.applicationId ?? ""),
+    groupId: String(raw.group_id ?? raw.groupId ?? ""),
+    userId: String(raw.user_id ?? raw.userId ?? ""),
+    groupName: String(raw.group_name ?? raw.groupName ?? ""),
+    message: String(raw.req_msg ?? raw.message ?? ""),
+    status: statusNum === 1 ? "accepted" : statusNum === -1 ? "rejected" : "pending",
+    handleUserId: raw.handle_user_id ? String(raw.handle_user_id) : undefined,
+    handleMsg: raw.handle_msg ? String(raw.handle_msg) : undefined,
+    createdAt: String(raw.create_time ?? raw.created_at ?? raw.createdAt ?? ""),
+    updatedAt: String(raw.updated_at ?? raw.handle_time ?? raw.updatedAt ?? ""),
+  };
 }
 
 // ---------- 上传 ----------

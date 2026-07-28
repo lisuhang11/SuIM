@@ -2,23 +2,21 @@
 
 // ============================================================
 // SidebarNav — 纵向图标导航栏
-// 类似 Slack/Discord/QQ 桌面端的左侧图标栏
+// 三个栏目：会话 | 好友 | 群聊
 // ============================================================
-import React from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   MessageSquare,
   Users,
-  Bell,
-  Settings,
+  UserPlus,
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import UserAvatar from "../shared/UserAvatar";
-import { mockIncomingRequests } from "@/data/mock";
 
-export type NavSection = "chats" | "contacts" | "requests" | "settings";
+export type NavSection = "chats" | "friends" | "groups";
 
 interface SidebarNavProps {
   activeSection: NavSection;
@@ -28,7 +26,29 @@ interface SidebarNavProps {
 export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const incomingCount = mockIncomingRequests.length;
+  const [friendBadge, setFriendBadge] = useState(0);
+  const [groupBadge, setGroupBadge] = useState(0);
+
+  // 定期拉取未处理的好友请求数 & 入群申请数
+  const fetchBadges = useCallback(async () => {
+    try {
+      const api = await import("@/services/api");
+      const [friendCount, groupCount] = await Promise.allSettled([
+        api.getUnhandledRequestCount(),
+        api.getUnhandledGroupApplicationCount(),
+      ]);
+      if (friendCount.status === "fulfilled") setFriendBadge(friendCount.value);
+      if (groupCount.status === "fulfilled") setGroupBadge(groupCount.value);
+    } catch {
+      // 忽略，使用 mock badge
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBadges();
+    const timer = setInterval(fetchBadges, 30000); // 30s 轮询
+    return () => clearInterval(timer);
+  }, [fetchBadges]);
 
   const navItems: {
     id: NavSection;
@@ -36,10 +56,9 @@ export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProp
     label: string;
     badge?: number;
   }[] = [
-    { id: "chats", icon: MessageSquare, label: "聊天" },
-    { id: "contacts", icon: Users, label: "联系人" },
-    { id: "requests", icon: Bell, label: "好友请求", badge: incomingCount },
-    { id: "settings", icon: Settings, label: "设置" },
+    { id: "chats", icon: MessageSquare, label: "会话" },
+    { id: "friends", icon: Users, label: "好友", badge: friendBadge },
+    { id: "groups", icon: UserPlus, label: "群聊", badge: groupBadge },
   ];
 
   const handleLogout = async () => {

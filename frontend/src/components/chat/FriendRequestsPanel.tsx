@@ -9,21 +9,14 @@ import { useChat } from "@/contexts/ChatContext";
 import UserAvatar from "../shared/UserAvatar";
 import { cn } from "@/lib/utils";
 import type { FriendRequest } from "@/types";
-import {
-  mockIncomingRequests,
-  mockOutgoingRequests,
-  mockUsers,
-  mockSentRequestUserIds,
-  mockIncomingRequestUserIds,
-} from "@/data/mock";
 
 type TabType = "incoming" | "outgoing";
 
 export default function FriendRequestsPanel() {
   const { refreshConversations } = useChat();
   const [tab, setTab] = useState<TabType>("incoming");
-  const [incomingReqs, setIncomingReqs] = useState<FriendRequest[]>(mockIncomingRequests);
-  const [outgoingReqs, setOutgoingReqs] = useState<FriendRequest[]>(mockOutgoingRequests);
+  const [incomingReqs, setIncomingReqs] = useState<FriendRequest[]>([]);
+  const [outgoingReqs, setOutgoingReqs] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [handlingId, setHandlingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -37,23 +30,10 @@ export default function FriendRequestsPanel() {
         api.getIncomingRequests({ handleResults: [0] }),
         api.getOutgoingRequests({ handleResults: [0] }),
       ]);
-      if (incomingRes.status === "fulfilled" && incomingRes.value.length > 0) {
-        // 附加上 mock 用户信息
-        const enriched = incomingRes.value.map((req) => ({
-          ...req,
-          fromUser: mockUsers.find((u) => u.userId === req.fromUserId),
-        }));
-        setIncomingReqs(enriched);
-      }
-      if (outgoingRes.status === "fulfilled" && outgoingRes.value.length > 0) {
-        const enriched = outgoingRes.value.map((req) => ({
-          ...req,
-          toUser: mockUsers.find((u) => u.userId === req.toUserId),
-        }));
-        setOutgoingReqs(enriched);
-      }
+      if (incomingRes.status === "fulfilled") setIncomingReqs(incomingRes.value);
+      if (outgoingRes.status === "fulfilled") setOutgoingReqs(outgoingRes.value);
     } catch {
-      // 使用 mock 数据
+      // API 不可用
     } finally {
       setLoading(false);
     }
@@ -90,7 +70,7 @@ export default function FriendRequestsPanel() {
           refreshConversations();
         }
       } catch {
-        // mock 回退
+        // API 不可用
         setIncomingReqs((prev) => prev.filter((r) => r.requestId !== request.requestId));
         setFeedback({
           type: "success",

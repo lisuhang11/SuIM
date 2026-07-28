@@ -6,7 +6,7 @@
 import React, { useEffect, useRef } from "react";
 import type { Message } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockConversations } from "@/data/mock";
+import { useChat } from "@/contexts/ChatContext";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
 
@@ -22,10 +22,11 @@ export default function MessageList({
   typingUsers,
 }: MessageListProps) {
   const { user } = useAuth();
+  const { conversations } = useChat();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // 判断是否为群聊
-  const conv = mockConversations.find((c) => c.conversationId === conversationId);
+  const conv = conversations.find((c) => c.conversationId === conversationId);
   const isGroup = conv?.type === "group";
 
   // 自动滚动到底部

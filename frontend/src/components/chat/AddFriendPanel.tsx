@@ -9,7 +9,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import UserAvatar from "../shared/UserAvatar";
 import { cn } from "@/lib/utils";
 import type { User, SearchedUser } from "@/types";
-import { mockUsers, mockSentRequestUserIds, mockIncomingRequestUserIds } from "@/data/mock";
 
 interface AddFriendPanelProps {
   embedded?: boolean; // 嵌入在联系人面板中时隐藏标题头
@@ -21,7 +20,7 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
   const [results, setResults] = useState<SearchedUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
-  const [sentSet, setSentSet] = useState<Set<string>>(new Set(mockSentRequestUserIds));
+  const [sentSet, setSentSet] = useState<Set<string>>(new Set());
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const handleSearch = useCallback(async (query: string) => {
@@ -43,26 +42,11 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
           ...u,
           isFriend: false,
           hasSentRequest: sentSet.has(u.userId),
-          hasIncomingRequest: mockIncomingRequestUserIds.has(u.userId),
+          hasIncomingRequest: false,
         }));
       setResults(enriched);
     } catch {
-      // 回退到本地 mock 搜索
-      const q = query.toLowerCase();
-      const filtered = mockUsers.filter(
-        (u) =>
-          u.userId !== currentUser?.userId &&
-          (u.username.toLowerCase().includes(q) ||
-            u.displayName.toLowerCase().includes(q) ||
-            u.email.toLowerCase().includes(q))
-      );
-      const enriched: SearchedUser[] = filtered.map((u) => ({
-        ...u,
-        isFriend: false,
-        hasSentRequest: sentSet.has(u.userId),
-        hasIncomingRequest: mockIncomingRequestUserIds.has(u.userId),
-      }));
-      setResults(enriched);
+      setResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -85,14 +69,7 @@ export default function AddFriendPanel({ embedded = false }: AddFriendPanelProps
         )
       );
     } catch {
-      // mock 回退
-      setSentSet((prev) => new Set(prev).add(targetUser.userId));
-      setFeedback({ type: "success", message: `已向 ${targetUser.displayName} 发送好友请求` });
-      setResults((prev) =>
-        prev.map((u) =>
-          u.userId === targetUser.userId ? { ...u, hasSentRequest: true } : u
-        )
-      );
+      setFeedback({ type: "error", message: "发送失败，请检查后端服务" });
     } finally {
       setSendingId(null);
     }

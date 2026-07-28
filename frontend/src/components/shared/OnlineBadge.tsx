@@ -5,7 +5,7 @@
 // ============================================================
 import React from "react";
 import type { UserStatus } from "@/types";
-import { getStatusColor } from "@/data/mock";
+import { getStatusColor } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 interface OnlineBadgeProps {

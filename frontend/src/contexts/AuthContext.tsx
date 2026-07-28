@@ -8,7 +8,6 @@ import type { User, LoginRequest, RegisterRequest } from "@/types";
 import * as api from "@/services/api";
 import * as storage from "@/services/storage";
 import { wsManager } from "@/services/websocket";
-import { mockUsers } from "@/data/mock";
 
 interface AuthState {
   user: User | null;
@@ -94,28 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: null,
       });
       wsManager.connect();
-    } catch {
-      // API 不可用时回退到 mock（便于纯前端调试）
-      try {
-        const found = mockUsers.find(
-          (u) => u.username === data.username || u.email === data.username
-        );
-        if (!found) throw new Error("用户不存在");
-
-        storage.setToken("mock_dev_token_suim");
-        storage.setCachedUser(found);
-        setState({
-          user: found,
-          isLoading: false,
-          isAuthenticated: true,
-          error: null,
-        });
-        wsManager.connect();
-      } catch (mockErr) {
-        const message = mockErr instanceof Error ? mockErr.message : "登录失败";
-        setState((s) => ({ ...s, isLoading: false, error: message }));
-        throw mockErr;
-      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "登录失败，请检查后端服务";
+      setState((s) => ({ ...s, isLoading: false, error: message }));
+      throw err;
     }
   }, []);
 
@@ -133,32 +114,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: null,
       });
       wsManager.connect();
-    } catch {
-      // API 不可用时回退到 mock
-      try {
-        const newUser: User = {
-          userId: `u_${Date.now()}`,
-          username: data.username,
-          displayName: data.displayName,
-          email: data.email,
-          avatar: "",
-          status: "online",
-          createdAt: new Date().toISOString(),
-        };
-        storage.setToken("mock_dev_token_suim");
-        storage.setCachedUser(newUser);
-        setState({
-          user: newUser,
-          isLoading: false,
-          isAuthenticated: true,
-          error: null,
-        });
-        wsManager.connect();
-      } catch (mockErr) {
-        const message = mockErr instanceof Error ? mockErr.message : "注册失败";
-        setState((s) => ({ ...s, isLoading: false, error: message }));
-        throw mockErr;
-      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "注册失败，请检查后端服务";
+      setState((s) => ({ ...s, isLoading: false, error: message }));
+      throw err;
     }
   }, []);
 

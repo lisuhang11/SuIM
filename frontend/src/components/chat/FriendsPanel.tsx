@@ -20,7 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { Contact, FriendRequest } from "@/types";
 import UserAvatar from "../shared/UserAvatar";
 import OnlineBadge from "../shared/OnlineBadge";
-import { getStatusText } from "@/data/mock";
+import { getStatusText } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 type SubView = "list" | "add" | "requests";
@@ -244,14 +244,7 @@ function SearchAndAdd({ onBack, currentUser }: { onBack: () => void; currentUser
           }))
       );
     } catch {
-      const { mockUsers } = await import("@/data/mock");
-      const q = query.toLowerCase();
-      setResults(
-        mockUsers
-          .filter((u) => u.userId !== currentUser?.userId &&
-            (u.username.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)))
-          .map((u) => ({ ...u, hasSentRequest: sentSet.has(u.userId) }))
-      );
+      setResults([]);
     } finally {
       setIsSearching(false);
     }

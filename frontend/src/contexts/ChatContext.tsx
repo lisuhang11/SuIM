@@ -23,13 +23,6 @@ import type {
 import { useAuth } from "./AuthContext";
 import { wsManager } from "@/services/websocket";
 import * as storage from "@/services/storage";
-import {
-  mockConversations,
-  mockMessages,
-  mockContacts,
-  mockGroups,
-  getUserById,
-} from "@/data/mock";
 
 interface ChatState {
   conversations: Conversation[];
@@ -76,7 +69,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // ---------- 初始化：加载数据（优先真实 API，回退 mock）----------
+  // ---------- 初始化：从后端 API 加载数据 ----------
   useEffect(() => {
     if (!user) return;
 
@@ -93,20 +86,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
         setState((s) => ({
           ...s,
-          conversations: convRes.status === "fulfilled" ? convRes.value : mockConversations,
-          messages: mockMessages, // 消息按会话懒加载
-          contacts: contactRes.status === "fulfilled" ? contactRes.value : mockContacts,
-          groups: groupRes.status === "fulfilled" ? groupRes.value : mockGroups,
+          conversations: convRes.status === "fulfilled" ? convRes.value : [],
+          messages: {},
+          contacts: contactRes.status === "fulfilled" ? contactRes.value : [],
+          groups: groupRes.status === "fulfilled" ? groupRes.value : [],
           isLoading: false,
         }));
       } catch {
-        // 回退到 mock 数据
+        // API 不可用，使用空数据
         setState((s) => ({
           ...s,
-          conversations: mockConversations,
-          messages: mockMessages,
-          contacts: mockContacts,
-          groups: mockGroups,
+          conversations: [],
+          messages: {},
+          contacts: [],
+          groups: [],
           isLoading: false,
         }));
       }
@@ -396,7 +389,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         messages: { ...prev.messages, [conversationId]: msgs },
       }));
     } catch {
-      // API 不可用时，保持 mock 数据
+      // API 不可用，保持当前数据
     }
   }, []);
 
@@ -499,7 +492,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         setState((prev) => ({ ...prev, groups }));
       }
     } catch {
-      // API 不可用，保持 mock 数据
+      // API 不可用，保持当前数据
     }
   }, []);
 

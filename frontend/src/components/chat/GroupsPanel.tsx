@@ -29,7 +29,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { Group, GroupMemberInfo, GroupApplication } from "@/types";
 import UserAvatar from "../shared/UserAvatar";
 import { cn } from "@/lib/utils";
-import { mockUsers } from "@/data/mock";
 
 type SubView = "list" | "detail" | "applications";
 
@@ -251,20 +250,7 @@ function GroupDetailPanel({
       const list = await api.getGroupMembers(group.groupId);
       setMembers(list);
     } catch {
-      // mock fallback
-      const { mockUsers } = await import("@/data/mock");
-      setMembers(
-        mockUsers.slice(0, group.memberCount).map((u) => ({
-          userId: u.userId,
-          groupId: group.groupId,
-          displayName: u.displayName,
-          username: u.username,
-          avatar: u.avatar,
-          roleLevel: u.userId === group.ownerId ? 2 : u.userId === currentUser?.userId ? 1 : 0,
-          muteEndTime: 0,
-          joinedAt: group.createdAt,
-        }))
-      );
+      // API 不可用，保持空列表
     } finally {
       setLoading(false);
     }

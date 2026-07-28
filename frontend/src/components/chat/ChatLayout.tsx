@@ -15,11 +15,10 @@ import FriendsPanel from "./FriendsPanel";
 import GroupsPanel from "./GroupsPanel";
 import ChatArea from "./ChatArea";
 import EmptyChat from "./EmptyChat";
-import { getConversationById, getMessagesByConversationId } from "@/data/mock";
 
 export default function ChatLayout() {
   const { user, isLoading } = useAuth();
-  const { activeConversationId, messages } = useChat();
+  const { activeConversationId, messages, conversations } = useChat();
   const router = useRouter();
   const [navSection, setNavSection] = useState<NavSection>("chats");
 
@@ -42,10 +41,10 @@ export default function ChatLayout() {
   }
 
   const activeConversation = activeConversationId
-    ? getConversationById(activeConversationId)
+    ? conversations.find((c) => c.conversationId === activeConversationId) ?? null
     : null;
   const activeMessages = activeConversationId
-    ? messages[activeConversationId] || getMessagesByConversationId(activeConversationId)
+    ? messages[activeConversationId] || []
     : [];
 
   return (

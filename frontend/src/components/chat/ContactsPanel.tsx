@@ -9,7 +9,7 @@ import { useChat } from "@/contexts/ChatContext";
 import type { Contact } from "@/types";
 import UserAvatar from "../shared/UserAvatar";
 import OnlineBadge from "../shared/OnlineBadge";
-import { getStatusText } from "@/data/mock";
+import { getStatusText } from "@/lib/status";
 import AddFriendPanel from "./AddFriendPanel";
 
 export default function ContactsPanel() {

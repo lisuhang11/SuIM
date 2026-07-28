@@ -368,12 +368,12 @@ export async function getIncomingRequests(
   }
   if (params?.offset !== undefined) query.set("offset", String(params.offset));
   if (params?.limit !== undefined) query.set("limit", String(params.limit));
-  const res = await request<ApiResponse<Record<string, unknown>[] | { applies: unknown[] }>>(
+  const res = await request<ApiResponse<Record<string, unknown>[] | { requests: unknown[] }>>(
     `/relations/incoming-applies?${query.toString()}`
   );
   const data = res.data;
   if (!data) return [];
-  const list = Array.isArray(data) ? data : (data as { applies?: unknown[] }).applies || [];
+  const list = Array.isArray(data) ? data : (data as { requests?: unknown[] }).requests || [];
   return list.map((item) => toFriendRequest(item as Record<string, unknown>));
 }
 
@@ -387,12 +387,12 @@ export async function getOutgoingRequests(
   }
   if (params?.offset !== undefined) query.set("offset", String(params.offset));
   if (params?.limit !== undefined) query.set("limit", String(params.limit));
-  const res = await request<ApiResponse<Record<string, unknown>[] | { applies: unknown[] }>>(
+  const res = await request<ApiResponse<Record<string, unknown>[] | { requests: unknown[] }>>(
     `/relations/outgoing-applies?${query.toString()}`
   );
   const data = res.data;
   if (!data) return [];
-  const list = Array.isArray(data) ? data : (data as { applies?: unknown[] }).applies || [];
+  const list = Array.isArray(data) ? data : (data as { requests?: unknown[] }).requests || [];
   return list.map((item) => toFriendRequest(item as Record<string, unknown>));
 }
 
@@ -412,17 +412,19 @@ export async function deleteFriend(friendId: string): Promise<void> {
   });
 }
 
-// 后端 FriendRequestInfo -> 前端 FriendRequest
+// 后端 FriendRequestInfo (proto) -> 前端 FriendRequest
 function toFriendRequest(raw: Record<string, unknown>): FriendRequest {
   const statusNum = Number(raw.status ?? raw.handle_result ?? 0);
+  const createdAtMs = Number(raw.created_at ?? raw.create_time ?? 0);
+  const updatedAtMs = Number(raw.updated_at ?? raw.handle_time ?? 0);
   return {
     requestId: String(raw.request_id || (raw.from_user_id + "_" + raw.to_user_id)),
     fromUserId: String(raw.from_user_id ?? raw.fromUserId ?? ""),
     toUserId: String(raw.to_user_id ?? raw.toUserId ?? ""),
-    message: String(raw.req_msg ?? raw.message ?? ""),
+    message: String(raw.message ?? raw.req_msg ?? ""),
     status: statusNum === 1 ? "accepted" : statusNum === -1 ? "rejected" : "pending",
-    createdAt: String(raw.create_time ?? raw.created_at ?? raw.createdAt ?? ""),
-    updatedAt: String(raw.updated_at ?? raw.handle_time ?? raw.updatedAt ?? raw.createdAt ?? ""),
+    createdAt: createdAtMs > 0 ? new Date(createdAtMs).toISOString() : "",
+    updatedAt: updatedAtMs > 0 ? new Date(updatedAtMs).toISOString() : "",
   };
 }
 

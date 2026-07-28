@@ -489,11 +489,11 @@ function FriendRequestPanel({ embedded, onHandled }: { embedded?: boolean; onHan
             <div className="px-3 py-3 space-y-2">
               {incomingReqs.map((req) => (
                 <div key={req.requestId} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50/80">
-                  <UserAvatar name={req.fromUser?.displayName || "用户"} size="md" />
+                  <UserAvatar name={req.fromUser?.displayName || req.fromUserId} size="md" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-medium text-gray-900">{req.fromUser?.displayName || "未知用户"}</h4>
-                      <span className="text-xs text-gray-400">@{req.fromUser?.username || ""}</span>
+                      <h4 className="text-sm font-medium text-gray-900">{req.fromUser?.displayName || req.fromUserId}</h4>
+                      <span className="text-xs text-gray-400">@{req.fromUser?.username || req.fromUserId}</span>
                     </div>
                     {req.message && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{req.message}</p>}
                     <p className="text-xs text-gray-400 mt-1.5">{formatTimeAgo(req.createdAt)}</p>
@@ -535,11 +535,11 @@ function FriendRequestPanel({ embedded, onHandled }: { embedded?: boolean; onHan
           <div className="px-3 py-3 space-y-2">
             {outgoingReqs.map((req) => (
               <div key={req.requestId} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50/80">
-                <UserAvatar name={req.toUser?.displayName || "用户"} size="md" />
+                <UserAvatar name={req.toUser?.displayName || req.toUserId} size="md" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-medium text-gray-900">{req.toUser?.displayName || "未知用户"}</h4>
-                    <span className="text-xs text-gray-400">@{req.toUser?.username || ""}</span>
+                    <h4 className="text-sm font-medium text-gray-900">{req.toUser?.displayName || req.toUserId}</h4>
+                    <span className="text-xs text-gray-400">@{req.toUser?.username || req.toUserId}</span>
                   </div>
                   {req.message && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{req.message}</p>}
                   <div className="flex items-center gap-2 mt-1.5">

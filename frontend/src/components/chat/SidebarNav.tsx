@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import UserAvatar from "../shared/UserAvatar";
+import { wsManager } from "@/services/websocket";
 
 export type NavSection = "chats" | "friends" | "groups";
 
@@ -28,6 +29,13 @@ export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProp
   const router = useRouter();
   const [friendBadge, setFriendBadge] = useState(0);
   const [groupBadge, setGroupBadge] = useState(0);
+  const [wsConnected, setWsConnected] = useState(false);
+
+  // 监听 WebSocket 连接状态
+  useEffect(() => {
+    const unsub = wsManager.onStatusChange(setWsConnected);
+    return unsub;
+  }, []);
 
   // 定期拉取未处理的好友请求数 & 入群申请数
   const fetchBadges = useCallback(async () => {
@@ -68,16 +76,24 @@ export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProp
 
   return (
     <div className="h-full w-16 flex flex-col items-center bg-gray-900 text-gray-300 py-3 gap-1 flex-shrink-0 select-none">
-      {/* 用户头像 */}
+      {/* 用户头像 + WS 状态指示 */}
       <button
         onClick={() => onNavigate("chats")}
-        className="mb-2"
+        className="mb-2 relative"
         title={user?.displayName || user?.username || "用户"}
       >
         <UserAvatar
           name={user?.displayName || user?.username || ""}
           size="sm"
           className="ring-2 ring-gray-700 hover:ring-indigo-400 transition-all"
+        />
+        {/* WebSocket 连接状态指示器 */}
+        <span
+          className={cn(
+            "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900 transition-colors",
+            wsConnected ? "bg-green-400" : "bg-red-400"
+          )}
+          title={wsConnected ? "实时连接正常" : "实时连接断开"}
         />
       </button>
 
@@ -117,16 +133,17 @@ export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProp
         </button>
       ))}
 
-      {/* 底部操作 */}
+      {/* 底部操作 — 退出登录 */}
       <div className="mt-auto flex flex-col items-center gap-1 pb-2">
         <button
           onClick={handleLogout}
           className="w-11 h-11 flex items-center justify-center rounded-xl
-            text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-all duration-200 group"
+            text-gray-300 hover:text-red-400 hover:bg-red-500/20 transition-all duration-200 group relative"
           title="退出登录"
         >
           <LogOut className="w-5 h-5" />
-          <div className="absolute left-full ml-3 px-2 py-1 bg-gray-800 text-white text-xs rounded-md
+          {/* 悬停提示 */}
+          <div className="absolute left-full ml-3 px-2 py-1 bg-red-600 text-white text-xs rounded-md
             opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
             退出登录
           </div>

@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 const groupEventContentType int32 = 1100
@@ -48,6 +49,9 @@ func distinct(values ...[]string) []string {
 }
 
 func (p *groupEventPublisher) Publish(ctx context.Context, event interfaces.GroupEvent) error {
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		ctx = metadata.NewOutgoingContext(ctx, md.Copy())
+	}
 	var publishErr error
 	if event.Type == "group.created" || event.Type == "group.members_joined" || event.Type == "group.application_accepted" {
 		if len(event.SubjectUserIDs) > 0 {

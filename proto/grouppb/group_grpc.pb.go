@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v6.33.2
-// source: proto/group.proto
+// source: group.proto
 
 package grouppb
 
@@ -23,6 +23,8 @@ const (
 	GroupService_DismissGroup_FullMethodName                 = "/group.GroupService/DismissGroup"
 	GroupService_TransferGroupOwner_FullMethodName           = "/group.GroupService/TransferGroupOwner"
 	GroupService_UpdateGroupInfo_FullMethodName              = "/group.GroupService/UpdateGroupInfo"
+	GroupService_InitiateAvatarUpload_FullMethodName         = "/group.GroupService/InitiateAvatarUpload"
+	GroupService_CompleteAvatarUpload_FullMethodName         = "/group.GroupService/CompleteAvatarUpload"
 	GroupService_GetGroup_FullMethodName                     = "/group.GroupService/GetGroup"
 	GroupService_InviteUserToGroup_FullMethodName            = "/group.GroupService/InviteUserToGroup"
 	GroupService_KickGroupMember_FullMethodName              = "/group.GroupService/KickGroupMember"
@@ -49,6 +51,8 @@ type GroupServiceClient interface {
 	DismissGroup(ctx context.Context, in *DismissGroupReq, opts ...grpc.CallOption) (*DismissGroupResp, error)
 	TransferGroupOwner(ctx context.Context, in *TransferGroupOwnerReq, opts ...grpc.CallOption) (*TransferGroupOwnerResp, error)
 	UpdateGroupInfo(ctx context.Context, in *UpdateGroupInfoReq, opts ...grpc.CallOption) (*UpdateGroupInfoResp, error)
+	InitiateAvatarUpload(ctx context.Context, in *InitiateGroupAvatarUploadReq, opts ...grpc.CallOption) (*InitiateGroupAvatarUploadResp, error)
+	CompleteAvatarUpload(ctx context.Context, in *CompleteGroupAvatarUploadReq, opts ...grpc.CallOption) (*CompleteGroupAvatarUploadResp, error)
 	GetGroup(ctx context.Context, in *GetGroupReq, opts ...grpc.CallOption) (*GetGroupResp, error)
 	// Members
 	InviteUserToGroup(ctx context.Context, in *InviteUserToGroupReq, opts ...grpc.CallOption) (*InviteUserToGroupResp, error)
@@ -109,6 +113,26 @@ func (c *groupServiceClient) UpdateGroupInfo(ctx context.Context, in *UpdateGrou
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateGroupInfoResp)
 	err := c.cc.Invoke(ctx, GroupService_UpdateGroupInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) InitiateAvatarUpload(ctx context.Context, in *InitiateGroupAvatarUploadReq, opts ...grpc.CallOption) (*InitiateGroupAvatarUploadResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitiateGroupAvatarUploadResp)
+	err := c.cc.Invoke(ctx, GroupService_InitiateAvatarUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) CompleteAvatarUpload(ctx context.Context, in *CompleteGroupAvatarUploadReq, opts ...grpc.CallOption) (*CompleteGroupAvatarUploadResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteGroupAvatarUploadResp)
+	err := c.cc.Invoke(ctx, GroupService_CompleteAvatarUpload_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -256,6 +280,8 @@ type GroupServiceServer interface {
 	DismissGroup(context.Context, *DismissGroupReq) (*DismissGroupResp, error)
 	TransferGroupOwner(context.Context, *TransferGroupOwnerReq) (*TransferGroupOwnerResp, error)
 	UpdateGroupInfo(context.Context, *UpdateGroupInfoReq) (*UpdateGroupInfoResp, error)
+	InitiateAvatarUpload(context.Context, *InitiateGroupAvatarUploadReq) (*InitiateGroupAvatarUploadResp, error)
+	CompleteAvatarUpload(context.Context, *CompleteGroupAvatarUploadReq) (*CompleteGroupAvatarUploadResp, error)
 	GetGroup(context.Context, *GetGroupReq) (*GetGroupResp, error)
 	// Members
 	InviteUserToGroup(context.Context, *InviteUserToGroupReq) (*InviteUserToGroupResp, error)
@@ -293,6 +319,12 @@ func (UnimplementedGroupServiceServer) TransferGroupOwner(context.Context, *Tran
 }
 func (UnimplementedGroupServiceServer) UpdateGroupInfo(context.Context, *UpdateGroupInfoReq) (*UpdateGroupInfoResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateGroupInfo not implemented")
+}
+func (UnimplementedGroupServiceServer) InitiateAvatarUpload(context.Context, *InitiateGroupAvatarUploadReq) (*InitiateGroupAvatarUploadResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method InitiateAvatarUpload not implemented")
+}
+func (UnimplementedGroupServiceServer) CompleteAvatarUpload(context.Context, *CompleteGroupAvatarUploadReq) (*CompleteGroupAvatarUploadResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompleteAvatarUpload not implemented")
 }
 func (UnimplementedGroupServiceServer) GetGroup(context.Context, *GetGroupReq) (*GetGroupResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGroup not implemented")
@@ -422,6 +454,42 @@ func _GroupService_UpdateGroupInfo_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(GroupServiceServer).UpdateGroupInfo(ctx, req.(*UpdateGroupInfoReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_InitiateAvatarUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiateGroupAvatarUploadReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).InitiateAvatarUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_InitiateAvatarUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).InitiateAvatarUpload(ctx, req.(*InitiateGroupAvatarUploadReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_CompleteAvatarUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteGroupAvatarUploadReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).CompleteAvatarUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_CompleteAvatarUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).CompleteAvatarUpload(ctx, req.(*CompleteGroupAvatarUploadReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -684,6 +752,14 @@ var GroupService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GroupService_UpdateGroupInfo_Handler,
 		},
 		{
+			MethodName: "InitiateAvatarUpload",
+			Handler:    _GroupService_InitiateAvatarUpload_Handler,
+		},
+		{
+			MethodName: "CompleteAvatarUpload",
+			Handler:    _GroupService_CompleteAvatarUpload_Handler,
+		},
+		{
 			MethodName: "GetGroup",
 			Handler:    _GroupService_GetGroup_Handler,
 		},
@@ -737,5 +813,5 @@ var GroupService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/group.proto",
+	Metadata: "group.proto",
 }

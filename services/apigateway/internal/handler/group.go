@@ -26,6 +26,8 @@ func (h *GroupHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/joined", h.GetJoinedGroups)
 	r.GET("/:id", h.GetGroup)
 	r.PUT("/:id", h.UpdateGroupInfo)
+	r.POST("/:id/avatar/initiate", h.InitiateAvatarUpload)
+	r.POST("/:id/avatar/:file_id/complete", h.CompleteAvatarUpload)
 	r.DELETE("/:id", h.DismissGroup)
 	r.PUT("/:id/owner", h.TransferGroupOwner)
 	r.POST("/:id/members", h.InviteUserToGroup)
@@ -39,6 +41,34 @@ func (h *GroupHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/applications/mine", h.GetUserApplications)
 	r.PUT("/applications/:id", h.HandleApplication)
 	r.GET("/unhandled-application-count", h.GetUnhandledApplicationCount)
+}
+
+func (h *GroupHandler) InitiateAvatarUpload(c *gin.Context) {
+	var req pb.InitiateGroupAvatarUploadReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, err)
+		return
+	}
+	req.GroupId = c.Param("id")
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 5*time.Second)
+	defer cancel()
+	resp, err := h.client.InitiateAvatarUpload(ctx, &req)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
+func (h *GroupHandler) CompleteAvatarUpload(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 90*time.Second)
+	defer cancel()
+	resp, err := h.client.CompleteAvatarUpload(ctx, &pb.CompleteGroupAvatarUploadReq{GroupId: c.Param("id"), FileId: c.Param("file_id")})
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
 }
 
 // CreateGroup POST /groups

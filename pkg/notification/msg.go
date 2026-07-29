@@ -7,19 +7,19 @@ import (
 	"time"
 
 	"SuIM/pkg/notification/common_user"
-	"SuIM/proto/sdkws"
+	messagepb "SuIM/proto/messagepb"
 
 	"github.com/google/uuid"
 )
 
 // NotificationSender 是通知发送的通用内核，与具体业务无关。
 // 各业务服务通过嵌入 + 添加领域方法来扩展。
-// 命名由来：通知最终都"落为一条消息"（sdkws.MsgData）经 msggateway 发出。
+// 命名由来：通知最终都"落为一条消息"（messagepb.MsgData）经 msggateway 发出。
 type NotificationSender struct {
 	sessionTypeConf map[int32]int32 // contentType → sessionType 硬编码映射
 
 	// pushMsg 是发送出口，通过依赖注入传入（通常是 msggateway.OnlinePushMsg）。
-	pushMsg func(ctx context.Context, recvID string, msg *sdkws.MsgData) error
+	pushMsg func(ctx context.Context, recvID string, msg *messagepb.MsgData) error
 
 	// getUserInfo 可选：用户资料获取函数，用于填充 MsgData 的发送者昵称/头像。
 	getUserInfo func(ctx context.Context, userID string) (common_user.CommonUser, error)
@@ -29,7 +29,7 @@ type NotificationSender struct {
 type Option func(*NotificationSender)
 
 // WithPushMsg 注入消息推送函数（通常是 msggateway gRPC OnlinePushMsg 的封装）。
-func WithPushMsg(fn func(ctx context.Context, recvID string, msg *sdkws.MsgData) error) Option {
+func WithPushMsg(fn func(ctx context.Context, recvID string, msg *messagepb.MsgData) error) Option {
 	return func(s *NotificationSender) { s.pushMsg = fn }
 }
 
@@ -61,7 +61,7 @@ func (s *NotificationSender) Notification(ctx context.Context, sendID, recvID st
 	go s.send(ctx, sendID, recvID, contentType, sessionType, payload)
 }
 
-// send 组装 sdkws.MsgData 并通过注入的 pushMsg 发送。
+// send 组装 messagepb.MsgData 并通过注入的 pushMsg 发送。
 func (s *NotificationSender) send(ctx context.Context, sendID, recvID string, contentType, sessionType int32, payload any) {
 	// 独立 context，不受主请求生命周期影响；5s 超时兜底。
 	ctx = context.WithoutCancel(ctx)
@@ -77,7 +77,8 @@ func (s *NotificationSender) send(ctx context.Context, sendID, recvID string, co
 	}
 
 	// 2. 组装 MsgData
-	msg := &sdkws.MsgData{
+	now := time.Now().UnixMilli()
+	msg := &messagepb.MsgData{
 		ClientMsgId: uuid.NewString(),
 		SendId:      sendID,
 		RecvId:      recvID,
@@ -85,7 +86,8 @@ func (s *NotificationSender) send(ctx context.Context, sendID, recvID string, co
 		ContentType: contentType,
 		SessionType: sessionType,
 		Content:     string(contentJSON),
-		SendTime:    time.Now().UnixMilli(),
+		SendTime:    now,
+		CreateTime:  now,
 	}
 
 	// 3. 可选：填充发送者昵称/头像

@@ -18,6 +18,7 @@ import (
 	"group/internal/service"
 
 	"SuIM/pkg/discovery"
+	filePB "SuIM/proto/filepb"
 	pb "SuIM/proto/grouppb"
 
 	"google.golang.org/grpc"
@@ -76,6 +77,12 @@ func main() {
 	}
 	defer messageConn.Close()
 	eventPublisher := client.NewGroupEventPublisher(conversationConn, messageConn)
+	fileConn, err := grpc.NewClient(discovery.TargetURL("file"), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`))
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to file service: %v", err))
+	}
+	defer fileConn.Close()
+	fileClient := filePB.NewFileServiceClient(fileConn)
 
 	// 组合根：将按功能聚合的仓库和 user 校验器注入到服务层。
 	groupRepo := repository.NewGroupRepository(db)
@@ -84,7 +91,7 @@ func main() {
 	grpcSvr := grpc.NewServer(
 		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor(userVerifier)),
 	)
-	pb.RegisterGroupServiceServer(grpcSvr, handler.NewGroupHandler(groupSvc))
+	pb.RegisterGroupServiceServer(grpcSvr, handler.NewGroupHandler(groupSvc, fileClient))
 	reflection.Register(grpcSvr) // 启用 grpcurl 等调试工具
 
 	lis, err := net.Listen("tcp", cfg.ServerAddr)

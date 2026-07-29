@@ -11,6 +11,7 @@ message OfflinePush {
   string ex = 3;
   string ios_sound = 4;
   bool   ios_badge_count = 5;
+  string signal_info = 6;
 }
 
 // RevokeInfo records who/when revoked a message.
@@ -37,7 +38,7 @@ message MsgData {
   int64  send_time = 12;       // epoch millis
   int32  status = 13;          // 0=normal 1=revoked
   string ex = 14;
-  bool   is_read = 15;
+  bool   is_read = 15 [deprecated = true]; // use the per-user seq_user.read_seq cursor
 
   // ---- extended fields (OpenIM MsgDataModel) ----
   int32  sender_platform_id = 16;
@@ -54,10 +55,13 @@ message MsgData {
   string doc_id = 24;          // conversationID:docIndex (batching)
   int32  msg_index = 25;       // index within the document
 
-  // senders-only: recipients whose seq_user.max_seq should advance. Excludes
+  // Deprecated transport field. Recipient resolution will move entirely to
+  // the server; until then, trusted internal senders may provide this list.
+  // Recipients whose seq_user.max_seq should advance. Excludes
   // the sender. For single chat use [recv_id]; for group chat use the member
   // list (provided by the caller / gateway).
-  repeated string recv_user_ids = 26;
+  repeated string recv_user_ids = 26 [deprecated = true];
+  int64 create_time = 27;
 }
 
 // --------------- SendMsg ---------------
@@ -108,16 +112,16 @@ message GetMessagesByClientMsgIDsResp {
 message RevokeMsgReq {
   string conversation_id = 1;
   string client_msg_id = 2;
-  string send_id = 3;
-  int32  revoke_role = 4;
-  string revoke_nickname = 5;
+  string send_id = 3 [deprecated = true];
+  int32  revoke_role = 4 [deprecated = true];
+  string revoke_nickname = 5 [deprecated = true];
 }
 message RevokeMsgResp {}
 
 // --------------- MarkMsgsAsRead ---------------
 message MarkMsgsAsReadReq {
   string conversation_id = 1;
-  string user_id = 2;
+  string user_id = 2 [deprecated = true];
   int64  seq = 3;  // mark all messages with seq <= this as read
 }
 message MarkMsgsAsReadResp {}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"message/internal/logger"
@@ -12,14 +13,26 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
+
+type userIDContextKey struct{}
+
+type Authenticator interface {
+	Authenticate(ctx context.Context, token string) (string, error)
+}
+
+func UserIDFromContext(ctx context.Context) (string, bool) {
+	userID, ok := ctx.Value(userIDContextKey{}).(string)
+	return userID, ok && userID != ""
+}
 
 // UnaryServerInterceptor 返回 gRPC 一元拦截器，依次执行：
 //   1. 注入请求 ID
 //   2. panic 恢复
 //   3. 请求日志（耗时/状态码）
-func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
+func UnaryServerInterceptor(auth Authenticator) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req any,
@@ -29,6 +42,25 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		// 1. 注入请求 ID。
 		requestID := uuid.New().String()
 		ctx = logger.WithRequestID(ctx, requestID)
+
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, "missing authorization metadata")
+		}
+		values := md.Get("authorization")
+		if len(values) != 1 || !strings.HasPrefix(values[0], "Bearer ") {
+			return nil, status.Error(codes.Unauthenticated, "missing or invalid authorization token")
+		}
+		token := strings.TrimSpace(strings.TrimPrefix(values[0], "Bearer "))
+		if token == "" {
+			return nil, status.Error(codes.Unauthenticated, "empty authorization token")
+		}
+		userID, authErr := auth.Authenticate(ctx, token)
+		if authErr != nil || userID == "" {
+			logger.Warn(ctx, "gRPC authentication failed", "method", info.FullMethod, "error", authErr)
+			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
+		}
+		ctx = context.WithValue(ctx, userIDContextKey{}, userID)
 
 		// 2. panic 恢复。
 		defer func() {

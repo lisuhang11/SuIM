@@ -15,6 +15,7 @@ message FileInfo {
   string status = 8;
   int64 created_at = 9;
   int64 expires_at = 10;
+  string purpose = 11;
 }
 
 message InitiateUploadReq {
@@ -23,6 +24,7 @@ message InitiateUploadReq {
   string content_type = 3;
   int64 size = 4;
   string sha256 = 5;
+  string purpose = 6;
 }
 
 message InitiateUploadResp {
@@ -73,6 +75,15 @@ message DeleteFileReq {
 
 message DeleteFileResp {}
 
+message ActivateAvatarReq {
+  string user_id = 1;
+  string file_id = 2;
+  string target_type = 3;
+  string target_id = 4;
+}
+
+message ActivateAvatarResp { FileInfo file = 1; }
+
 service FileService {
   rpc InitiateUpload(InitiateUploadReq) returns (InitiateUploadResp);
   rpc CompleteUpload(CompleteUploadReq) returns (CompleteUploadResp);
@@ -80,4 +91,5 @@ service FileService {
   rpc GetDownloadURL(GetDownloadURLReq) returns (GetDownloadURLResp);
   rpc GetFile(GetFileReq) returns (GetFileResp);
   rpc DeleteFile(DeleteFileReq) returns (DeleteFileResp);
+  rpc ActivateAvatar(ActivateAvatarReq) returns (ActivateAvatarResp);
 }

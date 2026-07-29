@@ -17,6 +17,7 @@ func (h *FileHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/:id/complete", h.Complete)
 	r.GET("/:id", h.Get)
 	r.GET("/:id/download", h.Download)
+	r.GET("/:id/avatar", h.Download)
 	r.DELETE("/:id", h.Delete)
 }
 func (h *FileHandler) Initiate(c *gin.Context) {
@@ -49,6 +50,7 @@ func (h *FileHandler) Complete(c *gin.Context) {
 	}
 	Respond(c, resp)
 }
+
 func (h *FileHandler) Get(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()

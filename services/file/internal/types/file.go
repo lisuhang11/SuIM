@@ -3,9 +3,11 @@ package types
 import "time"
 
 const (
-	StatusPending   = "pending"
-	StatusAvailable = "available"
-	StatusDeleted   = "deleted"
+	StatusPending     = "pending"
+	StatusAvailable   = "available"
+	StatusDeleted     = "deleted"
+	PurposeAttachment = "attachment"
+	PurposeAvatar     = "avatar"
 )
 
 type File struct {
@@ -17,6 +19,7 @@ type File struct {
 	Size            int64      `gorm:"column:size;not null"`
 	SHA256          string     `gorm:"column:sha256;size:64;index:idx_file_dedup"`
 	Category        string     `gorm:"column:category;size:32;not null"`
+	Purpose         string     `gorm:"column:purpose;size:32;not null;default:'attachment';index:idx_file_dedup"`
 	Status          string     `gorm:"column:status;size:16;not null;index:idx_file_owner_status"`
 	UploadExpiresAt time.Time  `gorm:"column:upload_expires_at;index"`
 	ExpiresAt       time.Time  `gorm:"column:expires_at;index"`
@@ -36,3 +39,14 @@ type Binding struct {
 }
 
 func (Binding) TableName() string { return "file_binding" }
+
+type AvatarBinding struct {
+	ID         uint64    `gorm:"column:id;primaryKey;autoIncrement"`
+	TargetType string    `gorm:"column:target_type;size:16;not null;uniqueIndex:idx_avatar_target"`
+	TargetID   string    `gorm:"column:target_id;size:64;not null;uniqueIndex:idx_avatar_target"`
+	FileID     string    `gorm:"column:file_id;size:36;not null;uniqueIndex"`
+	CreatedAt  time.Time `gorm:"column:created_at"`
+	UpdatedAt  time.Time `gorm:"column:updated_at"`
+}
+
+func (AvatarBinding) TableName() string { return "file_avatar_binding" }

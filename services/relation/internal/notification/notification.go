@@ -9,7 +9,7 @@ import (
 
 	"SuIM/pkg/notification"
 	"SuIM/pkg/notification/common_user"
-	"SuIM/proto/sdkws"
+	messagepb "SuIM/proto/messagepb"
 )
 
 // FriendNotificationSender 好友类通知发送器。
@@ -30,7 +30,7 @@ func WithRpcFunc(fn func(ctx context.Context, userID string) (common_user.Common
 
 // NewFriendNotificationSender 创建好友类通知发送器。
 // pushMsg 是发送出口，通常封装了 msggateway.OnlinePushMsg。
-func NewFriendNotificationSender(pushMsg func(ctx context.Context, recvID string, msg *sdkws.MsgData) error, opts ...friendNotifOption) *FriendNotificationSender {
+func NewFriendNotificationSender(pushMsg func(ctx context.Context, recvID string, msg *messagepb.MsgData) error, opts ...friendNotifOption) *FriendNotificationSender {
 	f := &FriendNotificationSender{
 		NotificationSender: notification.NewNotificationSender(
 			notification.WithPushMsg(pushMsg),

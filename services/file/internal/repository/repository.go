@@ -19,10 +19,32 @@ func (r *Repository) Get(ctx context.Context, id string) (*types.File, error) {
 	err := r.db.WithContext(ctx).Where("file_id = ? AND status <> ?", id, types.StatusDeleted).First(&f).Error
 	return &f, err
 }
-func (r *Repository) FindDuplicate(ctx context.Context, owner, hash string, size int64, now time.Time) (*types.File, error) {
+func (r *Repository) FindDuplicate(ctx context.Context, owner, hash, purpose string, size int64, now time.Time) (*types.File, error) {
 	var f types.File
-	err := r.db.WithContext(ctx).Where("owner_id = ? AND sha256 = ? AND size = ? AND status = ? AND expires_at > ?", owner, hash, size, types.StatusAvailable, now).First(&f).Error
+	err := r.db.WithContext(ctx).Where("owner_id = ? AND sha256 = ? AND purpose = ? AND size = ? AND status = ? AND expires_at > ?", owner, hash, purpose, size, types.StatusAvailable, now).First(&f).Error
 	return &f, err
+}
+
+func (r *Repository) ActivateAvatar(ctx context.Context, fileID, targetType, targetID string, now time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var old types.AvatarBinding
+		err := tx.Where("target_type = ? AND target_id = ?", targetType, targetID).First(&old).Error
+		if err == nil && old.FileID != fileID {
+			if err := tx.Model(&types.File{}).Where("file_id = ?", old.FileID).Update("expires_at", now.Add(7*24*time.Hour)).Error; err != nil {
+				return err
+			}
+		} else if err != nil && err != gorm.ErrRecordNotFound {
+			return err
+		}
+		binding := &types.AvatarBinding{TargetType: targetType, TargetID: targetID, FileID: fileID}
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "target_type"}, {Name: "target_id"}},
+			DoUpdates: clause.Assignments(map[string]any{"file_id": fileID, "updated_at": now}),
+		}).Create(binding).Error; err != nil {
+			return err
+		}
+		return tx.Model(&types.File{}).Where("file_id = ?", fileID).Update("expires_at", now.AddDate(100, 0, 0)).Error
+	})
 }
 func (r *Repository) UsedBytes(ctx context.Context, owner string) (int64, error) {
 	var total int64
@@ -47,7 +69,7 @@ func (r *Repository) ConversationExists(ctx context.Context, userID, conversatio
 	return n > 0, err
 }
 func (r *Repository) CanAccess(ctx context.Context, f *types.File, userID string, now time.Time) (bool, error) {
-	if f.OwnerID == userID {
+	if f.OwnerID == userID || (f.Purpose == types.PurposeAvatar && f.Status == types.StatusAvailable) {
 		return true, nil
 	}
 	var n int64

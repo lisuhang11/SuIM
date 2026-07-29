@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Bell, LogOut, MessageCircle, Settings, UserRound, UsersRound } from "lucide-react";
+import { Bell, LogOut, MessageCircle, UserRound, UsersRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChat } from "@/contexts/ChatContext";
 import { cn } from "@/lib/utils";
@@ -12,9 +12,10 @@ export type NavSection = "chats" | "friends" | "groups";
 interface SidebarNavProps {
   activeSection: NavSection;
   onNavigate: (section: NavSection) => void;
+  onOpenProfile: () => void;
 }
 
-export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProps) {
+export default function SidebarNav({ activeSection, onNavigate, onOpenProfile }: SidebarNavProps) {
   const { user, logout } = useAuth();
   const { friendRequestBadge, conversations } = useChat();
   const unread = conversations.reduce((sum, item) => sum + item.unreadCount, 0);
@@ -27,14 +28,15 @@ export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProp
   return (
     <aside className="z-30 flex h-16 w-full flex-shrink-0 items-center border-t border-slate-800 bg-[#172033] px-3 text-slate-300 md:h-full md:w-[76px] md:flex-col md:border-r md:border-t-0 md:px-0 md:py-4">
       <button
-        onClick={() => onNavigate("chats")}
-        className="hidden h-11 w-11 items-center justify-center rounded-lg bg-emerald-400 text-lg font-bold text-[#172033] md:flex"
-        title="SuIM"
+        onClick={onOpenProfile}
+        className="group relative hidden h-11 w-11 items-center justify-center rounded-full md:flex"
+        title="个人信息"
       >
-        S
+        <UserAvatar src={user?.avatar} name={user?.displayName || "我"} size="md" className="ring-2 ring-white/20" />
+        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#172033] bg-emerald-400" />
       </button>
 
-      <nav className="flex flex-1 items-center justify-around md:mt-7 md:w-full md:flex-none md:flex-col md:gap-2">
+      <nav className="flex flex-1 items-center justify-around md:mt-5 md:w-full md:flex-none md:flex-col md:gap-2">
         {items.map((item) => (
           <button
             key={item.id}
@@ -59,20 +61,18 @@ export default function SidebarNav({ activeSection, onNavigate }: SidebarNavProp
         ))}
       </nav>
 
+      <button onClick={onOpenProfile} className="relative ml-1 flex h-11 w-11 items-center justify-center md:hidden" title="个人信息">
+        <UserAvatar src={user?.avatar} name={user?.displayName || "我"} size="sm" className="ring-2 ring-white/20" />
+        <span className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-[#172033] bg-emerald-400" />
+      </button>
+
       <div className="hidden flex-1 md:block" />
       <div className="hidden flex-col items-center gap-2 md:flex">
         <button className="relative flex h-10 w-10 items-center justify-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white" title="通知中心">
           <Bell className="h-5 w-5" />
           <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-500" />
         </button>
-        <button className="flex h-10 w-10 items-center justify-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white" title="设置">
-          <Settings className="h-5 w-5" />
-        </button>
         <div className="my-1 h-px w-8 bg-white/10" />
-        <div className="group relative">
-          <UserAvatar src={user?.avatar} name={user?.displayName || "我"} size="md" className="ring-2 ring-white/20" />
-          <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#172033] bg-emerald-400" />
-        </div>
         <button onClick={logout} className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-rose-500/10 hover:text-rose-400" title="退出登录">
           <LogOut className="h-4 w-4" />
         </button>

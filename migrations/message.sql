@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `msg_info` (
     `doc_id`              VARCHAR(255)  NOT NULL DEFAULT '' COMMENT '文档ID, 格式: {conversationID}:{docIndex}',
     `msg_index`           INT           NOT NULL DEFAULT 0 COMMENT '在文档中的索引位置(0-99)',
     `del_list`            TEXT                     COMMENT '删除该消息的用户ID列表(json)',
-    `is_read`             TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '是否已读',
+    `is_read`             TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '已废弃，已读状态使用seq_user.read_seq',
 
     `conversation_id`     VARCHAR(255)  NOT NULL DEFAULT '' COMMENT '会话ID(冗余列, 便于索引查询)',
 
@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS `msg_info` (
 
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_server_msg_id` (`server_msg_id`),
+    UNIQUE KEY `uk_sender_client_msg` (`send_id`, `client_msg_id`),
     KEY `idx_doc_id` (`doc_id`),
     KEY `idx_conversation_id` (`conversation_id`),
     KEY `idx_send_id` (`send_id`),
@@ -87,3 +88,15 @@ CREATE TABLE IF NOT EXISTS `seq_user` (
     KEY `idx_user_id` (`user_id`),
     KEY `idx_conversation_id` (`conversation_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户会话序号表';
+
+-- 用户级消息删除标记。删除一条消息不会影响会话中的其他用户。
+CREATE TABLE IF NOT EXISTS `msg_delete` (
+    `id`         BIGINT      NOT NULL AUTO_INCREMENT,
+    `message_id` BIGINT      NOT NULL COMMENT 'msg_info.id',
+    `user_id`    VARCHAR(64) NOT NULL,
+    `created_at` BIGINT      NOT NULL COMMENT 'Unix毫秒',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_message` (`message_id`, `user_id`),
+    KEY `idx_message_delete_user` (`user_id`),
+    CONSTRAINT `fk_msg_delete_message` FOREIGN KEY (`message_id`) REFERENCES `msg_info` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户级消息删除标记';

@@ -44,7 +44,7 @@ func (h *Handler) InitiateUpload(ctx context.Context, r *pb.InitiateUploadReq) (
 	if err := check(ctx, r.UserId); err != nil {
 		return nil, err
 	}
-	v, err := h.svc.Initiate(ctx, r.UserId, r.Name, r.ContentType, r.Sha256, r.Size)
+	v, err := h.svc.Initiate(ctx, r.UserId, r.Name, r.ContentType, r.Sha256, r.Purpose, r.Size)
 	return v, grpcErr(err)
 }
 func (h *Handler) CompleteUpload(ctx context.Context, r *pb.CompleteUploadReq) (*pb.CompleteUploadResp, error) {
@@ -95,4 +95,15 @@ func (h *Handler) DeleteFile(ctx context.Context, r *pb.DeleteFileReq) (*pb.Dele
 		return nil, grpcErr(err)
 	}
 	return &pb.DeleteFileResp{}, nil
+}
+
+func (h *Handler) ActivateAvatar(ctx context.Context, r *pb.ActivateAvatarReq) (*pb.ActivateAvatarResp, error) {
+	if err := check(ctx, r.UserId); err != nil {
+		return nil, err
+	}
+	f, err := h.svc.ActivateAvatar(ctx, r.UserId, r.FileId, r.TargetType, r.TargetId)
+	if err != nil {
+		return nil, grpcErr(err)
+	}
+	return &pb.ActivateAvatarResp{File: service.ToProto(f)}, nil
 }

@@ -7,6 +7,7 @@ import (
 
 	apperrors "message/internal/errors"
 	"message/internal/logger"
+	"message/internal/middleware"
 	"message/internal/types"
 	"message/internal/types/interfaces"
 
@@ -15,6 +16,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func authenticatedUserID(ctx context.Context) (string, error) {
+	userID, ok := middleware.UserIDFromContext(ctx)
+	if !ok {
+		return "", status.Error(codes.Unauthenticated, "authenticated user is missing")
+	}
+	return userID, nil
+}
 
 // messageHandler 实现 pb.MessageServer，委托给领域 MessageService。
 type messageHandler struct {
@@ -69,6 +78,7 @@ func messageToProto(m *types.Message) *pb.MsgData {
 		Content:          m.Content,
 		Seq:              m.Seq,
 		SendTime:         m.SendTime,
+		CreateTime:       m.CreateTime,
 		Status:           int32(m.Status),
 		Ex:               m.Ex,
 		IsRead:           m.IsRead,
@@ -129,6 +139,7 @@ func protoToMessage(m *pb.MsgData) *types.Message {
 			Content:          m.Content,
 			Seq:              m.Seq,
 			SendTime:         m.SendTime,
+			CreateTime:       m.CreateTime,
 			Status:           int(m.Status),
 			Ex:               m.Ex,
 			SenderPlatformID: int(m.SenderPlatformId),
@@ -190,6 +201,11 @@ func (h *messageHandler) SendMsg(ctx context.Context, req *pb.SendMsgReq) (*pb.S
 	if req.MsgData == nil {
 		return nil, appErrorToStatus(apperrors.NewValidationError("msg_data is required"))
 	}
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	req.MsgData.SendId = userID
 	saved, err := h.svc.SendMsg(ctx, protoToMessage(req.MsgData))
 	if err != nil {
 		logger.Error(ctx, "send message failed", "error", err)
@@ -206,18 +222,32 @@ func (h *messageHandler) SendMsg(ctx context.Context, req *pb.SendMsgReq) (*pb.S
 
 // GetHistoryMessages 获取历史消息（游标分页）。
 func (h *messageHandler) GetHistoryMessages(ctx context.Context, req *pb.GetHistoryMessagesReq) (*pb.GetHistoryMessagesResp, error) {
-	msgs, matched, err := h.svc.GetHistoryMessages(ctx, req.ConversationId, req.Seq, int(req.Limit), int(req.Order))
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	limit := int(req.Limit)
+	if limit <= 0 {
+		limit = 20
+	} else if limit > 100 {
+		limit = 100
+	}
+	msgs, matched, err := h.svc.GetHistoryMessages(ctx, userID, req.ConversationId, req.Seq, limit, int(req.Order))
 	if err != nil {
 		return nil, appErrorToStatus(err)
 	}
 	// is_end：当匹配行数不超过 limit 时说明没有更多数据。
-	isEnd := matched <= int64(req.Limit)
+	isEnd := matched <= int64(limit)
 	return &pb.GetHistoryMessagesResp{MsgData: toProtoSlice(msgs), IsEnd: isEnd}, nil
 }
 
 // GetMessagesBySeq 按 seq 获取消息。
 func (h *messageHandler) GetMessagesBySeq(ctx context.Context, req *pb.GetMessagesBySeqReq) (*pb.GetMessagesBySeqResp, error) {
-	msgs, err := h.svc.GetMessagesBySeq(ctx, req.ConversationId, req.Seqs)
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	msgs, err := h.svc.GetMessagesBySeq(ctx, userID, req.ConversationId, req.Seqs)
 	if err != nil {
 		return nil, appErrorToStatus(err)
 	}
@@ -226,7 +256,11 @@ func (h *messageHandler) GetMessagesBySeq(ctx context.Context, req *pb.GetMessag
 
 // GetMessagesByClientMsgIDs 按客户端消息 ID 列表获取消息。
 func (h *messageHandler) GetMessagesByClientMsgIDs(ctx context.Context, req *pb.GetMessagesByClientMsgIDsReq) (*pb.GetMessagesByClientMsgIDsResp, error) {
-	msgs, err := h.svc.GetMessagesByClientMsgIDs(ctx, req.ClientMsgIds)
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	msgs, err := h.svc.GetMessagesByClientMsgIDs(ctx, userID, req.ClientMsgIds)
 	if err != nil {
 		return nil, appErrorToStatus(err)
 	}
@@ -235,7 +269,11 @@ func (h *messageHandler) GetMessagesByClientMsgIDs(ctx context.Context, req *pb.
 
 // RevokeMsg 撤回消息（仅发送者可撤回）。
 func (h *messageHandler) RevokeMsg(ctx context.Context, req *pb.RevokeMsgReq) (*pb.RevokeMsgResp, error) {
-	if err := h.svc.RevokeMsg(ctx, req.ConversationId, req.ClientMsgId, req.SendId, req.RevokeRole, req.RevokeNickname); err != nil {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.RevokeMsg(ctx, req.ConversationId, req.ClientMsgId, userID, 0, ""); err != nil {
 		logger.Error(ctx, "revoke message failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
@@ -244,7 +282,11 @@ func (h *messageHandler) RevokeMsg(ctx context.Context, req *pb.RevokeMsgReq) (*
 
 // MarkMsgsAsRead 标记消息为已读。
 func (h *messageHandler) MarkMsgsAsRead(ctx context.Context, req *pb.MarkMsgsAsReadReq) (*pb.MarkMsgsAsReadResp, error) {
-	if err := h.svc.MarkMsgsAsRead(ctx, req.ConversationId, req.UserId, req.Seq); err != nil {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.MarkMsgsAsRead(ctx, req.ConversationId, userID, req.Seq); err != nil {
 		logger.Error(ctx, "mark messages read failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
@@ -253,7 +295,11 @@ func (h *messageHandler) MarkMsgsAsRead(ctx context.Context, req *pb.MarkMsgsAsR
 
 // DeleteMsgs 删除消息。
 func (h *messageHandler) DeleteMsgs(ctx context.Context, req *pb.DeleteMsgsReq) (*pb.DeleteMsgsResp, error) {
-	if err := h.svc.DeleteMsgs(ctx, req.ConversationId, req.Seqs); err != nil {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.DeleteMsgs(ctx, userID, req.ConversationId, req.Seqs); err != nil {
 		logger.Error(ctx, "delete messages failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}

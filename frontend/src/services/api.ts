@@ -682,6 +682,14 @@ function toAttachment(file: BackendFile): FileAttachment {
     expiresAt: new Date(Number(file.expires_at)).toISOString() };
 }
 
+export async function updateCurrentUser(data: { nickname?: string; avatarUrl?: string }): Promise<User> {
+  const body: Record<string, string> = {};
+  if (data.nickname !== undefined) body.nickname = data.nickname;
+  if (data.avatarUrl !== undefined) body.avatar_url = data.avatarUrl;
+  await request("/users/me", { method: "PUT", body: JSON.stringify(body) });
+  return getCurrentUser();
+}
+
 async function sha256(file: File): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -712,6 +720,44 @@ export async function uploadFile(file: File, onProgress?: (value: number) => voi
   }
   onProgress?.(100);
   return toAttachment(initiated.data.file);
+}
+
+export async function uploadAvatar(
+  file: File,
+  target: { type: "user" | "group"; id?: string },
+  onProgress?: (value: number) => void
+): Promise<string> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    throw new Error("头像仅支持 JPEG、PNG 或 WebP 格式");
+  }
+  if (file.size > 5 * 1024 * 1024) throw new Error("头像不能超过 5 MiB");
+  const hash = await sha256(file);
+  const initiateEndpoint = target.type === "user" ? "/users/me/avatar/initiate" : `/groups/${target.id}/avatar/initiate`;
+  const initiated = await request<ApiResponse<{ upload: { file: BackendFile; upload_url: string; headers: Record<string, string>; already_uploaded: boolean } }>>(initiateEndpoint, {
+    method: "POST",
+    body: JSON.stringify({ name: file.name, content_type: file.type, size: file.size, sha256: hash }),
+  });
+  const upload = initiated.data.upload;
+  if (!upload.already_uploaded) {
+    await putFile(upload.upload_url, file, upload.headers, onProgress);
+  }
+  const completeEndpoint = target.type === "user"
+    ? `/users/me/avatar/${upload.file.file_id}/complete`
+    : `/groups/${target.id}/avatar/${upload.file.file_id}/complete`;
+  const completed = await request<ApiResponse<{ avatar_url: string }>>(
+    completeEndpoint,
+    { method: "POST" },
+    60_000
+  );
+  onProgress?.(100);
+  return completed.data.avatar_url;
+}
+
+export async function resolveAvatarURL(source: string): Promise<string> {
+  const match = source.match(/\/files\/([^/]+)\/avatar(?:$|\?)/);
+  if (!match) return source;
+  const res = await request<ApiResponse<{ download_url: string }>>(`/files/${match[1]}/avatar`);
+  return res.data.download_url;
 }
 
 export async function getFileDownloadURL(fileId: string): Promise<string> {

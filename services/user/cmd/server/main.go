@@ -14,10 +14,12 @@ import (
 	"user/internal/repository"
 	"user/internal/service"
 
-	pb "SuIM/proto/userpb"
 	"SuIM/pkg/discovery"
+	filePB "SuIM/proto/filepb"
+	pb "SuIM/proto/userpb"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -44,9 +46,15 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := repository.NewAuthTokenRepository(db)
 	userSvc := service.NewUserService(userRepo, tokenRepo, cfg)
+	fileConn, err := grpc.NewClient(discovery.TargetURL("file"), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`))
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to file service: %v", err))
+	}
+	defer fileConn.Close()
+	fileClient := filePB.NewFileServiceClient(fileConn)
 
 	grpcSvr := grpc.NewServer()
-	pb.RegisterUserServiceServer(grpcSvr, handler.NewUserHandler(userSvc))
+	pb.RegisterUserServiceServer(grpcSvr, handler.NewUserHandler(userSvc, fileClient))
 	reflection.Register(grpcSvr) // 启用 grpcurl 等调试工具
 
 	lis, err := net.Listen("tcp", cfg.ServerAddr)

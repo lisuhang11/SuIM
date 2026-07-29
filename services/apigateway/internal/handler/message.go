@@ -87,7 +87,7 @@ func (h *MessageHandler) GetHistoryMessages(c *gin.Context) {
 		Limit:          parseInt32(c.Query("limit"), 20),
 		Order:          parseInt32(c.Query("order"), 0),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetHistoryMessages(ctx, req)
@@ -105,7 +105,7 @@ func (h *MessageHandler) GetMessagesBySeq(c *gin.Context) {
 		ConversationId: c.Query("conversation_id"),
 		Seqs:           parseInt64Slice(c.Query("seqs")),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetMessagesBySeq(ctx, req)
@@ -122,7 +122,7 @@ func (h *MessageHandler) GetMessagesByClientMsgIDs(c *gin.Context) {
 	req := &pb.GetMessagesByClientMsgIDsReq{
 		ClientMsgIds: splitComma(c.Query("ids")),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetMessagesByClientMsgIDs(ctx, req)
@@ -141,7 +141,7 @@ func (h *MessageHandler) RevokeMsg(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.RevokeMsg(ctx, &req)
@@ -160,7 +160,7 @@ func (h *MessageHandler) MarkMsgsAsRead(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.MarkMsgsAsRead(ctx, &req)
@@ -179,7 +179,7 @@ func (h *MessageHandler) DeleteMsgs(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.DeleteMsgs(ctx, &req)

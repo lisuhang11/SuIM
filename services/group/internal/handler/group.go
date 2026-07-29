@@ -10,9 +10,11 @@ import (
 	"group/internal/types"
 	"group/internal/types/interfaces"
 
+	filePB "SuIM/proto/filepb"
 	pb "SuIM/proto/grouppb"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -27,12 +29,18 @@ func authenticatedUserID(ctx context.Context) (string, error) {
 // groupHandler 实现 pb.GroupServiceServer，将请求委托给领域 GroupService。
 type groupHandler struct {
 	pb.UnimplementedGroupServiceServer
-	svc interfaces.GroupService
+	svc   interfaces.GroupService
+	files filePB.FileServiceClient
 }
 
 // NewGroupHandler 创建绑定到指定领域服务的 gRPC GroupServiceServer。
-func NewGroupHandler(svc interfaces.GroupService) pb.GroupServiceServer {
-	return &groupHandler{svc: svc}
+func NewGroupHandler(svc interfaces.GroupService, files filePB.FileServiceClient) pb.GroupServiceServer {
+	return &groupHandler{svc: svc, files: files}
+}
+
+func fileContext(ctx context.Context) context.Context {
+	md, _ := metadata.FromIncomingContext(ctx)
+	return metadata.NewOutgoingContext(ctx, md.Copy())
 }
 
 // --------------- 错误转换 ---------------
@@ -221,6 +229,54 @@ func (h *groupHandler) UpdateGroupInfo(ctx context.Context, req *pb.UpdateGroupI
 		return nil, appErrorToStatus(err)
 	}
 	return &pb.UpdateGroupInfoResp{Success: true, Message: "group updated", Group: groupToProto(g)}, nil
+}
+
+func (h *groupHandler) InitiateAvatarUpload(ctx context.Context, req *pb.InitiateGroupAvatarUploadReq) (*pb.InitiateGroupAvatarUploadResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.CanManageGroup(ctx, req.GroupId, userID); err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	upload, err := h.files.InitiateUpload(fileContext(ctx), &filePB.InitiateUploadReq{UserId: userID, Name: req.Name, ContentType: req.ContentType, Size: req.Size, Sha256: req.Sha256, Purpose: "avatar"})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.InitiateGroupAvatarUploadResp{Upload: upload}, nil
+}
+
+func (h *groupHandler) CompleteAvatarUpload(ctx context.Context, req *pb.CompleteGroupAvatarUploadReq) (*pb.CompleteGroupAvatarUploadResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.CanManageGroup(ctx, req.GroupId, userID); err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	completed, err := h.files.CompleteUpload(fileContext(ctx), &filePB.CompleteUploadReq{UserId: userID, FileId: req.FileId})
+	if err != nil {
+		return nil, err
+	}
+	current, err := h.svc.GetGroup(ctx, req.GroupId)
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	oldURL := current.FaceURL
+	avatarURL := "/api/v1/files/" + req.FileId + "/avatar"
+	updated, err := h.svc.UpdateGroupInfo(ctx, &types.UpdateGroupInfoInput{GroupID: req.GroupId, OpUserID: userID, FaceURL: &avatarURL})
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	activated, err := h.files.ActivateAvatar(fileContext(ctx), &filePB.ActivateAvatarReq{UserId: userID, FileId: req.FileId, TargetType: "group", TargetId: req.GroupId})
+	if err != nil {
+		_, _ = h.svc.UpdateGroupInfo(ctx, &types.UpdateGroupInfoInput{GroupID: req.GroupId, OpUserID: userID, FaceURL: &oldURL})
+		return nil, err
+	}
+	if activated.File != nil {
+		completed.File = activated.File
+	}
+	return &pb.CompleteGroupAvatarUploadResp{AvatarUrl: avatarURL, Group: groupToProto(updated), File: completed.File}, nil
 }
 
 // GetGroup 获取群组信息。

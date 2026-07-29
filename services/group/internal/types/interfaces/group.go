@@ -45,6 +45,8 @@ type GroupService interface {
 	UpdateGroupInfo(ctx context.Context, in *types.UpdateGroupInfoInput) (*types.Group, error)
 	// GetGroup 根据 ID 获取群组信息。
 	GetGroup(ctx context.Context, groupID string) (*types.Group, error)
+	// CanManageGroup 校验用户是否为群主或管理员。
+	CanManageGroup(ctx context.Context, groupID, userID string) error
 
 	// ---- 成员管理 ----
 	// InviteUserToGroup 邀请用户加入群组，opUserID 必须是群主或管理员。

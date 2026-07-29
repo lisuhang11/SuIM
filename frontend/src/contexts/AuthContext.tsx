@@ -21,6 +21,7 @@ interface AuthContextValue extends AuthState {
   login: (data: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (data: { nickname: string; avatarFile?: File }) => Promise<User>;
   clearError: () => void;
 }
 
@@ -182,9 +183,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, error: null }));
   }, []);
 
+  const updateProfile = useCallback(async (data: { nickname: string; avatarFile?: File }) => {
+    if (!state.user) throw new Error("尚未登录");
+    if (isMockMode) {
+      const next = { ...state.user, displayName: data.nickname, username: data.nickname, avatar: data.avatarFile ? URL.createObjectURL(data.avatarFile) : state.user.avatar };
+      setState((s) => ({ ...s, user: next }));
+      return next;
+    }
+    if (data.avatarFile) await api.uploadAvatar(data.avatarFile, { type: "user", id: state.user.userId });
+    const next = await api.updateCurrentUser({ nickname: data.nickname });
+    storage.setCachedUser(next);
+    setState((s) => ({ ...s, user: next }));
+    return next;
+  }, [state.user]);
+
   return (
     <AuthContext.Provider
-      value={{ ...state, login, register, logout, clearError }}
+      value={{ ...state, login, register, logout, updateProfile, clearError }}
     >
       {children}
     </AuthContext.Provider>

@@ -9,12 +9,14 @@ import FriendsPanel from "./FriendsPanel";
 import GroupsPanel from "./GroupsPanel";
 import ChatArea from "./ChatArea";
 import EmptyChat from "./EmptyChat";
+import ProfilePanel from "./ProfilePanel";
 
 export default function ChatLayout() {
   const { isLoading } = useAuth();
   const { activeConversationId, messages, conversations } = useChat();
   const [navSection, setNavSection] = useState<NavSection>("chats");
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleNavigate = useCallback((section: NavSection) => {
     setNavSection(section);
@@ -30,7 +32,7 @@ export default function ChatLayout() {
 
   return (
     <main className="flex h-dvh flex-col-reverse overflow-hidden bg-slate-100 md:flex-row">
-      <SidebarNav activeSection={navSection} onNavigate={handleNavigate} />
+      <SidebarNav activeSection={navSection} onNavigate={handleNavigate} onOpenProfile={() => setProfileOpen(true)} />
       <section className={`${mobileChatOpen ? "hidden" : "flex"} min-h-0 min-w-0 flex-1 border-r border-slate-200 bg-white md:flex md:w-[340px] md:flex-none`}>
         {navSection === "chats" && <ConversationList onOpenConversation={() => setMobileChatOpen(true)} />}
         {navSection === "friends" && <FriendsPanel onOpenConversation={() => setMobileChatOpen(true)} />}
@@ -43,6 +45,7 @@ export default function ChatLayout() {
           <EmptyChat />
         )}
       </section>
+      <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
     </main>
   );
 }

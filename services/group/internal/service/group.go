@@ -296,6 +296,11 @@ func (s *groupService) UpdateGroupInfo(ctx context.Context, in *types.UpdateGrou
 	return g, nil
 }
 
+func (s *groupService) CanManageGroup(ctx context.Context, groupID, userID string) error {
+	_, _, err := authMemberWithRepo(ctx, s.repo, groupID, userID, types.GroupMemberRoleAdmin)
+	return err
+}
+
 // GetGroup 根据 ID 获取群组信息。
 func (s *groupService) GetGroup(ctx context.Context, groupID string) (*types.Group, error) {
 	g, err := s.repo.GetGroup(ctx, groupID)

@@ -13,7 +13,7 @@ func MustOpen(cfg *config.Config) *gorm.DB {
 	if err != nil {
 		panic(fmt.Sprintf("file database: %v", err))
 	}
-	if err := db.AutoMigrate(&types.File{}, &types.Binding{}); err != nil {
+	if err := db.AutoMigrate(&types.File{}, &types.Binding{}, &types.AvatarBinding{}); err != nil {
 		panic(fmt.Sprintf("file migrate: %v", err))
 	}
 	return db

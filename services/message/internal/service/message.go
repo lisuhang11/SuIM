@@ -13,9 +13,9 @@ import (
 	"message/internal/types"
 	"message/internal/types/interfaces"
 
-	pb "SuIM/proto/pushpb"
-	sdkws "SuIM/proto/sdkws"
 	"SuIM/pkg/discovery"
+	messagepb "SuIM/proto/messagepb"
+	pb "SuIM/proto/pushpb"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -65,7 +65,7 @@ func (s *messageService) SendMsg(ctx context.Context, msg *types.Message) (*type
 	}
 
 	// 幂等检查：如果 client_msg_id 已存在，直接返回已存储的消息。
-	existing, err := s.repo.GetByClientMsgIDs(ctx, []string{msg.ClientMsgID})
+	existing, err := s.repo.GetBySenderClientMsgIDs(ctx, msg.SendID, []string{msg.ClientMsgID})
 	if err != nil {
 		return nil, apperrors.NewInternalError("failed to check message idempotency").WithDetails(err)
 	}
@@ -90,6 +90,11 @@ func (s *messageService) SendMsg(ctx context.Context, msg *types.Message) (*type
 
 	// msg.RecvUserIDs 不持久化，仅用于推进接收方游标。
 	if err := s.repo.SendMessage(ctx, msg, msg.RecvUserIDs); err != nil {
+		// 唯一约束解决并发重试竞态；冲突时返回已经成功落库的消息。
+		existing, lookupErr := s.repo.GetBySenderClientMsgIDs(ctx, msg.SendID, []string{msg.ClientMsgID})
+		if lookupErr == nil && len(existing) > 0 {
+			return &existing[0], nil
+		}
 		return nil, apperrors.NewInternalError("failed to persist message").WithDetails(err)
 	}
 
@@ -110,11 +115,11 @@ func (s *messageService) SendMsg(ctx context.Context, msg *types.Message) (*type
 }
 
 // GetHistoryMessages 返回一页历史消息和分页前的匹配行数。
-func (s *messageService) GetHistoryMessages(ctx context.Context, conversationID string, anchorSeq int64, limit, order int) ([]types.Message, int64, error) {
-	if conversationID == "" {
-		return nil, 0, apperrors.NewValidationError("conversation_id is required")
+func (s *messageService) GetHistoryMessages(ctx context.Context, userID, conversationID string, anchorSeq int64, limit, order int) ([]types.Message, int64, error) {
+	if userID == "" || conversationID == "" {
+		return nil, 0, apperrors.NewValidationError("user_id and conversation_id are required")
 	}
-	msgs, matched, err := s.repo.GetHistory(ctx, conversationID, anchorSeq, limit, order)
+	msgs, matched, err := s.repo.GetHistory(ctx, userID, conversationID, anchorSeq, limit, order)
 	if err != nil {
 		return nil, 0, apperrors.NewInternalError("failed to load history").WithDetails(err)
 	}
@@ -122,8 +127,11 @@ func (s *messageService) GetHistoryMessages(ctx context.Context, conversationID 
 }
 
 // GetMessagesBySeq 按 seq 获取消息。
-func (s *messageService) GetMessagesBySeq(ctx context.Context, conversationID string, seqs []int64) ([]types.Message, error) {
-	msgs, err := s.repo.GetBySeqs(ctx, conversationID, seqs)
+func (s *messageService) GetMessagesBySeq(ctx context.Context, userID, conversationID string, seqs []int64) ([]types.Message, error) {
+	if userID == "" || conversationID == "" {
+		return nil, apperrors.NewValidationError("user_id and conversation_id are required")
+	}
+	msgs, err := s.repo.GetBySeqs(ctx, userID, conversationID, seqs)
 	if err != nil {
 		return nil, apperrors.NewInternalError("failed to load messages by seq").WithDetails(err)
 	}
@@ -131,8 +139,11 @@ func (s *messageService) GetMessagesBySeq(ctx context.Context, conversationID st
 }
 
 // GetMessagesByClientMsgIDs 按客户端消息 ID 获取消息。
-func (s *messageService) GetMessagesByClientMsgIDs(ctx context.Context, clientMsgIDs []string) ([]types.Message, error) {
-	msgs, err := s.repo.GetByClientMsgIDs(ctx, clientMsgIDs)
+func (s *messageService) GetMessagesByClientMsgIDs(ctx context.Context, userID string, clientMsgIDs []string) ([]types.Message, error) {
+	if userID == "" {
+		return nil, apperrors.NewValidationError("user_id is required")
+	}
+	msgs, err := s.repo.GetByClientMsgIDs(ctx, userID, clientMsgIDs)
 	if err != nil {
 		return nil, apperrors.NewInternalError("failed to load messages by client_msg_id").WithDetails(err)
 	}
@@ -154,21 +165,26 @@ func (s *messageService) RevokeMsg(ctx context.Context, conversationID, clientMs
 	return nil
 }
 
-// MarkMsgsAsRead 标记已读，同时尽最大努力同步会话服务的 min_seq。
+// MarkMsgsAsRead 推进指定用户的已读游标。
 func (s *messageService) MarkMsgsAsRead(ctx context.Context, conversationID, userID string, seq int64) error {
-	if err := s.repo.MarkMessagesRead(ctx, conversationID, seq); err != nil {
-		return apperrors.NewInternalError("failed to mark messages read").WithDetails(err)
+	if userID == "" || conversationID == "" || seq < 0 {
+		return apperrors.NewValidationError("valid user_id, conversation_id and seq are required")
 	}
-	if err := s.repo.SetConversationMinSeq(ctx, conversationID, userID, seq); err != nil {
-		// 尽最大努力兼容性操作；失败记录日志但不影响已读确认。
-		logger.Warn(ctx, "failed to advance conversation read cursor", "error", err)
+	if err := s.repo.SetReadSeq(ctx, userID, conversationID, seq); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.NewValidationError("user cannot access conversation")
+		}
+		return apperrors.NewInternalError("failed to advance read sequence").WithDetails(err)
 	}
 	return nil
 }
 
-// DeleteMsgs 删除消息。
-func (s *messageService) DeleteMsgs(ctx context.Context, conversationID string, seqs []int64) error {
-	if err := s.repo.Delete(ctx, conversationID, seqs); err != nil {
+// DeleteMsgs 仅对指定用户隐藏消息。
+func (s *messageService) DeleteMsgs(ctx context.Context, userID, conversationID string, seqs []int64) error {
+	if userID == "" || conversationID == "" {
+		return apperrors.NewValidationError("user_id and conversation_id are required")
+	}
+	if err := s.repo.DeleteForUser(ctx, userID, conversationID, seqs); err != nil {
 		return apperrors.NewInternalError("failed to delete messages").WithDetails(err)
 	}
 	return nil
@@ -176,7 +192,7 @@ func (s *messageService) DeleteMsgs(ctx context.Context, conversationID string, 
 
 // buildPushRequest 将消息领域模型转换为 push 服务请求。
 func buildPushRequest(msg *types.Message) *pb.PushMsgReq {
-	sdkMsg := &sdkws.MsgData{
+	sdkMsg := &messagepb.MsgData{
 		ClientMsgId:      msg.ClientMsgID,
 		ServerMsgId:      msg.ServerMsgID,
 		ConversationId:   msg.ConversationID,
@@ -189,6 +205,7 @@ func buildPushRequest(msg *types.Message) *pb.PushMsgReq {
 		Content:          msg.Content,
 		Seq:              msg.Seq,
 		SendTime:         msg.SendTime,
+		CreateTime:       msg.CreateTime,
 		Status:           int32(msg.Status),
 		Ex:               msg.Ex,
 		SenderPlatformId: int32(msg.SenderPlatformID),

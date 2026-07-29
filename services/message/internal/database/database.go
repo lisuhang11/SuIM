@@ -31,7 +31,7 @@ func MustOpen(ctx context.Context, cfg *config.Config) *gorm.DB {
 	sqlDB.SetMaxIdleConns(10)
 
 	// 自动迁移消息领域模型。
-	if err := db.AutoMigrate(&types.Message{}, &types.SeqConversation{}, &types.SeqUser{}); err != nil {
+	if err := db.AutoMigrate(&types.Message{}, &types.SeqConversation{}, &types.SeqUser{}, &types.MessageDelete{}); err != nil {
 		panic(fmt.Sprintf("failed to auto-migrate: %v", err))
 	}
 

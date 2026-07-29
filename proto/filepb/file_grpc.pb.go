@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v6.33.2
-// source: proto/file.proto
+// source: file.proto
 
 package filepb
 
@@ -25,6 +25,7 @@ const (
 	FileService_GetDownloadURL_FullMethodName = "/file.FileService/GetDownloadURL"
 	FileService_GetFile_FullMethodName        = "/file.FileService/GetFile"
 	FileService_DeleteFile_FullMethodName     = "/file.FileService/DeleteFile"
+	FileService_ActivateAvatar_FullMethodName = "/file.FileService/ActivateAvatar"
 )
 
 // FileServiceClient is the client API for FileService service.
@@ -37,6 +38,7 @@ type FileServiceClient interface {
 	GetDownloadURL(ctx context.Context, in *GetDownloadURLReq, opts ...grpc.CallOption) (*GetDownloadURLResp, error)
 	GetFile(ctx context.Context, in *GetFileReq, opts ...grpc.CallOption) (*GetFileResp, error)
 	DeleteFile(ctx context.Context, in *DeleteFileReq, opts ...grpc.CallOption) (*DeleteFileResp, error)
+	ActivateAvatar(ctx context.Context, in *ActivateAvatarReq, opts ...grpc.CallOption) (*ActivateAvatarResp, error)
 }
 
 type fileServiceClient struct {
@@ -107,6 +109,16 @@ func (c *fileServiceClient) DeleteFile(ctx context.Context, in *DeleteFileReq, o
 	return out, nil
 }
 
+func (c *fileServiceClient) ActivateAvatar(ctx context.Context, in *ActivateAvatarReq, opts ...grpc.CallOption) (*ActivateAvatarResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ActivateAvatarResp)
+	err := c.cc.Invoke(ctx, FileService_ActivateAvatar_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FileServiceServer is the server API for FileService service.
 // All implementations must embed UnimplementedFileServiceServer
 // for forward compatibility.
@@ -117,6 +129,7 @@ type FileServiceServer interface {
 	GetDownloadURL(context.Context, *GetDownloadURLReq) (*GetDownloadURLResp, error)
 	GetFile(context.Context, *GetFileReq) (*GetFileResp, error)
 	DeleteFile(context.Context, *DeleteFileReq) (*DeleteFileResp, error)
+	ActivateAvatar(context.Context, *ActivateAvatarReq) (*ActivateAvatarResp, error)
 	mustEmbedUnimplementedFileServiceServer()
 }
 
@@ -144,6 +157,9 @@ func (UnimplementedFileServiceServer) GetFile(context.Context, *GetFileReq) (*Ge
 }
 func (UnimplementedFileServiceServer) DeleteFile(context.Context, *DeleteFileReq) (*DeleteFileResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteFile not implemented")
+}
+func (UnimplementedFileServiceServer) ActivateAvatar(context.Context, *ActivateAvatarReq) (*ActivateAvatarResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method ActivateAvatar not implemented")
 }
 func (UnimplementedFileServiceServer) mustEmbedUnimplementedFileServiceServer() {}
 func (UnimplementedFileServiceServer) testEmbeddedByValue()                     {}
@@ -274,6 +290,24 @@ func _FileService_DeleteFile_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FileService_ActivateAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ActivateAvatarReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileServiceServer).ActivateAvatar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FileService_ActivateAvatar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServiceServer).ActivateAvatar(ctx, req.(*ActivateAvatarReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FileService_ServiceDesc is the grpc.ServiceDesc for FileService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -305,7 +339,11 @@ var FileService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "DeleteFile",
 			Handler:    _FileService_DeleteFile_Handler,
 		},
+		{
+			MethodName: "ActivateAvatar",
+			Handler:    _FileService_ActivateAvatar_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/file.proto",
+	Metadata: "file.proto",
 }

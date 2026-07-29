@@ -2,13 +2,13 @@ syntax = "proto3";
 
 package push;
 
-import "sdkws/sdkws.proto";
+import "message.proto";
 
 option go_package = "SuIM/proto/pushpb";
 
 // PushMsgReq is the request for pushing a message notification to specified users.
 message PushMsgReq {
-  sdkws.MsgData msg_data = 1;
+  .message.MsgData msg_data = 1;
   string conversation_id = 2;
   repeated string user_ids = 3;
 }

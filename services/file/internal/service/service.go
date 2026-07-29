@@ -22,6 +22,8 @@ import (
 
 var sha256Pattern = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
 
+const maxAvatarSize int64 = 5 << 20
+
 type Service struct {
 	repo  *repository.Repository
 	store *storage.Store
@@ -32,7 +34,14 @@ func New(repo *repository.Repository, store *storage.Store, cfg *config.Config) 
 	return &Service{repo: repo, store: store, cfg: cfg}
 }
 
-func (s *Service) Initiate(ctx context.Context, userID, name, contentType, hash string, size int64) (*pb.InitiateUploadResp, error) {
+func (s *Service) Initiate(ctx context.Context, userID, name, contentType, hash, purpose string, size int64) (*pb.InitiateUploadResp, error) {
+	purpose = strings.ToLower(strings.TrimSpace(purpose))
+	if purpose == "" {
+		purpose = types.PurposeAttachment
+	}
+	if purpose != types.PurposeAttachment && purpose != types.PurposeAvatar {
+		return nil, invalid("unsupported file purpose")
+	}
 	name = strings.TrimSpace(path.Base(strings.ReplaceAll(name, "\\", "/")))
 	if name == "" || name == "." || len([]rune(name)) > 255 {
 		return nil, invalid("invalid file name")
@@ -50,12 +59,20 @@ func (s *Service) Initiate(ctx context.Context, userID, name, contentType, hash 
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
+	if purpose == types.PurposeAvatar {
+		if size > maxAvatarSize {
+			return nil, invalid("avatar size must not exceed 5 MiB")
+		}
+		if !avatarContentType(contentType) {
+			return nil, invalid("avatars must be JPEG, PNG, or WebP")
+		}
+	}
 	if forbidden(contentType, filepath.Ext(name)) {
 		return nil, invalid("this file type is not allowed")
 	}
 	now := time.Now()
 	if hash != "" {
-		if f, err := s.repo.FindDuplicate(ctx, userID, hash, size, now); err == nil {
+		if f, err := s.repo.FindDuplicate(ctx, userID, hash, purpose, size, now); err == nil {
 			return &pb.InitiateUploadResp{File: toProto(f), AlreadyUploaded: true}, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, internal(err)
@@ -70,9 +87,13 @@ func (s *Service) Initiate(ctx context.Context, userID, name, contentType, hash 
 	}
 	id := uuid.NewString()
 	ext := strings.ToLower(filepath.Ext(name))
-	key := path.Join("users", userID, now.Format("2006/01/02"), id+ext)
+	key := path.Join("users", userID, purpose, now.Format("2006/01/02"), id+ext)
 	uploadExpires := now.Add(s.cfg.UploadExpiry)
-	f := &types.File{FileID: id, OwnerID: userID, ObjectKey: key, OriginalName: name, ContentType: contentType, Size: size, SHA256: hash, Category: category(contentType), Status: types.StatusPending, UploadExpiresAt: uploadExpires, ExpiresAt: now.Add(s.cfg.PendingRetention)}
+	fileCategory := category(contentType)
+	if purpose == types.PurposeAvatar {
+		fileCategory = "avatar"
+	}
+	f := &types.File{FileID: id, OwnerID: userID, ObjectKey: key, OriginalName: name, ContentType: contentType, Size: size, SHA256: hash, Category: fileCategory, Purpose: purpose, Status: types.StatusPending, UploadExpiresAt: uploadExpires, ExpiresAt: now.Add(s.cfg.PendingRetention)}
 	if err := s.repo.Create(ctx, f); err != nil {
 		return nil, internal(err)
 	}
@@ -109,6 +130,10 @@ func (s *Service) Complete(ctx context.Context, userID, fileID string) (*types.F
 		_ = s.store.Delete(ctx, f.ObjectKey)
 		return nil, failed("uploaded file content is not allowed")
 	}
+	if f.Purpose == types.PurposeAvatar && !avatarContentType(detectedType) {
+		_ = s.store.Delete(ctx, f.ObjectKey)
+		return nil, failed("uploaded avatar content must be JPEG, PNG, or WebP")
+	}
 	if f.SHA256 != "" && sum != f.SHA256 {
 		_ = s.store.Delete(ctx, f.ObjectKey)
 		return nil, failed("uploaded file checksum mismatch")
@@ -117,6 +142,26 @@ func (s *Service) Complete(ctx context.Context, userID, fileID string) (*types.F
 		return nil, internal(err)
 	}
 	return s.repo.Get(ctx, f.FileID)
+}
+
+func (s *Service) ActivateAvatar(ctx context.Context, userID, fileID, targetType, targetID string) (*types.File, error) {
+	f, err := s.owned(ctx, userID, fileID)
+	if err != nil {
+		return nil, err
+	}
+	if f.Status != types.StatusAvailable || f.Purpose != types.PurposeAvatar {
+		return nil, failed("file is not an available avatar")
+	}
+	if targetType != "user" && targetType != "group" {
+		return nil, invalid("target_type must be user or group")
+	}
+	if targetID == "" || (targetType == "user" && targetID != userID) {
+		return nil, permission("avatar target is not allowed")
+	}
+	if err := s.repo.ActivateAvatar(ctx, fileID, targetType, targetID, time.Now()); err != nil {
+		return nil, internal(err)
+	}
+	return s.repo.Get(ctx, fileID)
 }
 func (s *Service) Bind(ctx context.Context, userID, fileID, conversationID string) (*types.File, error) {
 	f, err := s.owned(ctx, userID, fileID)
@@ -221,7 +266,11 @@ func toProto(f *types.File) *pb.FileInfo {
 	if f == nil {
 		return nil
 	}
-	return &pb.FileInfo{FileId: f.FileID, OwnerId: f.OwnerID, Name: f.OriginalName, ContentType: f.ContentType, Size: f.Size, Sha256: f.SHA256, Category: f.Category, Status: f.Status, CreatedAt: f.CreatedAt.UnixMilli(), ExpiresAt: f.ExpiresAt.UnixMilli()}
+	return &pb.FileInfo{FileId: f.FileID, OwnerId: f.OwnerID, Name: f.OriginalName, ContentType: f.ContentType, Size: f.Size, Sha256: f.SHA256, Category: f.Category, Status: f.Status, CreatedAt: f.CreatedAt.UnixMilli(), ExpiresAt: f.ExpiresAt.UnixMilli(), Purpose: f.Purpose}
+}
+func avatarContentType(contentType string) bool {
+	contentType = strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+	return contentType == "image/jpeg" || contentType == "image/png" || contentType == "image/webp"
 }
 func category(contentType string) string {
 	switch {

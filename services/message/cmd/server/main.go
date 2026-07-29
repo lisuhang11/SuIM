@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 
+	"message/internal/client"
 	"message/internal/config"
 	"message/internal/database"
 	"message/internal/handler"
@@ -16,10 +17,11 @@ import (
 	"message/internal/repository"
 	"message/internal/service"
 
-	pb "SuIM/proto/messagepb"
 	"SuIM/pkg/discovery"
+	pb "SuIM/proto/messagepb"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -47,8 +49,19 @@ func main() {
 	messageRepo := repository.NewMessageRepository(db)
 	messageSvc := service.NewMessageService(messageRepo)
 
+	userConn, err := grpc.NewClient(
+		discovery.TargetURL("user"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to user service: %v", err))
+	}
+	defer userConn.Close()
+	authenticator := client.NewUserAuthenticator(userConn)
+
 	grpcSvr := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor()),
+		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor(authenticator)),
 	)
 	pb.RegisterMessageServer(grpcSvr, handler.NewMessageHandler(messageSvc))
 	reflection.Register(grpcSvr) // 启用 grpcurl 调试支持

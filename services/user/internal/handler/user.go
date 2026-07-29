@@ -4,26 +4,48 @@ package handler
 import (
 	"context"
 	"log/slog"
+	"strings"
 
+	filePB "SuIM/proto/filepb"
+	pb "SuIM/proto/userpb"
 	apperrors "user/internal/errors"
 	"user/internal/repository"
 	"user/internal/types"
 	"user/internal/types/interfaces"
-	pb "SuIM/proto/userpb"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
 // userHandler 实现 pb.UserServiceServer，将请求委托给领域 UserService。
 type userHandler struct {
 	pb.UnimplementedUserServiceServer
-	svc interfaces.UserService
+	svc   interfaces.UserService
+	files filePB.FileServiceClient
 }
 
 // NewUserHandler 创建绑定到指定领域服务的 gRPC UserServiceServer。
-func NewUserHandler(svc interfaces.UserService) pb.UserServiceServer {
-	return &userHandler{svc: svc}
+func NewUserHandler(svc interfaces.UserService, files filePB.FileServiceClient) pb.UserServiceServer {
+	return &userHandler{svc: svc, files: files}
+}
+
+func (h *userHandler) authenticatedUser(ctx context.Context) (*types.User, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	values := md.Get("authorization")
+	if len(values) != 1 || !strings.HasPrefix(values[0], "Bearer ") {
+		return nil, status.Error(codes.Unauthenticated, "missing bearer token")
+	}
+	user, err := h.svc.ValidateToken(ctx, strings.TrimSpace(strings.TrimPrefix(values[0], "Bearer ")))
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "invalid bearer token")
+	}
+	return user, nil
+}
+
+func outgoingContext(ctx context.Context) context.Context {
+	md, _ := metadata.FromIncomingContext(ctx)
+	return metadata.NewOutgoingContext(ctx, md.Copy())
 }
 
 // --------------- 类型转换辅助函数 ---------------
@@ -131,6 +153,47 @@ func (h *userHandler) UpdateUser(ctx context.Context, req *pb.UpdateUserReq) (*p
 		return nil, err
 	}
 	return &pb.UpdateUserResp{Success: true}, nil
+}
+
+func (h *userHandler) InitiateAvatarUpload(ctx context.Context, req *pb.InitiateUserAvatarUploadReq) (*pb.InitiateUserAvatarUploadResp, error) {
+	user, err := h.authenticatedUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	upload, err := h.files.InitiateUpload(outgoingContext(ctx), &filePB.InitiateUploadReq{
+		UserId: user.UserID, Name: req.Name, ContentType: req.ContentType, Size: req.Size, Sha256: req.Sha256, Purpose: "avatar",
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.InitiateUserAvatarUploadResp{Upload: upload}, nil
+}
+
+func (h *userHandler) CompleteAvatarUpload(ctx context.Context, req *pb.CompleteUserAvatarUploadReq) (*pb.CompleteUserAvatarUploadResp, error) {
+	user, err := h.authenticatedUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	completed, err := h.files.CompleteUpload(outgoingContext(ctx), &filePB.CompleteUploadReq{UserId: user.UserID, FileId: req.FileId})
+	if err != nil {
+		return nil, err
+	}
+	avatarURL := "/api/v1/files/" + req.FileId + "/avatar"
+	oldURL := user.AvatarURL
+	user.AvatarURL = avatarURL
+	if err := h.svc.UpdateUser(ctx, user); err != nil {
+		return nil, err
+	}
+	activated, err := h.files.ActivateAvatar(outgoingContext(ctx), &filePB.ActivateAvatarReq{UserId: user.UserID, FileId: req.FileId, TargetType: "user", TargetId: user.UserID})
+	if err != nil {
+		user.AvatarURL = oldURL
+		_ = h.svc.UpdateUser(ctx, user)
+		return nil, err
+	}
+	if activated.File != nil {
+		completed.File = activated.File
+	}
+	return &pb.CompleteUserAvatarUploadResp{AvatarUrl: avatarURL, User: userToProto(user), File: completed.File}, nil
 }
 
 // DeleteUser 删除指定用户。

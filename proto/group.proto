@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "file.proto";
+
 package group;
 
 option go_package = "SuIM/proto/grouppb";
@@ -11,6 +13,8 @@ service GroupService {
   rpc DismissGroup(DismissGroupReq) returns (DismissGroupResp);
   rpc TransferGroupOwner(TransferGroupOwnerReq) returns (TransferGroupOwnerResp);
   rpc UpdateGroupInfo(UpdateGroupInfoReq) returns (UpdateGroupInfoResp);
+  rpc InitiateAvatarUpload(InitiateGroupAvatarUploadReq) returns (InitiateGroupAvatarUploadResp);
+  rpc CompleteAvatarUpload(CompleteGroupAvatarUploadReq) returns (CompleteGroupAvatarUploadResp);
   rpc GetGroup(GetGroupReq) returns (GetGroupResp);
 
   // Members
@@ -140,6 +144,29 @@ message UpdateGroupInfoResp {
   bool success = 1;
   string message = 2;
   GroupInfo group = 3;
+}
+
+message InitiateGroupAvatarUploadReq {
+  string group_id = 1;
+  string name = 2;
+  string content_type = 3;
+  int64 size = 4;
+  string sha256 = 5;
+}
+
+message InitiateGroupAvatarUploadResp {
+  file.InitiateUploadResp upload = 1;
+}
+
+message CompleteGroupAvatarUploadReq {
+  string group_id = 1;
+  string file_id = 2;
+}
+
+message CompleteGroupAvatarUploadResp {
+  string avatar_url = 1;
+  GroupInfo group = 2;
+  file.FileInfo file = 3;
 }
 
 // --------------- GetGroup ---------------

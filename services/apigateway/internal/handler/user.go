@@ -3,6 +3,8 @@ package handler
 
 import (
 	"context"
+	"net/http"
+	"strings"
 	"time"
 
 	pb "SuIM/proto/userpb"
@@ -25,6 +27,8 @@ func (h *UserHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/register", h.handleRegister)
 	r.POST("/login", h.Login)
 	r.GET("/me", h.GetCurrentUser) // 从 JWT 上下文获取当前用户
+	r.POST("/me/avatar/initiate", h.InitiateAvatarUpload)
+	r.POST("/me/avatar/:file_id/complete", h.CompleteAvatarUpload)
 	r.GET("/:id", h.GetUser)
 	r.GET("/batch", h.GetUsersByIDs)
 	r.PUT("/:id", h.UpdateUser)
@@ -34,6 +38,33 @@ func (h *UserHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/refresh-token", h.RefreshToken)
 	r.POST("/logout", h.Logout)
 	r.GET("/search", h.SearchUsers)
+}
+
+func (h *UserHandler) InitiateAvatarUpload(c *gin.Context) {
+	var req pb.InitiateUserAvatarUploadReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 5*time.Second)
+	defer cancel()
+	resp, err := h.client.InitiateAvatarUpload(ctx, &req)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
+func (h *UserHandler) CompleteAvatarUpload(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 90*time.Second)
+	defer cancel()
+	resp, err := h.client.CompleteAvatarUpload(ctx, &pb.CompleteUserAvatarUploadReq{FileId: c.Param("file_id")})
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
 }
 
 // handleRegister POST /users/register
@@ -149,14 +180,51 @@ func (h *UserHandler) GetUsersByIDs(c *gin.Context) {
 
 // UpdateUser PUT /users/:id
 func (h *UserHandler) UpdateUser(c *gin.Context) {
-	var req pb.UpdateUserReq
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var body struct {
+		Nickname  *string      `json:"nickname"`
+		AvatarURL *string      `json:"avatar_url"`
+		User      *pb.UserInfo `json:"user"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
 		RespondError(c, err)
 		return
 	}
-	// user_id 从 JSON body 的 User 字段中获取；path param 仅做 URL 级标识
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	userID := userIDFromCtx(c)
+	if pathID := c.Param("id"); pathID != "me" && pathID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "only your own profile can be updated"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
+	current, err := h.client.GetUser(ctx, &pb.GetUserReq{UserId: userID})
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	if current.User == nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "user not found"})
+		return
+	}
+	if body.User != nil {
+		if body.Nickname == nil {
+			body.Nickname = &body.User.Nickname
+		}
+		if body.AvatarURL == nil {
+			body.AvatarURL = &body.User.AvatarUrl
+		}
+	}
+	if body.Nickname != nil {
+		nickname := strings.TrimSpace(*body.Nickname)
+		if nickname == "" || len([]rune(nickname)) > 64 {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "nickname must be between 1 and 64 characters"})
+			return
+		}
+		current.User.Nickname = nickname
+	}
+	if body.AvatarURL != nil {
+		current.User.AvatarUrl = *body.AvatarURL
+	}
+	req := pb.UpdateUserReq{User: current.User}
 	start := time.Now()
 	resp, err := h.client.UpdateUser(ctx, &req)
 	recordGRPC("user", "UpdateUser", err, start)

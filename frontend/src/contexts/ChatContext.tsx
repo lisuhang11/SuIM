@@ -52,6 +52,7 @@ interface ChatContextValue extends ChatState {
   markConversationRead: (conversationId: string) => void;
   addConversation: (conv: Conversation) => void;
   removeConversation: (id: string) => void;
+  updateConversation: (id: string, patch: Partial<Conversation>) => void;
   refreshConversations: () => Promise<void>;
   refreshGroups: () => Promise<void>;
   loadMessages: (conversationId: string) => Promise<void>;
@@ -81,6 +82,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const updateConversation = useCallback((id: string, patch: Partial<Conversation>) => {
+    setState((prev) => ({ ...prev, conversations: prev.conversations.map((item) => item.conversationId === id ? { ...item, ...patch } : item) }));
+  }, []);
 
   // ---------- 初始化：从后端 API 加载数据 ----------
   useEffect(() => {
@@ -618,6 +623,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         markConversationRead,
         addConversation,
         removeConversation,
+        updateConversation,
         refreshConversations,
         refreshGroups,
         loadMessages,

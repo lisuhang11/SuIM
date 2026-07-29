@@ -5,6 +5,7 @@
 // ============================================================
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { resolveAvatarURL } from "@/services/api";
 
 interface UserAvatarProps {
   src?: string;
@@ -46,13 +47,21 @@ export default function UserAvatar({
 }: UserAvatarProps) {
   const sizeClass = sizeMap[size];
   const [failed, setFailed] = useState(false);
+  const [resolvedSrc, setResolvedSrc] = useState(src || "");
 
-  useEffect(() => setFailed(false), [src]);
+  useEffect(() => {
+    let active = true;
+    setFailed(false);
+    setResolvedSrc("");
+    if (!src) return () => { active = false; };
+    resolveAvatarURL(src).then((value) => { if (active) setResolvedSrc(value); }).catch(() => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, [src]);
 
-  if (src && !failed) {
+  if (resolvedSrc && !failed) {
     return (
       <img
-        src={src}
+        src={resolvedSrc}
         alt={name}
         className={cn(sizeClass, "rounded-full object-cover flex-shrink-0", className)}
         onError={() => setFailed(true)}

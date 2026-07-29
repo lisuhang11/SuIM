@@ -17,11 +17,11 @@ import (
 	"relation/internal/repository"
 	"relation/internal/service"
 
-	pb "SuIM/proto/relationpb"
 	"SuIM/pkg/discovery"
+	pb "SuIM/proto/relationpb"
 
+	messagepb "SuIM/proto/messagepb"
 	"SuIM/proto/msggatewaypb"
-	"SuIM/proto/sdkws"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -61,7 +61,7 @@ func main() {
 	msgGatewayClient := msggatewaypb.NewMsgGatewayClient(msgGatewayConn)
 
 	// pushMsg 封装一次调用，后续所有通知复用同一个 client。
-	pushMsg := func(ctx context.Context, recvID string, msg *sdkws.MsgData) error {
+	pushMsg := func(ctx context.Context, recvID string, msg *messagepb.MsgData) error {
 		_, err := msgGatewayClient.OnlinePushMsg(ctx, &msggatewaypb.OnlinePushMsgReq{
 			MsgData:      msg,
 			PushToUserId: recvID,

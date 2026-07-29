@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "file.proto";
+
 package user;
 
 option go_package = "SuIM/proto/userpb";
@@ -11,6 +13,8 @@ service UserService {
   rpc GetUser(GetUserReq) returns (GetUserResp);
   rpc GetUsersByIDs(GetUsersByIDsReq) returns (GetUsersByIDsResp);
   rpc UpdateUser(UpdateUserReq) returns (UpdateUserResp);
+  rpc InitiateAvatarUpload(InitiateUserAvatarUploadReq) returns (InitiateUserAvatarUploadResp);
+  rpc CompleteAvatarUpload(CompleteUserAvatarUploadReq) returns (CompleteUserAvatarUploadResp);
   rpc DeleteUser(DeleteUserReq) returns (DeleteUserResp);
   rpc ChangePassword(ChangePasswordReq) returns (ChangePasswordResp);
   rpc ValidateToken(ValidateTokenReq) returns (ValidateTokenResp);
@@ -85,6 +89,25 @@ message UpdateUserReq {
 
 message UpdateUserResp {
   bool success = 1;
+}
+
+message InitiateUserAvatarUploadReq {
+  string name = 1;
+  string content_type = 2;
+  int64 size = 3;
+  string sha256 = 4;
+}
+
+message InitiateUserAvatarUploadResp {
+  file.InitiateUploadResp upload = 1;
+}
+
+message CompleteUserAvatarUploadReq { string file_id = 1; }
+
+message CompleteUserAvatarUploadResp {
+  string avatar_url = 1;
+  UserInfo user = 2;
+  file.FileInfo file = 3;
 }
 
 // --------------- DeleteUser ---------------

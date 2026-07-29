@@ -2,12 +2,12 @@ syntax = "proto3";
 
 package msggateway;
 
-import "sdkws/sdkws.proto";
+import "message.proto";
 
 option go_package = "SuIM/proto/msggatewaypb";
 
 message OnlinePushMsgReq {
-  sdkws.MsgData msg_data = 1;
+  .message.MsgData msg_data = 1;
   string push_to_user_id = 2;
 }
 
@@ -22,7 +22,7 @@ message SingleMsgToUserResults {
 }
 
 message OnlineBatchPushOneMsgReq {
-  sdkws.MsgData msg_data = 1;
+  .message.MsgData msg_data = 1;
   repeated string push_to_user_ids = 2;
 }
 

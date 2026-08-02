@@ -45,6 +45,10 @@ type Group struct {
 	ApplyMemberFriend      int       `json:"apply_member_friend"     gorm:"column:apply_member_friend;not null;default:0;comment:是否允许成员互加好友"`
 	NotificationUpdateTime time.Time `json:"notification_update_time" gorm:"column:notification_update_time;not null;comment:公告更新时间"`
 	NotificationUserID     string    `json:"notification_user_id"    gorm:"column:notification_user_id;not null;default:'';comment:公告更新者用户ID"`
+	// MemberCount 对齐 OpenIM GroupInfo.memberCount：不落库，读路径由 group_member 聚合填充。
+	MemberCount int `json:"member_count" gorm:"-"`
+	// OwnerUserID 对齐 OpenIM GroupInfo.ownerUserID：当前群主，读路径由 role=owner 填充。
+	OwnerUserID string `json:"owner_user_id" gorm:"-"`
 }
 
 // TableName 返回 group 表名。MySQL 保留字 `group` 由 GORM mysql 方言自动加引号处理。
@@ -90,6 +94,92 @@ type GroupRequest struct {
 // TableName 返回 group_request 表名。
 func (GroupRequest) TableName() string {
 	return "group_request"
+}
+
+// Join-group version states (align OpenIM / friend version).
+const (
+	VersionStateInsert = 1
+	VersionStateDelete = 2
+	VersionStateUpdate = 3
+)
+
+// JoinGroupVersion 每个用户一条「已加入群」列表水位。
+type JoinGroupVersion struct {
+	UserID    string `json:"user_id"    gorm:"column:user_id;primaryKey;type:varchar(64);not null"`
+	VersionID string `json:"version_id" gorm:"column:version_id;type:varchar(64);not null;default:''"`
+	Version   uint64 `json:"version"    gorm:"column:version;not null;default:0"`
+}
+
+func (JoinGroupVersion) TableName() string {
+	return "join_group_version"
+}
+
+// JoinGroupVersionLog 已加入群列表变更日志。
+type JoinGroupVersionLog struct {
+	ID      uint64 `json:"id"       gorm:"column:id;primaryKey;autoIncrement"`
+	UserID  string `json:"user_id"  gorm:"column:user_id;type:varchar(64);not null;index:idx_jgv_user_ver,priority:1"`
+	Version uint64 `json:"version"  gorm:"column:version;not null;index:idx_jgv_user_ver,priority:2"`
+	GroupID string `json:"group_id" gorm:"column:group_id;type:varchar(64);not null"`
+	State   int8   `json:"state"    gorm:"column:state;not null"` // 1 insert 2 delete 3 update
+}
+
+func (JoinGroupVersionLog) TableName() string {
+	return "join_group_version_log"
+}
+
+// IncrementalJoinGroupsResult 已加入群增量同步结果。
+type IncrementalJoinGroupsResult struct {
+	Version     uint64
+	VersionID   string
+	Full        bool
+	Delete      []string
+	Insert      []*Group
+	Update      []*Group
+	SortVersion uint64
+}
+
+// OpenIM-style special entity IDs in group member version logs.
+const (
+	// VersionGroupChangeID marks group info change (not a member userID).
+	VersionGroupChangeID = ""
+	// VersionSortChangeID marks member sort order change.
+	VersionSortChangeID = "____S_O_R_T_I_D____"
+)
+
+// GroupMemberVersion 每个群一条成员列表水位。
+type GroupMemberVersion struct {
+	GroupID   string `json:"group_id"   gorm:"column:group_id;primaryKey;type:varchar(64);not null"`
+	VersionID string `json:"version_id" gorm:"column:version_id;type:varchar(64);not null;default:''"`
+	Version   uint64 `json:"version"    gorm:"column:version;not null;default:0"`
+}
+
+func (GroupMemberVersion) TableName() string {
+	return "group_member_version"
+}
+
+// GroupMemberVersionLog 群成员列表变更日志；EntityID 多为 user_id，也可能是特殊 ID。
+type GroupMemberVersionLog struct {
+	ID       uint64 `json:"id"        gorm:"column:id;primaryKey;autoIncrement"`
+	GroupID  string `json:"group_id"  gorm:"column:group_id;type:varchar(64);not null;index:idx_gmv_group_ver,priority:1"`
+	Version  uint64 `json:"version"   gorm:"column:version;not null;index:idx_gmv_group_ver,priority:2"`
+	EntityID string `json:"entity_id" gorm:"column:entity_id;type:varchar(64);not null"` // user_id or special
+	State    int8   `json:"state"     gorm:"column:state;not null"`
+}
+
+func (GroupMemberVersionLog) TableName() string {
+	return "group_member_version_log"
+}
+
+// IncrementalGroupMembersResult 群成员增量同步结果。
+type IncrementalGroupMembersResult struct {
+	Version     uint64
+	VersionID   string
+	Full        bool
+	Delete      []string
+	Insert      []*GroupMember
+	Update      []*GroupMember
+	Group       *Group
+	SortVersion uint64
 }
 
 // --------------- 请求/结果值对象（服务层使用） ---------------

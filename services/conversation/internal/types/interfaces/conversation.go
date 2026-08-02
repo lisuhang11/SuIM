@@ -27,7 +27,9 @@ type ConversationService interface {
 	GetConversationNotReceiveMessageUserIDs(ctx context.Context, conversationID string) ([]string, error)
 	GetPinnedConversationIDs(ctx context.Context, userID string) ([]string, error)
 	GetNotNotifyConversationIDs(ctx context.Context, userID string) ([]string, error)
-	DeleteConversations(ctx context.Context, ownerUserID string, ids []string) error
+	DeleteConversations(ctx context.Context, ownerUserID string, ids []string, needDeleteTime int64) error
+	ListLatestMsgs(ctx context.Context, userID string, conversationIDs []string) (map[string]types.LatestMsg, error)
+	ListUnreadCounts(ctx context.Context, ownerUserID string, conversationIDs []string) (map[string]int64, error)
 	UpdateConversationsByUser(ctx context.Context, userID, ex string) error
 	GetUserConversationIDsHash(ctx context.Context, ownerUserID string) (uint64, error)
 	GetOwnerConversation(ctx context.Context, userID string, offset, limit int) ([]types.Conversation, int64, error)
@@ -55,8 +57,9 @@ type ConversationRepository interface {
 	ListConversationIDsByOwner(ctx context.Context, ownerUserID string) ([]string, error)
 	ListPinnedIDsByOwner(ctx context.Context, ownerUserID string) ([]string, error)
 	ListNotNotifyIDsByOwner(ctx context.Context, ownerUserID string) ([]string, error)
-	Delete(ctx context.Context, ownerUserID string, ids []string) error
+	Delete(ctx context.Context, ownerUserID string, ids []string, needDeleteTime int64) error
 	UpdateExByOwner(ctx context.Context, ownerUserID, ex string) error
 	ListNeedClearMsg(ctx context.Context, now int64) ([]types.Conversation, error)
 	ClearMsgSeqs(ctx context.Context, conversationIDs []string) (int64, error)
+	ListUnreadCounts(ctx context.Context, ownerUserID string, conversationIDs []string) (map[string]int64, error)
 }

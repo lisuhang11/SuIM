@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 
+	"relation/internal/client"
 	"relation/internal/config"
 	"relation/internal/database"
 	"relation/internal/handler"
@@ -24,6 +25,8 @@ import (
 	"SuIM/proto/msggatewaypb"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -62,6 +65,8 @@ func main() {
 
 	// pushMsg 封装一次调用，后续所有通知复用同一个 client。
 	pushMsg := func(ctx context.Context, recvID string, msg *messagepb.MsgData) error {
+		md, _ := metadata.FromIncomingContext(ctx)
+		ctx = metadata.NewOutgoingContext(ctx, md.Copy())
 		_, err := msgGatewayClient.OnlinePushMsg(ctx, &msggatewaypb.OnlinePushMsgReq{
 			MsgData:      msg,
 			PushToUserId: recvID,
@@ -76,10 +81,22 @@ func main() {
 	relationRepo := repository.NewRelationRepository(db)
 	relationSvc := service.NewRelationService(relationRepo, friendNotifier)
 
-	grpcSvr := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor()),
+	userConn, err := grpc.NewClient(
+		discovery.TargetURL("user"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
 	)
-	pb.RegisterRelationServiceServer(grpcSvr, handler.NewRelationHandler(relationSvc))
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to user service: %v", err))
+	}
+	defer userConn.Close()
+	authenticator := client.NewUserAuthenticator(userConn)
+	profiles := client.NewUserProfiles(userConn)
+
+	grpcSvr := grpc.NewServer(
+		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor(authenticator)),
+	)
+	pb.RegisterRelationServiceServer(grpcSvr, handler.NewRelationHandler(relationSvc, profiles))
 	reflection.Register(grpcSvr) // 启用 grpcurl 等调试工具
 
 	lis, err := net.Listen("tcp", cfg.ServerAddr)

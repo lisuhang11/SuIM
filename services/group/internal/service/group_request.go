@@ -78,6 +78,12 @@ func (s *groupService) ApplyToJoinGroup(ctx context.Context, in *types.ApplyInpu
 		if err := repo.CreateMember(ctx, m); err != nil {
 			return apperrors.NewInternalError("add member failed").WithDetails(err)
 		}
+		if err := bumpJoinVersions(ctx, repo, []string{in.UserID}, in.GroupID, types.VersionStateInsert); err != nil {
+			return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+		}
+		if err := bumpMemberVersion(ctx, repo, in.GroupID, []string{in.UserID}, types.VersionStateInsert); err != nil {
+			return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+		}
 		joined = true
 		recipients, err = memberIDs(ctx, repo, in.GroupID)
 		return err
@@ -86,6 +92,7 @@ func (s *groupService) ApplyToJoinGroup(ctx context.Context, in *types.ApplyInpu
 		return err
 	}
 	if joined {
+		s.invalidateGroupCache(ctx, in.GroupID)
 		s.publish(ctx, interfaces.GroupEvent{Type: "group.members_joined", GroupID: in.GroupID, OperatorUserID: in.UserID, SubjectUserIDs: []string{in.UserID}, RecipientUserIDs: recipients})
 	}
 	return nil
@@ -142,6 +149,12 @@ func (s *groupService) HandleApplication(ctx context.Context, in *types.HandleIn
 				if err := repo.CreateMember(ctx, m); err != nil {
 					return apperrors.NewInternalError("add member failed").WithDetails(err)
 				}
+				if err := bumpJoinVersions(ctx, repo, []string{in.UserID}, in.GroupID, types.VersionStateInsert); err != nil {
+					return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+				}
+				if err := bumpMemberVersion(ctx, repo, in.GroupID, []string{in.UserID}, types.VersionStateInsert); err != nil {
+					return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+				}
 			}
 		}
 		req.HandleResult = in.HandleResult
@@ -159,6 +172,7 @@ func (s *groupService) HandleApplication(ctx context.Context, in *types.HandleIn
 		return err
 	}
 	if in.HandleResult == 1 {
+		s.invalidateGroupCache(ctx, in.GroupID)
 		s.publish(ctx, interfaces.GroupEvent{Type: "group.application_accepted", GroupID: in.GroupID, OperatorUserID: in.OpUserID, SubjectUserIDs: []string{in.UserID}, RecipientUserIDs: recipients})
 	}
 	return nil

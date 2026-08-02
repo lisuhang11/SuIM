@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 
+	"conversation/internal/client"
 	"conversation/internal/config"
 	"conversation/internal/database"
 	"conversation/internal/handler"
@@ -19,6 +20,7 @@ import (
 	"SuIM/pkg/discovery"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -44,10 +46,32 @@ func main() {
 
 	// 组合根：将仓库注入到服务层。
 	conversationRepo := repository.NewConversationRepository(db)
-	conversationSvc := service.NewConversationService(conversationRepo)
+
+	userConn, err := grpc.NewClient(
+		discovery.TargetURL("user"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to user service: %v", err))
+	}
+	defer userConn.Close()
+	authenticator := client.NewUserAuthenticator(userConn)
+
+	msgConn, err := grpc.NewClient(
+		discovery.TargetURL("message"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to message service: %v", err))
+	}
+	defer msgConn.Close()
+	msgClient := client.NewMessageClient(msgConn)
+	conversationSvc := service.NewConversationService(conversationRepo, msgClient)
 
 	grpcSvr := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor()),
+		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor(authenticator)),
 	)
 	pb.RegisterConversationServer(grpcSvr, handler.NewConversationHandler(conversationSvc))
 	reflection.Register(grpcSvr) // 启用 grpcurl 等调试工具

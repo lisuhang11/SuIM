@@ -34,8 +34,10 @@ func getEndpoints() []string {
 }
 
 const (
-	defaultLeaseTTL    = 15 // 租约 TTL（秒）
-	defaultDialTimeout = 5 * time.Second
+	defaultLeaseTTL     = 15 // 租约 TTL（秒）
+	defaultDialTimeout  = 5 * time.Second
+	reRegisterMinWait   = time.Second
+	reRegisterMaxWait   = 30 * time.Second
 )
 
 // ServiceInfo 注册到 etcd 的服务信息。
@@ -43,13 +45,24 @@ type ServiceInfo struct {
 	Addr string `json:"addr"` // "host:port"
 }
 
+// etcdClient 是 Registry 依赖的 etcd 子集，便于单测注入。
+type etcdClient interface {
+	Grant(ctx context.Context, ttl int64) (*clientv3.LeaseGrantResponse, error)
+	Put(ctx context.Context, key, val string, opts ...clientv3.OpOption) (*clientv3.PutResponse, error)
+	KeepAlive(ctx context.Context, id clientv3.LeaseID) (<-chan *clientv3.LeaseKeepAliveResponse, error)
+	Revoke(ctx context.Context, id clientv3.LeaseID) (*clientv3.LeaseRevokeResponse, error)
+	Close() error
+}
+
 // Registry 管理 etcd 服务注册。
 type Registry struct {
-	client    *clientv3.Client
-	leaseID   clientv3.LeaseID
-	key       string
-	closeCh   chan struct{}
+	client      etcdClient
+	leaseID     clientv3.LeaseID
+	key         string
+	serviceAddr string
+	closeCh     chan struct{}
 	serviceName string
+	closeOnce   sync.Once
 }
 
 // NewRegistry 创建服务注册器并建立 etcd 连接。
@@ -69,18 +82,26 @@ func NewRegistry(serviceName, serviceAddr string, endpoints []string) (*Registry
 		return nil, fmt.Errorf("connect etcd: %w", err)
 	}
 
+	r, err := newRegistryWithClient(serviceName, serviceAddr, cli)
+	if err != nil {
+		cli.Close()
+		return nil, err
+	}
+	return r, nil
+}
+
+func newRegistryWithClient(serviceName, serviceAddr string, client etcdClient) (*Registry, error) {
 	key := fmt.Sprintf("/suim/services/%s/%s", serviceName, generateInstanceID())
 
 	r := &Registry{
-		client:      cli,
+		client:      client,
 		key:         key,
+		serviceAddr: serviceAddr,
 		closeCh:     make(chan struct{}),
 		serviceName: serviceName,
 	}
 
-	// 注册并启动 keepalive。
 	if err := r.register(serviceAddr); err != nil {
-		cli.Close()
 		return nil, fmt.Errorf("register service: %w", err)
 	}
 
@@ -91,7 +112,6 @@ func NewRegistry(serviceName, serviceAddr string, endpoints []string) (*Registry
 	)
 
 	go r.keepAlive()
-
 	return r, nil
 }
 
@@ -121,23 +141,46 @@ func (r *Registry) register(addr string) error {
 	return nil
 }
 
-// keepAlive 维持租约续期。
+// keepAlive 维持租约续期；channel 关闭或 KeepAlive 失败时重新注册并开启新会话。
 func (r *Registry) keepAlive() {
-	ch, err := r.client.KeepAlive(context.Background(), r.leaseID)
-	if err != nil {
-		slog.Error("[discovery] keepalive failed", "service", r.serviceName, "error", err)
-		return
-	}
+	backoff := reRegisterMinWait
 
+	for {
+		select {
+		case <-r.closeCh:
+			return
+		default:
+		}
+
+		ch, err := r.client.KeepAlive(context.Background(), r.leaseID)
+		if err != nil {
+			slog.Error("[discovery] keepalive failed",
+				"service", r.serviceName, "error", err)
+			if !r.reRegister(&backoff) {
+				return
+			}
+			continue
+		}
+
+		if shutdown := r.watchKeepAlive(ch); shutdown {
+			return
+		}
+
+		slog.Warn("[discovery] keepalive channel closed, re-registering",
+			"service", r.serviceName)
+		if !r.reRegister(&backoff) {
+			return
+		}
+	}
+}
+
+// watchKeepAlive 消费续约响应。返回 true 表示 Registry 已关闭应退出；false 表示需重注册。
+func (r *Registry) watchKeepAlive(ch <-chan *clientv3.LeaseKeepAliveResponse) (shutdown bool) {
 	for {
 		select {
 		case ka, ok := <-ch:
 			if !ok {
-				slog.Warn("[discovery] keepalive channel closed, re-registering",
-					"service", r.serviceName)
-				// 尝试重新注册。
-				time.Sleep(time.Second)
-				continue
+				return false
 			}
 			if ka != nil {
 				slog.Debug("[discovery] lease renewed",
@@ -146,14 +189,67 @@ func (r *Registry) keepAlive() {
 				)
 			}
 		case <-r.closeCh:
-			return
+			return true
 		}
+	}
+}
+
+// reRegister 在退避后重新 Grant+Put。成功将 backoff 重置；失败则拉长退避。
+// 返回 false 表示 Registry 已关闭。
+func (r *Registry) reRegister(backoff *time.Duration) bool {
+	for {
+		if r.closed() {
+			return false
+		}
+
+		timer := time.NewTimer(*backoff)
+		select {
+		case <-r.closeCh:
+			timer.Stop()
+			return false
+		case <-timer.C:
+		}
+
+		if r.closed() {
+			return false
+		}
+
+		if err := r.register(r.serviceAddr); err != nil {
+			slog.Error("[discovery] re-register failed",
+				"service", r.serviceName, "error", err, "backoff", backoff.String())
+			next := *backoff * 2
+			if next > reRegisterMaxWait {
+				next = reRegisterMaxWait
+			}
+			*backoff = next
+			continue
+		}
+
+		slog.Info("[discovery] service re-registered",
+			"service", r.serviceName,
+			"key", r.key,
+			"addr", r.serviceAddr,
+		)
+		*backoff = reRegisterMinWait
+		return true
+	}
+}
+
+func (r *Registry) closed() bool {
+	select {
+	case <-r.closeCh:
+		return true
+	default:
+		return false
 	}
 }
 
 // Deregister 从 etcd 注销服务。
 func (r *Registry) Deregister() {
-	close(r.closeCh)
+	r.closeOnce.Do(func() {
+		close(r.closeCh)
+	})
+
 	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
 	defer cancel()
 

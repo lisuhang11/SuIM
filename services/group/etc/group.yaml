@@ -6,5 +6,9 @@ etcd_endpoints:
 db_host: "127.0.0.1"
 db_port: 3306
 db_user: "root"
-db_password: ""
+db_password: "suim123"
 db_name: "suim"
+redis_addr: "127.0.0.1:6379"
+redis_password: "suim-redis"
+redis_db: 0
+group_info_cache_ttl: "12h"

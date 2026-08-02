@@ -50,6 +50,8 @@ export interface ConversationMember {
 export interface Conversation {
   conversationId: string;
   type: ConversationType;
+  /** 群聊时的裸 groupId；私聊为空。对齐 OpenIM conversation.groupID */
+  groupId?: string;
   title: string; // 群聊名称 / 私聊对方 displayName
   avatar: string;
   lastMessage?: Message;
@@ -63,7 +65,7 @@ export interface Conversation {
 
 // ---------- 消息 ----------
 export type MessageType = "text" | "image" | "file" | "system";
-export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed";
+export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed" | "revoked";
 
 export interface FileAttachment {
   fileId: string;
@@ -88,6 +90,10 @@ export interface Message {
   replyTo?: string; // 引用回复的消息 ID
   mentions?: string[]; // @提及的用户 ID 列表
   file?: FileAttachment;
+  /** 会话内递增序号，已读游标用 */
+  seq?: number;
+  /** 客户端幂等 ID，用于乐观发送与 WS 去重 */
+  clientMsgId?: string;
 }
 
 export interface SendMessageRequest {
@@ -108,6 +114,23 @@ export interface Contact {
   status: UserStatus;
   lastSeen?: string;
   isFriend: boolean;
+  /** 好友备注；有值时 displayName 优先用备注 */
+  remark?: string;
+  /** 账号昵称（未设备注时的展示名来源） */
+  nickname?: string;
+  isPinned?: boolean;
+}
+
+/** 黑名单条目（关系字段 + 用户资料） */
+export interface BlacklistEntry {
+  userId: string;
+  displayName: string;
+  username: string;
+  avatar: string;
+  createTime: number; // unix ms
+  addSource?: number;
+  operatorUserId?: string;
+  ex?: string;
 }
 
 // ---------- 好友请求 ----------
@@ -206,7 +229,30 @@ export type WsMessageType =
   | "user.status" // 用户在线状态变化
   | "typing" // 正在输入
   | "friend.request" // 好友请求推送（新申请 / 被接受 / 被拒绝）
-  | "ping" // 心跳
+  | "friend.sync" // tip 触发好友增量同步
+  | "friend.added"
+  | "friend.deleted"
+  | "friend.updated"
+  | "friend.synced"
+  | "group.sync"
+  | "group.synced"
+  | "group.member.sync"
+  | "group.member.synced"
+  | "push" // 网关原始推送帧（客户端规范化后分发）
+  | "heartbeat" // 网关心跳
+  | "kick" // 踢下线
+  | "sync.completed" // 离线消息同步完成
+  | "presence.subscribe" // 订阅好友在线状态
+  | "presence.unsubscribe"
+  | "presence.snapshot" // 订阅后的当前状态快照
+  | "call.invite"
+  | "call.accepted"
+  | "call.rejected"
+  | "call.cancelled"
+  | "call.timeout"
+  | "call.busy"
+  | "call.ended"
+  | "ping" // 心跳（旧）
   | "pong"; // 心跳响应
 
 export interface TypingPayload {
@@ -224,6 +270,17 @@ export interface FriendRequestPushPayload {
   apply_time?: number;
   handle_msg?: string;
   handle_time?: number;
+}
+
+/** 通话 WS tip payload（1401–1407） */
+export interface CallTipsPayload {
+  callId: string;
+  callerId?: string;
+  calleeId?: string;
+  mediaType?: "audio" | "video";
+  conversationId?: string;
+  reason?: string;
+  durationSec?: number;
 }
 
 // ---------- API 响应 ----------

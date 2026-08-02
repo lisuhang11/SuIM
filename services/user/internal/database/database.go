@@ -34,6 +34,39 @@ func MustOpen(cfg *config.Config) *gorm.DB {
 		panic(fmt.Sprintf("failed to auto-migrate: %v", err))
 	}
 
+	// 历史误用 GORM 默认复数表名 users，一次性并入正式表 user。
+	if err := migrateLegacyUsersTable(db); err != nil {
+		panic(fmt.Sprintf("failed to migrate legacy users table: %v", err))
+	}
+
 	slog.Info("database connected and migrated")
 	return db
+}
+
+// migrateLegacyUsersTable 将历史 `users` 表数据并入 `user`，然后删除 `users`。
+// 无 `users` 表时直接跳过。
+func migrateLegacyUsersTable(db *gorm.DB) error {
+	if !db.Migrator().HasTable("users") {
+		return nil
+	}
+
+	slog.Info("migrating legacy users table into user")
+	const copySQL = "" +
+		"INSERT INTO `user` (" +
+		"user_id, email, password_hash, nickname, avatar_url, ex, " +
+		"app_manger_level, global_recv_msg_opt, is_active, create_time, updated_at" +
+		") SELECT " +
+		"user_id, email, password_hash, nickname, avatar_url, ex, " +
+		"app_manger_level, global_recv_msg_opt, is_active, create_time, updated_at " +
+		"FROM users " +
+		"WHERE user_id NOT IN (SELECT user_id FROM `user`)"
+	if err := db.Exec(copySQL).Error; err != nil {
+		return fmt.Errorf("copy users -> user: %w", err)
+	}
+
+	if err := db.Migrator().DropTable("users"); err != nil {
+		return fmt.Errorf("drop users: %w", err)
+	}
+	slog.Info("legacy users table migrated and dropped")
+	return nil
 }

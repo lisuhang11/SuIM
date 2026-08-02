@@ -95,11 +95,7 @@ func (h *userHandler) Register(ctx context.Context, req *pb.RegisterReq) (*pb.Re
 		slog.ErrorContext(ctx, "register failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.RegisterResp{
-		Success: true,
-		Message: "registration successful",
-		User:    userToProto(user),
-	}, nil
+	return &pb.RegisterResp{User: userToProto(user)}, nil
 }
 
 // Login 处理用户登录请求，返回访问令牌和刷新令牌。
@@ -110,8 +106,6 @@ func (h *userHandler) Login(ctx context.Context, req *pb.LoginReq) (*pb.LoginRes
 		return nil, appErrorToStatus(err)
 	}
 	return &pb.LoginResp{
-		Success:      true,
-		Message:      "login successful",
 		User:         userToProto(user),
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -143,16 +137,55 @@ func (h *userHandler) GetUsersByIDs(ctx context.Context, req *pb.GetUsersByIDsRe
 	return &pb.GetUsersByIDsResp{Users: m}, nil
 }
 
-// UpdateUser 更新用户信息。
+// UpdateUser 更新用户资料：从 UserInfo 中非空字段构建 patch，UpdateByMap 写库后删缓存。
 func (h *userHandler) UpdateUser(ctx context.Context, req *pb.UpdateUserReq) (*pb.UpdateUserResp, error) {
-	u := protoToUser(req.User)
-	if u == nil {
-		return &pb.UpdateUserResp{Success: false}, nil
-	}
-	if err := h.svc.UpdateUser(ctx, u); err != nil {
+	authenticated, err := h.authenticatedUser(ctx)
+	if err != nil {
 		return nil, err
 	}
-	return &pb.UpdateUserResp{Success: true}, nil
+	if req.User == nil {
+		return nil, status.Error(codes.InvalidArgument, "user is required")
+	}
+	userID := strings.TrimSpace(req.User.UserId)
+	if userID == "" {
+		userID = authenticated.UserID
+	}
+	if userID != authenticated.UserID {
+		return nil, status.Error(codes.PermissionDenied, "only your own profile can be updated")
+	}
+	patch := profilePatchFromProto(req.User)
+	if patch == nil {
+		return nil, status.Error(codes.InvalidArgument, "at least one field must be updated")
+	}
+	if err := h.svc.UpdateUserProfile(ctx, userID, patch); err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	return &pb.UpdateUserResp{}, nil
+}
+
+// profilePatchFromProto 非空字段才进入 patch（方案 A：不改 proto optional）。
+func profilePatchFromProto(p *pb.UserInfo) *types.UserProfilePatch {
+	if p == nil {
+		return nil
+	}
+	patch := &types.UserProfilePatch{}
+	has := false
+	if nickname := strings.TrimSpace(p.Nickname); nickname != "" {
+		patch.Nickname = &nickname
+		has = true
+	}
+	if avatar := strings.TrimSpace(p.AvatarUrl); avatar != "" {
+		patch.AvatarURL = &avatar
+		has = true
+	}
+	if ex := p.Ex; ex != "" {
+		patch.Ex = &ex
+		has = true
+	}
+	if !has {
+		return nil
+	}
+	return patch
 }
 
 func (h *userHandler) InitiateAvatarUpload(ctx context.Context, req *pb.InitiateUserAvatarUploadReq) (*pb.InitiateUserAvatarUploadResp, error) {
@@ -180,14 +213,14 @@ func (h *userHandler) CompleteAvatarUpload(ctx context.Context, req *pb.Complete
 	}
 	avatarURL := "/api/v1/files/" + req.FileId + "/avatar"
 	oldURL := user.AvatarURL
-	user.AvatarURL = avatarURL
-	if err := h.svc.UpdateUser(ctx, user); err != nil {
-		return nil, err
+	if err := h.svc.UpdateUserProfile(ctx, user.UserID, &types.UserProfilePatch{AvatarURL: &avatarURL}); err != nil {
+		return nil, appErrorToStatus(err)
 	}
+	user.AvatarURL = avatarURL
 	activated, err := h.files.ActivateAvatar(outgoingContext(ctx), &filePB.ActivateAvatarReq{UserId: user.UserID, FileId: req.FileId, TargetType: "user", TargetId: user.UserID})
 	if err != nil {
+		_ = h.svc.UpdateUserProfile(ctx, user.UserID, &types.UserProfilePatch{AvatarURL: &oldURL})
 		user.AvatarURL = oldURL
-		_ = h.svc.UpdateUser(ctx, user)
 		return nil, err
 	}
 	if activated.File != nil {
@@ -198,18 +231,32 @@ func (h *userHandler) CompleteAvatarUpload(ctx context.Context, req *pb.Complete
 
 // DeleteUser 删除指定用户。
 func (h *userHandler) DeleteUser(ctx context.Context, req *pb.DeleteUserReq) (*pb.DeleteUserResp, error) {
+	user, err := h.authenticatedUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.UserId != user.UserID {
+		return nil, status.Error(codes.PermissionDenied, "only your own account can be deleted")
+	}
 	if err := h.svc.DeleteUser(ctx, req.UserId); err != nil {
 		return nil, err
 	}
-	return &pb.DeleteUserResp{Success: true}, nil
+	return &pb.DeleteUserResp{}, nil
 }
 
 // ChangePassword 修改用户密码。
 func (h *userHandler) ChangePassword(ctx context.Context, req *pb.ChangePasswordReq) (*pb.ChangePasswordResp, error) {
-	if err := h.svc.ChangePassword(ctx, req.UserId, req.OldPassword, req.NewPassword); err != nil {
-		return &pb.ChangePasswordResp{Success: false, Message: err.Error()}, nil
+	user, err := h.authenticatedUser(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return &pb.ChangePasswordResp{Success: true, Message: "password changed"}, nil
+	if req.UserId != "" && req.UserId != user.UserID {
+		return nil, status.Error(codes.PermissionDenied, "only your own password can be changed")
+	}
+	if err := h.svc.ChangePassword(ctx, user.UserID, req.OldPassword, req.NewPassword); err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	return &pb.ChangePasswordResp{}, nil
 }
 
 // ValidateToken 验证访问令牌是否有效，返回关联的用户信息。
@@ -239,12 +286,12 @@ func (h *userHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenReq)
 // Logout 处理用户登出，吊销所有令牌。
 func (h *userHandler) Logout(ctx context.Context, req *pb.LogoutReq) (*pb.LogoutResp, error) {
 	if err := h.svc.Logout(ctx, req.Token); err != nil {
-		return &pb.LogoutResp{Success: false}, nil
+		return nil, appErrorToStatus(err)
 	}
-	return &pb.LogoutResp{Success: true}, nil
+	return &pb.LogoutResp{}, nil
 }
 
-// SearchUsers 根据昵称或邮箱搜索用户。
+// SearchUsers 按用户 ID 精确查找用户。
 func (h *userHandler) SearchUsers(ctx context.Context, req *pb.SearchUsersReq) (*pb.SearchUsersResp, error) {
 	users, err := h.svc.SearchUsers(ctx, req.Query, int(req.Limit))
 	if err != nil {
@@ -255,6 +302,42 @@ func (h *userHandler) SearchUsers(ctx context.Context, req *pb.SearchUsersReq) (
 		pbUsers = append(pbUsers, userToProto(u))
 	}
 	return &pb.SearchUsersResp{Users: pbUsers}, nil
+}
+
+// SetGlobalRecvMessageOpt 设置当前用户的全局消息接收选项。
+func (h *userHandler) SetGlobalRecvMessageOpt(ctx context.Context, req *pb.SetGlobalRecvMessageOptReq) (*pb.SetGlobalRecvMessageOptResp, error) {
+	authenticated, err := h.authenticatedUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	userID := strings.TrimSpace(req.UserId)
+	if userID == "" {
+		userID = authenticated.UserID
+	}
+	if userID != authenticated.UserID {
+		return nil, status.Error(codes.PermissionDenied, "only your own global recv msg opt can be updated")
+	}
+	if err := h.svc.SetGlobalRecvMessageOpt(ctx, userID, int(req.GlobalRecvMsgOpt)); err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	return &pb.SetGlobalRecvMessageOptResp{}, nil
+}
+
+// GetGlobalRecvMessageOpt 获取指定用户的全局消息接收选项。
+func (h *userHandler) GetGlobalRecvMessageOpt(ctx context.Context, req *pb.GetGlobalRecvMessageOptReq) (*pb.GetGlobalRecvMessageOptResp, error) {
+	userID := strings.TrimSpace(req.UserId)
+	if userID == "" {
+		authenticated, err := h.authenticatedUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+		userID = authenticated.UserID
+	}
+	opt, err := h.svc.GetGlobalRecvMessageOpt(ctx, userID)
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	return &pb.GetGlobalRecvMessageOptResp{GlobalRecvMsgOpt: int32(opt)}, nil
 }
 
 // --------------- 错误转换 ---------------

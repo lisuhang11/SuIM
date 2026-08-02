@@ -1,14 +1,18 @@
 "use client";
 
 // ============================================================
-// RegisterForm — 注册表单
+// RegisterForm — Signal Zinc
 // ============================================================
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, MessageCircle } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
+
+const fieldClass =
+  "w-full rounded-control border border-edge bg-surface px-4 py-3 text-sm text-ink outline-none transition duration-ui placeholder:text-ink-muted focus:border-accent focus:ring-2 focus:ring-accent/20";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -53,101 +57,86 @@ export default function RegisterForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-surface p-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle compact />
+      </div>
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-500 text-white mb-4 shadow-lg shadow-indigo-200">
-            <MessageCircle className="w-8 h-8" />
+        <div className="mb-8 text-center">
+          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-control bg-accent text-lg font-bold text-accent-fg">
+            S
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">注册 SuIM</h1>
-          <p className="text-gray-500 mt-1">创建你的即时通讯账号</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">注册 SuIM</h1>
+          <p className="mt-1 text-sm text-ink-muted">创建你的即时通讯账号</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-4 rounded-control border border-edge bg-surface-elevated p-8 shadow-panel"
+        >
           {error && (
-            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm">
+            <div className="rounded-control bg-danger-soft px-4 py-3 text-sm text-danger">
               {error}
-              <button onClick={clearError} className="float-right font-bold">&times;</button>
+              <button type="button" onClick={clearError} className="float-right font-bold">
+                &times;
+              </button>
             </div>
           )}
           {localErr && (
-            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm">{localErr}</div>
+            <div className="rounded-control bg-danger-soft px-4 py-3 text-sm text-danger">{localErr}</div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
-            <input
-              type="text"
-              value={form.username}
-              onChange={(e) => update("username", e.target.value)}
-              placeholder="用于登录的唯一用户名"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400
-                focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
-              required
-              minLength={3}
-            />
-          </div>
+          {(
+            [
+              ["username", "用户名", "用于登录的唯一用户名", "text"],
+              ["displayName", "显示名称", "别人看到的名字", "text"],
+              ["email", "邮箱", "your@email.com", "email"],
+            ] as const
+          ).map(([key, label, placeholder, type]) => (
+            <div key={key} className="space-y-2">
+              <label className="block text-sm font-medium text-ink">{label}</label>
+              <input
+                type={type}
+                value={form[key]}
+                onChange={(e) => update(key, e.target.value)}
+                placeholder={placeholder}
+                className={fieldClass}
+                required
+                minLength={key === "username" ? 3 : undefined}
+              />
+            </div>
+          ))}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">显示名称</label>
-            <input
-              type="text"
-              value={form.displayName}
-              onChange={(e) => update("displayName", e.target.value)}
-              placeholder="别人看到的名字"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400
-                focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">邮箱</label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(e) => update("email", e.target.value)}
-              placeholder="your@email.com"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400
-                focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">密码</label>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-ink">密码</label>
             <div className="relative">
               <input
                 type={showPwd ? "text" : "password"}
                 value={form.password}
                 onChange={(e) => update("password", e.target.value)}
                 placeholder="至少 6 位密码"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400
-                  focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm pr-10"
+                className={cn(fieldClass, "pr-10")}
                 required
                 minLength={6}
               />
               <button
                 type="button"
                 onClick={() => setShowPwd(!showPwd)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
               >
-                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPwd ? <EyeOff className="h-4 w-4" strokeWidth={1.75} /> : <Eye className="h-4 w-4" strokeWidth={1.75} />}
               </button>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">确认密码</label>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-ink">确认密码</label>
             <input
               type="password"
               value={form.confirmPassword}
               onChange={(e) => update("confirmPassword", e.target.value)}
               placeholder="再次输入密码"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400
-                focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
+              className={fieldClass}
               required
               minLength={6}
             />
@@ -157,18 +146,16 @@ export default function RegisterForm() {
             type="submit"
             disabled={isLoading}
             className={cn(
-              "w-full py-3 rounded-xl font-semibold text-white transition-all",
-              "bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98]",
-              "shadow-lg shadow-indigo-200",
-              isLoading && "opacity-70 cursor-not-allowed"
+              "ui-press w-full rounded-control bg-accent py-3 text-sm font-semibold text-accent-fg hover:bg-accent-hover",
+              isLoading && "cursor-not-allowed opacity-70"
             )}
           >
             {isLoading ? "注册中..." : "注册"}
           </button>
 
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm text-ink-muted">
             已有账号？{" "}
-            <Link href="/login" className="text-indigo-500 hover:text-indigo-600 font-medium">
+            <Link href="/login" className="font-medium text-accent hover:text-accent-hover">
               立即登录
             </Link>
           </p>

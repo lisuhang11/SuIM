@@ -85,6 +85,25 @@ services:
       start_period: 10s
 
   # ==========================================================
+  # Redis 7 — 旁路缓存 / 临时状态
+  # ==========================================================
+  redis:
+    image: redis:7.0-alpine
+    container_name: suim-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-suim-redis}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-suim-redis}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  # ==========================================================
   # user service (:8080)
   # ==========================================================
   user:
@@ -106,12 +125,16 @@ services:
       DB_NAME: suim
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-24h}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-720h}
-    ports:
-      - "8080:8080"
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-suim-redis}
+      REDIS_DB: "0"
+      USER_INFO_CACHE_TTL: ${USER_INFO_CACHE_TTL:-12h}
     depends_on:
       mysql:
         condition: service_healthy
       etcd:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # ==========================================================
@@ -134,13 +157,13 @@ services:
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
-    ports:
-      - "8081:8081"
     depends_on:
       mysql:
         condition: service_healthy
       etcd:
         condition: service_healthy
+      user:
+        condition: service_started
 
   # ==========================================================
   # group service (:8082) — depends on user (via etcd discovery)
@@ -162,12 +185,16 @@ services:
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
-    ports:
-      - "8082:8082"
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-suim-redis}
+      REDIS_DB: "0"
+      GROUP_INFO_CACHE_TTL: ${GROUP_INFO_CACHE_TTL:-12h}
     depends_on:
       mysql:
         condition: service_healthy
       etcd:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # ==========================================================
@@ -190,13 +217,13 @@ services:
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
-    ports:
-      - "8083:8083"
     depends_on:
       mysql:
         condition: service_healthy
       etcd:
         condition: service_healthy
+      user:
+        condition: service_started
 
   # ==========================================================
   # message service (:8084) — depends on push (via etcd discovery)
@@ -218,8 +245,6 @@ services:
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
-    ports:
-      - "8084:8084"
     depends_on:
       mysql:
         condition: service_healthy
@@ -255,8 +280,6 @@ services:
       FILE_USER_QUOTA: ${FILE_USER_QUOTA:-10737418240}
       FILE_PENDING_RETENTION: ${FILE_PENDING_RETENTION:-24h}
       FILE_RETENTION: ${FILE_RETENTION:-4320h}
-    ports:
-      - "8086:8086"
     depends_on:
       mysql:
         condition: service_healthy
@@ -264,6 +287,51 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+
+  # ==========================================================
+  # livekit — WebRTC SFU (dev keys)
+  # ==========================================================
+  livekit:
+    image: livekit/livekit-server:v1.8.4
+    container_name: suim-livekit
+    restart: unless-stopped
+    command: --dev --bind 0.0.0.0 --node-ip=${LIVEKIT_NODE_IP:-127.0.0.1}
+    ports:
+      - "${LIVEKIT_HTTP_PORT:-7880}:7880"
+      - "${LIVEKIT_RTC_PORT:-7881}:7881"
+      - "${LIVEKIT_UDP_PORT:-7882}:7882/udp"
+
+  # ==========================================================
+  # rtc service (:8087) — call signaling + LiveKit tokens
+  # ==========================================================
+  rtc:
+    build:
+      context: ..
+      dockerfile: services/rtc/Dockerfile
+    image: suim-rtc:latest
+    container_name: suim-rtc
+    restart: unless-stopped
+    environment:
+      SERVER_ADDR: ":8087"
+      SERVICE_ADDR: rtc:8087
+      ETCD_ENDPOINTS: etcd:2379
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
+      DB_NAME: suim
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      LIVEKIT_URL: ${LIVEKIT_URL:-ws://localhost:7880}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret}
+      RING_TIMEOUT_SEC: ${RING_TIMEOUT_SEC:-45}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      etcd:
+        condition: service_healthy
+      livekit:
+        condition: service_started
 
   # ==========================================================
   # push service (:8085)
@@ -285,8 +353,6 @@ services:
       DB_PASSWORD: ${DB_ROOT_PASSWORD:-suim123}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       DB_NAME: suim
-    ports:
-      - "8085:8085"
     depends_on:
       mysql:
         condition: service_healthy
@@ -315,12 +381,15 @@ services:
       MSGGW_READ_TIMEOUT: ${MSGGW_READ_TIMEOUT:-60s}
       MSGGW_WRITE_TIMEOUT: ${MSGGW_WRITE_TIMEOUT:-10s}
       MSGGW_SHUTDOWN_TIMEOUT: ${MSGGW_SHUTDOWN_TIMEOUT:-30s}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-suim-redis}
+      REDIS_DB: "0"
     ports:
       - "${MSGGW_WS_PORT:-9001}:9001"
-      - "${MSGGW_GRPC_PORT:-9091}:9091"
-      - "${MSGGW_METRICS_PORT:-9092}:9092"
     depends_on:
       etcd:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # ==========================================================
@@ -353,6 +422,8 @@ services:
         condition: service_healthy
       file:
         condition: service_started
+      rtc:
+        condition: service_started
 
   # ==========================================================
   # frontend — Next.js 前端应用
@@ -367,6 +438,7 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:9000/api/v1}
       NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:9001/ws}
+      NEXT_PUBLIC_LIVEKIT_URL: ${NEXT_PUBLIC_LIVEKIT_URL:-ws://localhost:7880}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
@@ -377,3 +449,4 @@ volumes:
   mysql-data:
   etcd-data:
   minio-data:
+  redis-data:

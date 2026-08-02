@@ -65,6 +65,69 @@ func (r *groupRepository) ListMembers(ctx context.Context, groupID string, offse
 	return members, total, nil
 }
 
+// ListMemberUserIDs 返回群全部成员 userID。
+func (r *groupRepository) ListMemberUserIDs(ctx context.Context, groupID string) ([]string, error) {
+	if groupID == "" {
+		return nil, nil
+	}
+	var ids []string
+	if err := r.db.WithContext(ctx).Model(&types.GroupMember{}).
+		Where("group_id = ?", groupID).
+		Pluck("user_id", &ids).Error; err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+// MapGroupOwners 批量查询各群当前群主（role_level = owner）。
+func (r *groupRepository) MapGroupOwners(ctx context.Context, groupIDs []string) (map[string]string, error) {
+	out := make(map[string]string, len(groupIDs))
+	if len(groupIDs) == 0 {
+		return out, nil
+	}
+	type row struct {
+		GroupID string `gorm:"column:group_id"`
+		UserID  string `gorm:"column:user_id"`
+	}
+	var rows []row
+	if err := r.db.WithContext(ctx).Model(&types.GroupMember{}).
+		Select("group_id, user_id").
+		Where("group_id IN ? AND role_level = ?", groupIDs, types.GroupMemberRoleOwner).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		if r.GroupID != "" && r.UserID != "" {
+			out[r.GroupID] = r.UserID
+		}
+	}
+	return out, nil
+}
+
+// MapGroupMemberNum 批量统计各群成员数；缺失的 groupID 不出现在 map 中（视为 0）。
+func (r *groupRepository) MapGroupMemberNum(ctx context.Context, groupIDs []string) (map[string]int64, error) {
+	out := make(map[string]int64, len(groupIDs))
+	if len(groupIDs) == 0 {
+		return out, nil
+	}
+	type row struct {
+		GroupID string `gorm:"column:group_id"`
+		Cnt     int64  `gorm:"column:cnt"`
+	}
+	var rows []row
+	if err := r.db.WithContext(ctx).Model(&types.GroupMember{}).
+		Select("group_id, COUNT(*) AS cnt").
+		Where("group_id IN ?", groupIDs).
+		Group("group_id").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.GroupID] = r.Cnt
+	}
+	return out, nil
+}
+
 // MemberExists 判断指定用户在指定群组中是否已是成员。
 func (r *groupRepository) MemberExists(ctx context.Context, groupID, userID string) (bool, error) {
 	var count int64

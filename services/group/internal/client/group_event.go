@@ -89,7 +89,8 @@ func (p *groupEventPublisher) Publish(ctx context.Context, event interfaces.Grou
 		publishErr = errors.Join(publishErr, err)
 	}
 
-	if event.Type == "group.member_kicked" || event.Type == "group.member_quit" || event.Type == "group.dismissed" {
+	// 解散群：删除相关会话。退群/被踢：保留会话，依赖消息侧只推进参与者 max_seq 实现冻结（对齐 OpenIM QuitGroup）。
+	if event.Type == "group.dismissed" {
 		for _, userID := range distinct(event.SubjectUserIDs) {
 			_, err := p.conversation.DeleteConversations(ctx, &convpb.DeleteConversationsReq{OwnerUserId: userID, ConversationIds: []string{"gid_" + event.GroupID}})
 			publishErr = errors.Join(publishErr, err)

@@ -4,8 +4,9 @@
 // FriendRequestsPanel — 好友请求管理（收到的/发出的）
 // ============================================================
 import React, { useState, useEffect, useCallback } from "react";
-import { UserPlus, UserCheck, UserX, Clock, Check, X, Loader2, RefreshCw } from "lucide-react";
+import { UserCheck, Clock, Check, X, Loader2, RefreshCw } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
+import { IMSDK } from "@/suim-sdk";
 import UserAvatar from "../shared/UserAvatar";
 import { cn } from "@/lib/utils";
 import type { FriendRequest } from "@/types";
@@ -13,7 +14,7 @@ import type { FriendRequest } from "@/types";
 type TabType = "incoming" | "outgoing";
 
 export default function FriendRequestsPanel() {
-  const { refreshConversations, refreshFriendRequestBadge, friendRequestVersion } = useChat();
+  const { refreshConversations, refreshContacts, refreshFriendRequestBadge, friendRequestVersion } = useChat();
   const [tab, setTab] = useState<TabType>("incoming");
   const [incomingReqs, setIncomingReqs] = useState<FriendRequest[]>([]);
   const [outgoingReqs, setOutgoingReqs] = useState<FriendRequest[]>([]);
@@ -25,10 +26,9 @@ export default function FriendRequestsPanel() {
     setLoading(true);
     setFeedback(null);
     try {
-      const api = await import("@/services/api");
       const [incomingRes, outgoingRes] = await Promise.allSettled([
-        api.getIncomingRequests({ handleResults: [0] }),
-        api.getOutgoingRequests({ handleResults: [0] }),
+        IMSDK.getFriendApplicationListAsRecipient({ handleResults: [0] }),
+        IMSDK.getFriendApplicationListAsApplicant({ handleResults: [0] }),
       ]);
       if (incomingRes.status === "fulfilled") setIncomingReqs(incomingRes.value);
       if (outgoingRes.status === "fulfilled") setOutgoingReqs(outgoingRes.value);
@@ -51,12 +51,11 @@ export default function FriendRequestsPanel() {
       setFeedback(null);
 
       try {
-        const api = await import("@/services/api");
-        await api.respondFriendRequest(
-          request.fromUserId,
-          accept ? 1 : -1,
-          accept ? "已同意" : ""
-        );
+        if (accept) {
+          await IMSDK.acceptFriendApplication(request.fromUserId, "已同意");
+        } else {
+          await IMSDK.refuseFriendApplication(request.fromUserId, "");
+        }
 
         // 从列表移除
         setIncomingReqs((prev) => prev.filter((r) => r.requestId !== request.requestId));
@@ -67,7 +66,7 @@ export default function FriendRequestsPanel() {
             : "已拒绝好友请求",
         });
         if (accept) {
-          refreshConversations();
+          await Promise.all([refreshConversations(), refreshContacts()]);
         }
         refreshFriendRequestBadge();
       } catch {
@@ -76,21 +75,16 @@ export default function FriendRequestsPanel() {
         setHandlingId(null);
       }
     },
-    [handlingId, refreshConversations, refreshFriendRequestBadge]
+    [handlingId, refreshConversations, refreshContacts, refreshFriendRequestBadge]
   );
 
-  const emptyIcon =
-    tab === "incoming"
-      ? (incomingReqs.length === 0 ? UserCheck : undefined)
-      : (outgoingReqs.length === 0 ? Clock : undefined);
-
   return (
-    <div className="h-full flex flex-col bg-white w-full">
+    <div className="h-full flex flex-col bg-surface-elevated w-full">
       {/* 头部 */}
-      <div className="h-14 flex items-center justify-between px-4 border-b border-gray-100 flex-shrink-0">
+      <div className="h-14 flex items-center justify-between px-4 border-b border-edge flex-shrink-0">
         <div>
-          <h2 className="text-sm font-semibold text-gray-900">好友请求</h2>
-          <p className="text-[10px] text-gray-400">
+          <h2 className="text-sm font-semibold text-ink">好友请求</h2>
+          <p className="text-[10px] text-ink-muted">
             {incomingReqs.length > 0
               ? `${incomingReqs.length} 条待处理`
               : "暂无待处理请求"}
@@ -99,34 +93,34 @@ export default function FriendRequestsPanel() {
         <button
           onClick={loadRequests}
           className={cn(
-            "p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors",
+            "ui-press p-1.5 rounded-control hover:bg-surface-muted text-ink-muted hover:text-ink transition-colors",
             loading && "animate-spin"
           )}
           title="刷新"
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className="w-4 h-4" strokeWidth={1.75} />
         </button>
       </div>
 
       {/* 标签切换 */}
-      <div className="flex border-b border-gray-100 px-4">
+      <div className="flex border-b border-edge px-4">
         <button
           onClick={() => { setTab("incoming"); setFeedback(null); }}
           className={cn(
             "relative px-4 py-2.5 text-sm font-medium transition-colors",
             tab === "incoming"
-              ? "text-indigo-600"
-              : "text-gray-400 hover:text-gray-600"
+              ? "text-accent"
+              : "text-ink-muted hover:text-ink"
           )}
         >
           收到的请求
           {incomingReqs.length > 0 && (
-            <span className="ml-1.5 px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
+            <span className="ml-1.5 px-1.5 py-0.5 text-xs font-bold text-white bg-danger rounded-control">
               {incomingReqs.length}
             </span>
           )}
           {tab === "incoming" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-full" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />
           )}
         </button>
         <button
@@ -134,13 +128,13 @@ export default function FriendRequestsPanel() {
           className={cn(
             "relative px-4 py-2.5 text-sm font-medium transition-colors",
             tab === "outgoing"
-              ? "text-indigo-600"
-              : "text-gray-400 hover:text-gray-600"
+              ? "text-accent"
+              : "text-ink-muted hover:text-ink"
           )}
         >
           发出的请求
           {tab === "outgoing" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-full" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />
           )}
         </button>
       </div>
@@ -149,10 +143,10 @@ export default function FriendRequestsPanel() {
       {feedback && (
         <div
           className={cn(
-            "mx-4 mt-3 px-3 py-2 rounded-lg text-sm",
+            "mx-4 mt-3 px-3 py-2 rounded-control text-sm",
             feedback.type === "success"
-              ? "bg-green-50 text-green-700"
-              : "bg-red-50 text-red-600"
+              ? "bg-accent-soft text-accent"
+              : "bg-danger-soft text-danger"
           )}
         >
           {feedback.message}
@@ -163,13 +157,13 @@ export default function FriendRequestsPanel() {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
-            <span className="ml-2 text-sm text-gray-400">加载中...</span>
+            <Loader2 className="w-5 h-5 text-accent animate-spin" strokeWidth={1.75} />
+            <span className="ml-2 text-sm text-ink-muted">加载中...</span>
           </div>
         ) : tab === "incoming" ? (
           incomingReqs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-              <UserCheck className="w-12 h-12 mb-3 opacity-30" />
+            <div className="flex flex-col items-center justify-center py-20 text-ink-muted">
+              <UserCheck className="w-12 h-12 mb-3 opacity-30" strokeWidth={1.75} />
               <p className="text-sm">暂无收到的请求</p>
             </div>
           ) : (
@@ -177,7 +171,7 @@ export default function FriendRequestsPanel() {
               {incomingReqs.map((req) => (
                 <div
                   key={req.requestId}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-gray-50/80"
+                  className="flex items-start gap-3 p-3 rounded-control bg-surface-muted/80"
                 >
                   <UserAvatar
                     name={req.fromUser?.displayName || "用户"}
@@ -185,19 +179,19 @@ export default function FriendRequestsPanel() {
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-medium text-gray-900">
+                      <h4 className="text-sm font-medium text-ink">
                         {req.fromUser?.displayName || "未知用户"}
                       </h4>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-ink-muted">
                         @{req.fromUser?.username || ""}
                       </span>
                     </div>
                     {req.message && (
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                      <p className="text-xs text-ink-muted mt-1 line-clamp-2">
                         {req.message}
                       </p>
                     )}
-                    <p className="text-xs text-gray-400 mt-1.5">
+                    <p className="text-xs text-ink-muted mt-1.5">
                       {formatTimeAgo(req.createdAt)}
                     </p>
                     {/* 操作按钮 */}
@@ -206,16 +200,15 @@ export default function FriendRequestsPanel() {
                         onClick={() => handleRespond(req, true)}
                         disabled={handlingId === req.requestId}
                         className={cn(
-                          "inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all",
-                          "bg-green-500 text-white hover:bg-green-600 active:scale-95",
-                          "shadow-sm shadow-green-200",
+                          "ui-press inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-control transition-all",
+                          "bg-accent text-accent-fg hover:bg-accent-hover active:scale-95",
                           handlingId === req.requestId && "opacity-60 cursor-not-allowed"
                         )}
                       >
                         {handlingId === req.requestId ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.75} />
                         ) : (
-                          <Check className="w-3 h-3" />
+                          <Check className="w-3 h-3" strokeWidth={1.75} />
                         )}
                         同意
                       </button>
@@ -223,12 +216,12 @@ export default function FriendRequestsPanel() {
                         onClick={() => handleRespond(req, false)}
                         disabled={handlingId === req.requestId}
                         className={cn(
-                          "inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all",
-                          "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:scale-95",
+                          "ui-press inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-control transition-all",
+                          "bg-surface-elevated text-ink-muted border border-edge hover:bg-surface-muted active:scale-95",
                           handlingId === req.requestId && "opacity-60 cursor-not-allowed"
                         )}
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3 h-3" strokeWidth={1.75} />
                         拒绝
                       </button>
                     </div>
@@ -238,8 +231,8 @@ export default function FriendRequestsPanel() {
             </div>
           )
         ) : outgoingReqs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <Clock className="w-12 h-12 mb-3 opacity-30" />
+          <div className="flex flex-col items-center justify-center py-20 text-ink-muted">
+            <Clock className="w-12 h-12 mb-3 opacity-30" strokeWidth={1.75} />
             <p className="text-sm">暂无发出的请求</p>
           </div>
         ) : (
@@ -247,7 +240,7 @@ export default function FriendRequestsPanel() {
             {outgoingReqs.map((req) => (
               <div
                 key={req.requestId}
-                className="flex items-start gap-3 p-3 rounded-xl bg-gray-50/80"
+                className="flex items-start gap-3 p-3 rounded-control bg-surface-muted/80"
               >
                 <UserAvatar
                   name={req.toUser?.displayName || "用户"}
@@ -255,24 +248,24 @@ export default function FriendRequestsPanel() {
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-medium text-gray-900">
+                    <h4 className="text-sm font-medium text-ink">
                       {req.toUser?.displayName || "未知用户"}
                     </h4>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-ink-muted">
                       @{req.toUser?.username || ""}
                     </span>
                   </div>
                   {req.message && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                    <p className="text-xs text-ink-muted mt-1 line-clamp-2">
                       {req.message}
                     </p>
                   )}
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-amber-600 bg-amber-50 rounded-full">
-                      <Clock className="w-3 h-3" />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-amber-600 bg-amber-50 rounded-control">
+                      <Clock className="w-3 h-3" strokeWidth={1.75} />
                       等待对方回应
                     </span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-ink-muted">
                       {formatTimeAgo(req.createdAt)}
                     </span>
                   </div>

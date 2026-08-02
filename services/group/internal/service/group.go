@@ -4,10 +4,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"group/internal/cache"
 	apperrors "group/internal/errors"
 	"group/internal/logger"
 	"group/internal/repository"
@@ -27,19 +29,24 @@ type groupService struct {
 	repo         interfaces.GroupRepository
 	userVerifier interfaces.UserVerifier
 	events       interfaces.GroupEventPublisher
+	groupCache   *cache.GroupInfoCache
 }
 
 type noopGroupEventPublisher struct{}
 
 func (noopGroupEventPublisher) Publish(context.Context, interfaces.GroupEvent) error { return nil }
 
-// NewGroupService 创建群组服务实例。
-func NewGroupService(repo interfaces.GroupRepository, userVerifier interfaces.UserVerifier, publishers ...interfaces.GroupEventPublisher) interfaces.GroupService {
+// NewGroupService 创建群组服务实例。groupCache 可为 nil（禁用旁路缓存）。
+func NewGroupService(repo interfaces.GroupRepository, userVerifier interfaces.UserVerifier, groupCache *cache.GroupInfoCache, publishers ...interfaces.GroupEventPublisher) interfaces.GroupService {
 	events := interfaces.GroupEventPublisher(noopGroupEventPublisher{})
 	if len(publishers) > 0 && publishers[0] != nil {
 		events = publishers[0]
 	}
-	return &groupService{repo: repo, userVerifier: userVerifier, events: events}
+	return &groupService{repo: repo, userVerifier: userVerifier, events: events, groupCache: groupCache}
+}
+
+func (s *groupService) invalidateGroupCache(ctx context.Context, groupIDs ...string) {
+	s.groupCache.Del(ctx, groupIDs...)
 }
 
 // authMember 加载群组和调用者的成员信息，强制调用者至少满足 minRole 角色要求。
@@ -161,12 +168,25 @@ func (s *groupService) CreateGroup(ctx context.Context, in *types.CreateGroupInp
 				return apperrors.NewInternalError("add member failed").WithDetails(err)
 			}
 		}
+		insertUIDs := make([]string, 0, len(members))
+		for _, member := range members {
+			insertUIDs = append(insertUIDs, member.UserID)
+		}
+		if err := bumpJoinVersions(ctx, repo, insertUIDs, groupID, types.VersionStateInsert); err != nil {
+			return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+		}
+		if err := bumpMemberVersion(ctx, repo, groupID, insertUIDs, types.VersionStateInsert); err != nil {
+			return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+		}
 		return nil
 	}); err != nil {
 		return "", nil, err
 	}
 
 	logger.Info(ctx, "[group] group created", "group_id", groupID)
+	g.MemberCount = len(members)
+	g.OwnerUserID = in.CreatorUserID
+	s.groupCache.Set(ctx, g)
 	recipients := make([]string, 0, len(members))
 	for _, member := range members {
 		recipients = append(recipients, member.UserID)
@@ -188,6 +208,12 @@ func (s *groupService) DismissGroup(ctx context.Context, groupID, opUserID strin
 		if err != nil {
 			return apperrors.NewInternalError("list members failed").WithDetails(err)
 		}
+		if err := bumpJoinVersions(ctx, repo, recipients, groupID, types.VersionStateDelete); err != nil {
+			return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+		}
+		if err := bumpMemberVersion(ctx, repo, groupID, recipients, types.VersionStateDelete); err != nil {
+			return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+		}
 		if err := repo.DeleteMembersByGroup(ctx, groupID); err != nil {
 			return apperrors.NewInternalError("delete members failed").WithDetails(err)
 		}
@@ -202,6 +228,7 @@ func (s *groupService) DismissGroup(ctx context.Context, groupID, opUserID strin
 		return err
 	}
 	logger.Info(ctx, "[group] group dismissed", "group_id", groupID)
+	s.invalidateGroupCache(ctx, groupID)
 	s.publish(ctx, interfaces.GroupEvent{Type: "group.dismissed", GroupID: groupID, OperatorUserID: opUserID, SubjectUserIDs: recipients, RecipientUserIDs: recipients})
 	return nil
 }
@@ -234,11 +261,23 @@ func (s *groupService) TransferGroupOwner(ctx context.Context, groupID, opUserID
 			return apperrors.NewInternalError("update new owner failed").WithDetails(err)
 		}
 		recipients, err = memberIDs(ctx, repo, groupID)
-		return err
+		if err != nil {
+			return err
+		}
+		if err := bumpJoinVersions(ctx, repo, recipients, groupID, types.VersionStateUpdate); err != nil {
+			return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+		}
+		if err := bumpMemberVersion(ctx, repo, groupID, []string{
+			types.VersionSortChangeID, opUserID, newOwnerUserID,
+		}, types.VersionStateUpdate); err != nil {
+			return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+		}
+		return nil
 	}); err != nil {
 		return err
 	}
 	logger.Info(ctx, "[group] owner transferred", "group_id", groupID, "new_owner", newOwnerUserID)
+	s.invalidateGroupCache(ctx, groupID)
 	s.publish(ctx, interfaces.GroupEvent{Type: "group.owner_transferred", GroupID: groupID, OperatorUserID: opUserID, SubjectUserIDs: []string{newOwnerUserID}, RecipientUserIDs: recipients})
 	return nil
 }
@@ -287,11 +326,25 @@ func (s *groupService) UpdateGroupInfo(ctx context.Context, in *types.UpdateGrou
 			return apperrors.NewInternalError("update group failed").WithDetails(err)
 		}
 		recipients, err = memberIDs(ctx, repo, in.GroupID)
-		return err
+		if err != nil {
+			return err
+		}
+		if err := bumpJoinVersions(ctx, repo, recipients, in.GroupID, types.VersionStateUpdate); err != nil {
+			return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+		}
+		if err := bumpMemberVersion(ctx, repo, in.GroupID, []string{types.VersionGroupChangeID}, types.VersionStateUpdate); err != nil {
+			return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+	s.invalidateGroupCache(ctx, in.GroupID)
+	if err := s.fillMemberCounts(ctx, []*types.Group{g}); err != nil {
+		return nil, err
+	}
+	s.groupCache.Set(ctx, g)
 	s.publish(ctx, interfaces.GroupEvent{Type: "group.updated", GroupID: in.GroupID, OperatorUserID: in.OpUserID, RecipientUserIDs: recipients})
 	return g, nil
 }
@@ -301,13 +354,112 @@ func (s *groupService) CanManageGroup(ctx context.Context, groupID, userID strin
 	return err
 }
 
-// GetGroup 根据 ID 获取群组信息。
+// GetGroup 根据 ID 获取群组信息（走批量 cache-aside）。
 func (s *groupService) GetGroup(ctx context.Context, groupID string) (*types.Group, error) {
-	g, err := s.repo.GetGroup(ctx, groupID)
-	if err != nil {
-		return nil, apperrors.NewGroupNotFoundError().WithDetails(err)
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return nil, apperrors.NewValidationError("group_id is required")
 	}
-	return g, nil
+	groups, err := s.GetGroupsInfo(ctx, []string{groupID})
+	if err != nil {
+		return nil, err
+	}
+	if len(groups) == 0 || groups[0] == nil {
+		return nil, apperrors.NewGroupNotFoundError()
+	}
+	return groups[0], nil
+}
+
+// GetGroupsInfo 批量获取群组：缓存 → miss 查库 → 回填；member_count 对齐 OpenIM 由 group_member 聚合。
+func (s *groupService) GetGroupsInfo(ctx context.Context, groupIDs []string) ([]*types.Group, error) {
+	unique := uniqueNonEmpty(groupIDs)
+	if len(unique) == 0 {
+		return nil, nil
+	}
+
+	hit, miss := s.groupCache.MGet(ctx, unique)
+	out := make([]*types.Group, 0, len(unique))
+	byID := make(map[string]*types.Group, len(unique))
+	for id, g := range hit {
+		byID[id] = g
+	}
+	if len(miss) > 0 {
+		fromDB, err := s.repo.ListGroupsByIDs(ctx, miss)
+		if err != nil {
+			return nil, apperrors.NewInternalError("list groups failed").WithDetails(err)
+		}
+		for _, g := range fromDB {
+			if g == nil || g.GroupID == "" {
+				continue
+			}
+			byID[g.GroupID] = g
+			s.groupCache.Set(ctx, g)
+		}
+	}
+	for _, id := range unique {
+		if g := byID[id]; g != nil {
+			out = append(out, g)
+		}
+	}
+	if err := s.fillGroupDerivedFields(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// fillGroupDerivedFields 对齐 OpenIM：memberCount / ownerUserID 不落 group 表，读时填充。
+func (s *groupService) fillGroupDerivedFields(ctx context.Context, groups []*types.Group) error {
+	if len(groups) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(groups))
+	for _, g := range groups {
+		if g != nil && g.GroupID != "" {
+			ids = append(ids, g.GroupID)
+		}
+	}
+	nums, err := s.repo.MapGroupMemberNum(ctx, ids)
+	if err != nil {
+		return apperrors.NewInternalError("count group members failed").WithDetails(err)
+	}
+	owners, err := s.repo.MapGroupOwners(ctx, ids)
+	if err != nil {
+		return apperrors.NewInternalError("load group owners failed").WithDetails(err)
+	}
+	for _, g := range groups {
+		if g == nil {
+			continue
+		}
+		g.MemberCount = int(nums[g.GroupID])
+		if ownerID := owners[g.GroupID]; ownerID != "" {
+			g.OwnerUserID = ownerID
+		} else {
+			g.OwnerUserID = g.CreatorUserID
+		}
+	}
+	return nil
+}
+
+// fillMemberCounts 兼容旧调用点。
+func (s *groupService) fillMemberCounts(ctx context.Context, groups []*types.Group) error {
+	return s.fillGroupDerivedFields(ctx, groups)
+}
+
+func uniqueNonEmpty(ids []string) []string {
+	seen := make(map[string]struct{}, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
 }
 
 // SetGroupMute 设置群全员禁言开关。opUserID 必须是群主或管理员。
@@ -324,11 +476,21 @@ func (s *groupService) SetGroupMute(ctx context.Context, groupID, opUserID strin
 			return apperrors.NewInternalError("set group mute failed").WithDetails(err)
 		}
 		recipients, err = memberIDs(ctx, repo, groupID)
-		return err
+		if err != nil {
+			return err
+		}
+		if err := bumpJoinVersions(ctx, repo, recipients, groupID, types.VersionStateUpdate); err != nil {
+			return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+		}
+		if err := bumpMemberVersion(ctx, repo, groupID, []string{types.VersionGroupChangeID}, types.VersionStateUpdate); err != nil {
+			return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+		}
+		return nil
 	})
 	if err != nil {
 		return err
 	}
+	s.invalidateGroupCache(ctx, groupID)
 	eventType := "group.muted"
 	if !muted {
 		eventType = "group.unmuted"
@@ -364,6 +526,9 @@ func (s *groupService) SetMemberMute(ctx context.Context, groupID, opUserID, tar
 		target.MuteEndTime = t
 		if err := repo.UpdateMember(ctx, target); err != nil {
 			return apperrors.NewInternalError("set member mute failed").WithDetails(err)
+		}
+		if err := bumpMemberVersion(ctx, repo, groupID, []string{targetUserID}, types.VersionStateUpdate); err != nil {
+			return apperrors.NewInternalError("bump member version failed").WithDetails(err)
 		}
 		recipients, err = memberIDs(ctx, repo, groupID)
 		return err

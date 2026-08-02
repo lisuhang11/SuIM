@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -18,7 +19,12 @@ var (
 	// ErrRevokePermission 非发送者尝试撤回消息时返回。
 	// 服务层通过 errors.Is 识别后包装为 *AppError。
 	ErrRevokePermission = errors.New("only the sender can revoke this message")
+	// ErrRevokeExpired 超过撤回时限时返回。
+	ErrRevokeExpired = errors.New("message can only be revoked within 2 minutes")
 )
+
+// RevokeTimeLimit 发送后可撤回的最长时长。
+const RevokeTimeLimit = 2 * time.Minute
 
 // messageRepository GORM 实现的消息仓库。
 type messageRepository struct {
@@ -96,9 +102,26 @@ func (r *messageRepository) SendMessage(ctx context.Context, msg *types.Message,
 			}
 		}
 
-		// 尽最大努力同步 conversation.max_seq（供会话服务未读模型使用）。
-		if err := tx.Table("conversation").Where("conversation_id = ?", msg.ConversationID).Update("max_seq", next).Error; err != nil {
-			return err
+		// 仅推进本条消息参与者（发送者+接收者）的 conversation.max_seq。
+		// 退群/被踢用户不再出现在接收列表中，其会话 max_seq 自然冻结（对齐 OpenIM）。
+		participantIDs := make([]string, 0, len(users))
+		seen := make(map[string]struct{}, len(users))
+		for _, u := range users {
+			if u == "" {
+				continue
+			}
+			if _, ok := seen[u]; ok {
+				continue
+			}
+			seen[u] = struct{}{}
+			participantIDs = append(participantIDs, u)
+		}
+		if len(participantIDs) > 0 {
+			if err := tx.Table("conversation").
+				Where("conversation_id = ? AND owner_user_id IN ?", msg.ConversationID, participantIDs).
+				Update("max_seq", next).Error; err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -170,9 +193,10 @@ func (r *messageRepository) GetHistory(ctx context.Context, userID, conversation
 	return raw, matched, nil
 }
 
-// Revoke 撤回消息（仅发送者可撤回），否则返回 ErrRevokePermission。
-func (r *messageRepository) Revoke(ctx context.Context, conversationID, clientMsgID, sendID string, revokeRole int32, revokeNickname string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+// Revoke 撤回消息（仅发送者可撤回），否则返回 ErrRevokePermission；成功时返回撤回后快照。
+func (r *messageRepository) Revoke(ctx context.Context, conversationID, clientMsgID, sendID string, revokeRole int32, revokeNickname string) (*types.Message, error) {
+	var out types.Message
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var m types.Message
 		if err := tx.Where("conversation_id = ? AND client_msg_id = ?", conversationID, clientMsgID).First(&m).Error; err != nil {
 			return err
@@ -180,16 +204,49 @@ func (r *messageRepository) Revoke(ctx context.Context, conversationID, clientMs
 		if m.SendID != sendID {
 			return ErrRevokePermission
 		}
-		return tx.Model(&types.Message{}).
+		if m.Status == types.MsgStatusRevoke {
+			out = m
+			return nil
+		}
+		if !withinRevokeWindow(m.SendTime, time.Now()) {
+			return ErrRevokeExpired
+		}
+		now := time.Now().UnixMilli()
+		if err := tx.Model(&types.Message{}).
 			Where("conversation_id = ? AND client_msg_id = ?", conversationID, clientMsgID).
 			Updates(map[string]any{
 				"status":          types.MsgStatusRevoke,
 				"revoke_role":     revokeRole,
 				"revoke_user_id":  sendID,
 				"revoke_nickname": revokeNickname,
-				"revoke_time":     time.Now().UnixMilli(),
-			}).Error
+				"revoke_time":     now,
+			}).Error; err != nil {
+			return err
+		}
+		m.Status = types.MsgStatusRevoke
+		m.RevokeRole = int(revokeRole)
+		m.RevokeUserID = sendID
+		m.RevokeNickname = revokeNickname
+		m.RevokeTime = now
+		out = m
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// withinRevokeWindow 判断 sendTime（Unix 毫秒，兼容秒）是否仍在撤回时限内。
+func withinRevokeWindow(sendTimeMs int64, now time.Time) bool {
+	if sendTimeMs <= 0 {
+		return false
+	}
+	if sendTimeMs < 1e12 {
+		sendTimeMs *= 1000
+	}
+	elapsed := now.Sub(time.UnixMilli(sendTimeMs))
+	return elapsed >= 0 && elapsed <= RevokeTimeLimit
 }
 
 // SetReadSeq 推进单个用户的已读游标，不修改公共消息行。
@@ -213,6 +270,81 @@ func (r *messageRepository) SetReadSeq(ctx context.Context, userID, conversation
 		}
 	}
 	return nil
+}
+
+// ListSeqUser 返回用户的 seq_user 行；conversationIDs 为空时返回该用户全部行。
+func (r *messageRepository) ListSeqUser(ctx context.Context, userID string, conversationIDs []string) ([]types.SeqUser, error) {
+	if userID == "" {
+		return nil, fmt.Errorf("user_id is required")
+	}
+	q := r.db.WithContext(ctx).Where("user_id = ?", userID)
+	if len(conversationIDs) > 0 {
+		q = q.Where("conversation_id IN ?", conversationIDs)
+	}
+	var rows []types.SeqUser
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+// MapSendTimeByConvSeq 按 (conversation_id, seq) 批量查 send_time；结果 key 为 conversation_id。
+func (r *messageRepository) MapSendTimeByConvSeq(ctx context.Context, conversationSeqs map[string]int64) (map[string]int64, error) {
+	out := make(map[string]int64, len(conversationSeqs))
+	if len(conversationSeqs) == 0 {
+		return out, nil
+	}
+	type row struct {
+		ConversationID string `gorm:"column:conversation_id"`
+		Seq            int64  `gorm:"column:seq"`
+		SendTime       int64  `gorm:"column:send_time"`
+	}
+	q := r.db.WithContext(ctx).Model(&types.Message{}).Select("conversation_id, seq, send_time")
+	first := true
+	for id, seq := range conversationSeqs {
+		if id == "" || seq <= 0 {
+			continue
+		}
+		if first {
+			q = q.Where("(conversation_id = ? AND seq = ?)", id, seq)
+			first = false
+		} else {
+			q = q.Or("(conversation_id = ? AND seq = ?)", id, seq)
+		}
+	}
+	if first {
+		return out, nil
+	}
+	var rows []row
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ConversationID] = row.SendTime
+	}
+	return out, nil
+}
+
+// GetLastMessage 批量取每个会话对用户可见的最后一条消息（跳过用户已删）。
+func (r *messageRepository) GetLastMessage(ctx context.Context, userID string, conversationIDs []string) (map[string]types.Message, error) {
+	out := make(map[string]types.Message, len(conversationIDs))
+	if userID == "" || len(conversationIDs) == 0 {
+		return out, nil
+	}
+	var rows []types.Message
+	err := visibleToUser(r.db.WithContext(ctx).Model(&types.Message{}), userID).
+		Where("conversation_id IN ?", conversationIDs).
+		Where("seq = (SELECT MAX(m2.seq) FROM msg_info m2 WHERE m2.conversation_id = msg_info.conversation_id "+
+			"AND EXISTS (SELECT 1 FROM seq_user su WHERE su.user_id = ? AND su.conversation_id = m2.conversation_id AND m2.seq BETWEEN su.min_seq AND su.max_seq) "+
+			"AND NOT EXISTS (SELECT 1 FROM msg_delete md WHERE md.message_id = m2.id AND md.user_id = ?))", userID, userID).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		out[rows[i].ConversationID] = rows[i]
+	}
+	return out, nil
 }
 
 // DeleteForUser 按 seq 记录用户级删除标记，不影响其他会话成员。

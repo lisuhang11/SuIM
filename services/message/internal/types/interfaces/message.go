@@ -25,6 +25,14 @@ type MessageService interface {
 	MarkMsgsAsRead(ctx context.Context, conversationID, userID string, seq int64) error
 	// DeleteMsgs 删除消息。
 	DeleteMsgs(ctx context.Context, userID, conversationID string, seqs []int64) error
+	// GetMaxSeq 返回用户在指定会话中的 max/min seq；conversationIDs 为空则返回全部。
+	GetMaxSeq(ctx context.Context, userID string, conversationIDs []string) (map[string]types.SeqBounds, error)
+	// GetConversationsHasReadAndMaxSeq 返回用户在指定会话中的 max_seq、已读 seq 与 max_seq_time。
+	GetConversationsHasReadAndMaxSeq(ctx context.Context, userID string, conversationIDs []string) (map[string]types.SeqPair, error)
+	// GetActiveConversation 返回指定会话的 max_seq + last_time；limit>0 时按 last_time 降序截断。
+	GetActiveConversation(ctx context.Context, userID string, conversationIDs []string, limit int64) ([]types.ActiveConversation, error)
+	// GetLastMessage 返回每个会话对用户可见的最后一条消息。
+	GetLastMessage(ctx context.Context, userID string, conversationIDs []string) (map[string]types.Message, error)
 }
 
 // MessageRepository 持久层契约。
@@ -41,10 +49,16 @@ type MessageRepository interface {
 	GetBySeqs(ctx context.Context, userID, conversationID string, seqs []int64) ([]types.Message, error)
 	// GetHistory 返回分页消息和截断前匹配行数（供调用方推导 is_end）。
 	GetHistory(ctx context.Context, userID, conversationID string, anchorSeq int64, limit, order int) ([]types.Message, int64, error)
-	// Revoke 撤回消息（事务内执行）。
-	Revoke(ctx context.Context, conversationID, clientMsgID, sendID string, revokeRole int32, revokeNickname string) error
+	// Revoke 撤回消息（事务内执行），返回撤回后的消息快照供 tip 推送。
+	Revoke(ctx context.Context, conversationID, clientMsgID, sendID string, revokeRole int32, revokeNickname string) (*types.Message, error)
 	// SetReadSeq 推进指定用户的已读游标。
 	SetReadSeq(ctx context.Context, userID, conversationID string, seq int64) error
 	// DeleteForUser 仅对指定用户隐藏消息。
 	DeleteForUser(ctx context.Context, userID, conversationID string, seqs []int64) error
+	// ListSeqUser 返回 user 的 seq_user 行。conversationIDs 为空则返回该用户全部行。
+	ListSeqUser(ctx context.Context, userID string, conversationIDs []string) ([]types.SeqUser, error)
+	// MapSendTimeByConvSeq 按 (conversation_id, seq) 批量查 send_time；key 为 conversation_id。
+	MapSendTimeByConvSeq(ctx context.Context, conversationSeqs map[string]int64) (map[string]int64, error)
+	// GetLastMessage 批量取每个会话对用户可见的最后一条消息。
+	GetLastMessage(ctx context.Context, userID string, conversationIDs []string) (map[string]types.Message, error)
 }

@@ -7,6 +7,7 @@ package user;
 option go_package = "SuIM/proto/userpb";
 
 // UserService provides user management and authentication RPCs.
+// Success/failure is conveyed by gRPC status; response messages carry business data only.
 service UserService {
   rpc Register(RegisterReq) returns (RegisterResp);
   rpc Login(LoginReq) returns (LoginResp);
@@ -21,6 +22,9 @@ service UserService {
   rpc RefreshToken(RefreshTokenReq) returns (RefreshTokenResp);
   rpc Logout(LogoutReq) returns (LogoutResp);
   rpc SearchUsers(SearchUsersReq) returns (SearchUsersResp);
+  // 全局消息接收选项：0 正常接收 1 不接收消息 2 接收但不推送通知
+  rpc SetGlobalRecvMessageOpt(SetGlobalRecvMessageOptReq) returns (SetGlobalRecvMessageOptResp);
+  rpc GetGlobalRecvMessageOpt(GetGlobalRecvMessageOptReq) returns (GetGlobalRecvMessageOptResp);
 }
 
 // --------------- User message ---------------
@@ -45,9 +49,7 @@ message RegisterReq {
 }
 
 message RegisterResp {
-  bool     success = 1;
-  string   message = 2;
-  UserInfo user    = 3;
+  UserInfo user = 1;
 }
 
 // --------------- Login ---------------
@@ -57,11 +59,9 @@ message LoginReq {
 }
 
 message LoginResp {
-  bool     success       = 1;
-  string   message       = 2;
-  UserInfo user          = 3;
-  string   access_token  = 4;
-  string   refresh_token = 5;
+  UserInfo user          = 1;
+  string   access_token  = 2;
+  string   refresh_token = 3;
 }
 
 // --------------- GetUser ---------------
@@ -87,9 +87,7 @@ message UpdateUserReq {
   UserInfo user = 1;
 }
 
-message UpdateUserResp {
-  bool success = 1;
-}
+message UpdateUserResp {}
 
 message InitiateUserAvatarUploadReq {
   string name = 1;
@@ -115,9 +113,7 @@ message DeleteUserReq {
   string user_id = 1;
 }
 
-message DeleteUserResp {
-  bool success = 1;
-}
+message DeleteUserResp {}
 
 // --------------- ChangePassword ---------------
 message ChangePasswordReq {
@@ -126,10 +122,7 @@ message ChangePasswordReq {
   string new_password = 3;
 }
 
-message ChangePasswordResp {
-  bool   success = 1;
-  string message = 2;
-}
+message ChangePasswordResp {}
 
 // --------------- ValidateToken ---------------
 message ValidateTokenReq {
@@ -156,11 +149,10 @@ message LogoutReq {
   string token = 1;
 }
 
-message LogoutResp {
-  bool success = 1;
-}
+message LogoutResp {}
 
 // --------------- SearchUsers ---------------
+// query 为用户 ID，仅精确匹配（添加好友场景）。
 message SearchUsersReq {
   string query = 1;
   int32  limit = 2;
@@ -168,4 +160,21 @@ message SearchUsersReq {
 
 message SearchUsersResp {
   repeated UserInfo users = 1;
+}
+
+// --------------- GlobalRecvMessageOpt ---------------
+// global_recv_msg_opt: 0=ReceiveMessage 1=NotReceiveMessage 2=ReceiveNotNotifyMessage
+message SetGlobalRecvMessageOptReq {
+  string user_id             = 1;
+  int32  global_recv_msg_opt = 2;
+}
+
+message SetGlobalRecvMessageOptResp {}
+
+message GetGlobalRecvMessageOptReq {
+  string user_id = 1;
+}
+
+message GetGlobalRecvMessageOptResp {
+  int32 global_recv_msg_opt = 1;
 }

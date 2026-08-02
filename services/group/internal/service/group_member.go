@@ -4,6 +4,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	apperrors "group/internal/errors"
@@ -54,12 +55,24 @@ func (s *groupService) InviteUserToGroup(ctx context.Context, in *types.InviteIn
 		}
 		var err error
 		recipients, err = memberIDs(ctx, repo, in.GroupID)
-		return err
+		if err != nil {
+			return err
+		}
+		if len(joined) > 0 {
+			if err := bumpJoinVersions(ctx, repo, joined, in.GroupID, types.VersionStateInsert); err != nil {
+				return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+			}
+			if err := bumpMemberVersion(ctx, repo, in.GroupID, joined, types.VersionStateInsert); err != nil {
+				return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return err
 	}
 	if len(joined) > 0 {
+		s.invalidateGroupCache(ctx, in.GroupID)
 		s.publish(ctx, interfaces.GroupEvent{Type: "group.members_joined", GroupID: in.GroupID, OperatorUserID: in.OpUserID, SubjectUserIDs: joined, RecipientUserIDs: recipients})
 	}
 	return nil
@@ -84,12 +97,19 @@ func (s *groupService) KickGroupMember(ctx context.Context, groupID, opUserID, t
 		if err := repo.DeleteMember(ctx, groupID, targetUserID); err != nil {
 			return apperrors.NewInternalError("kick member failed").WithDetails(err)
 		}
+		if err := bumpJoinVersions(ctx, repo, []string{targetUserID}, groupID, types.VersionStateDelete); err != nil {
+			return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+		}
+		if err := bumpMemberVersion(ctx, repo, groupID, []string{targetUserID}, types.VersionStateDelete); err != nil {
+			return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+		}
 		recipients, err = memberIDs(ctx, repo, groupID)
 		return err
 	})
 	if err != nil {
 		return err
 	}
+	s.invalidateGroupCache(ctx, groupID)
 	s.publish(ctx, interfaces.GroupEvent{Type: "group.member_kicked", GroupID: groupID, OperatorUserID: opUserID, SubjectUserIDs: []string{targetUserID}, RecipientUserIDs: recipients})
 	return nil
 }
@@ -109,12 +129,19 @@ func (s *groupService) QuitGroup(ctx context.Context, groupID, userID string) er
 		if err := repo.DeleteMember(ctx, groupID, userID); err != nil {
 			return apperrors.NewInternalError("quit group failed").WithDetails(err)
 		}
+		if err := bumpJoinVersions(ctx, repo, []string{userID}, groupID, types.VersionStateDelete); err != nil {
+			return apperrors.NewInternalError("bump join version failed").WithDetails(err)
+		}
+		if err := bumpMemberVersion(ctx, repo, groupID, []string{userID}, types.VersionStateDelete); err != nil {
+			return apperrors.NewInternalError("bump member version failed").WithDetails(err)
+		}
 		recipients, err = memberIDs(ctx, repo, groupID)
 		return err
 	})
 	if err != nil {
 		return err
 	}
+	s.invalidateGroupCache(ctx, groupID)
 	s.publish(ctx, interfaces.GroupEvent{Type: "group.member_quit", GroupID: groupID, OperatorUserID: userID, SubjectUserIDs: []string{userID}, RecipientUserIDs: recipients})
 	return nil
 }
@@ -132,6 +159,22 @@ func (s *groupService) GetGroupMembers(ctx context.Context, groupID, opUserID st
 	return members, int(total), nil
 }
 
+// GetGroupMemberUserIDs 对齐 OpenIM getGroupMemberUserIDs。
+func (s *groupService) GetGroupMemberUserIDs(ctx context.Context, groupID string) ([]string, error) {
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return nil, apperrors.NewValidationError("group_id is required")
+	}
+	if _, err := s.repo.GetGroup(ctx, groupID); err != nil {
+		return nil, apperrors.NewGroupNotFoundError().WithDetails(err)
+	}
+	ids, err := s.repo.ListMemberUserIDs(ctx, groupID)
+	if err != nil {
+		return nil, apperrors.NewInternalError("list member user ids failed").WithDetails(err)
+	}
+	return ids, nil
+}
+
 // GetJoinedGroups 分页获取用户已加入的群组列表。
 func (s *groupService) GetJoinedGroups(ctx context.Context, userID string, offset, limit int) ([]*types.Group, int, error) {
 	members, total, err := s.repo.ListGroupsOfUser(ctx, userID, offset, limit)
@@ -145,6 +188,9 @@ func (s *groupService) GetJoinedGroups(ctx context.Context, userID string, offse
 	groups, err := s.repo.ListGroupsByIDs(ctx, ids)
 	if err != nil {
 		return nil, 0, apperrors.NewInternalError("load groups failed").WithDetails(err)
+	}
+	if err := s.fillMemberCounts(ctx, groups); err != nil {
+		return nil, 0, err
 	}
 	return groups, int(total), nil
 }

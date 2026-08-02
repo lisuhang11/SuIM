@@ -67,3 +67,48 @@ type Black struct {
 func (Black) TableName() string {
 	return "black"
 }
+
+// --------------- 好友增量 version ---------------
+
+// VersionState 好友 changelog 状态（对齐 OpenIM）。
+const (
+	VersionStateInsert = 1
+	VersionStateDelete = 2
+	VersionStateUpdate = 3
+)
+
+// FriendVersion 每个 owner 一条好友列表水位。
+type FriendVersion struct {
+	OwnerUserID string `json:"owner_user_id" gorm:"column:owner_user_id;primaryKey;type:varchar(64);not null"`
+	VersionID   string `json:"version_id"    gorm:"column:version_id;type:varchar(64);not null;default:''"`
+	Version     uint64 `json:"version"       gorm:"column:version;not null;default:0"`
+}
+
+func (FriendVersion) TableName() string {
+	return "friend_version"
+}
+
+// FriendVersionLog 好友列表变更日志。
+type FriendVersionLog struct {
+	ID           uint64 `json:"id"             gorm:"column:id;primaryKey;autoIncrement"`
+	OwnerUserID  string `json:"owner_user_id"  gorm:"column:owner_user_id;type:varchar(64);not null;index:idx_fv_owner_ver,priority:1"`
+	Version      uint64 `json:"version"        gorm:"column:version;not null;index:idx_fv_owner_ver,priority:2"`
+	FriendUserID string `json:"friend_user_id" gorm:"column:friend_user_id;type:varchar(64);not null"`
+	State        int8   `json:"state"          gorm:"column:state;not null"` // 1 insert 2 delete 3 update
+	IsSort       bool   `json:"is_sort"        gorm:"column:is_sort;not null;default:0"`
+}
+
+func (FriendVersionLog) TableName() string {
+	return "friend_version_log"
+}
+
+// IncrementalFriendsResult 增量同步结果（服务层用）。
+type IncrementalFriendsResult struct {
+	Version     uint64
+	VersionID   string
+	Full        bool
+	Delete      []string
+	Insert      []*Friend
+	Update      []*Friend
+	SortVersion uint64
+}

@@ -1,0 +1,15 @@
+# RTC 服务配置文件
+server_addr: ":8087"
+service_addr: "127.0.0.1:8087"
+etcd_endpoints:
+  - "127.0.0.1:2379"
+db_host: "127.0.0.1"
+db_port: 3306
+db_user: "root"
+db_password: "suim123"
+db_name: "suim"
+jwt_secret: "change-me-in-production"
+livekit_url: "ws://localhost:7880"
+livekit_api_key: "devkey"
+livekit_api_secret: "secret"
+ring_timeout_sec: 45

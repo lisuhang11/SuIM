@@ -24,16 +24,22 @@ func NewGroupHandler(client pb.GroupServiceClient) *GroupHandler {
 func (h *GroupHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("", h.CreateGroup)
 	r.GET("/joined", h.GetJoinedGroups)
+	r.POST("/joined/incremental", h.GetIncrementalJoinGroup)
+	r.POST("/joined/full-ids", h.GetFullJoinGroupIDs)
+	r.POST("/info", h.GetGroupsInfo)
 	r.GET("/:id", h.GetGroup)
 	r.PUT("/:id", h.UpdateGroupInfo)
 	r.POST("/:id/avatar/initiate", h.InitiateAvatarUpload)
 	r.POST("/:id/avatar/:file_id/complete", h.CompleteAvatarUpload)
 	r.DELETE("/:id", h.DismissGroup)
 	r.PUT("/:id/owner", h.TransferGroupOwner)
+	r.POST("/:id/members/incremental", h.GetIncrementalGroupMember)
+	r.POST("/:id/members/full-ids", h.GetFullGroupMemberUserIDs)
 	r.POST("/:id/members", h.InviteUserToGroup)
 	r.DELETE("/:id/members/:user_id", h.KickGroupMember)
 	r.POST("/:id/quit", h.QuitGroup)
 	r.GET("/:id/members", h.GetGroupMembers)
+	r.GET("/:id/member-user-ids", h.GetGroupMemberUserIDs)
 	r.PUT("/:id/mute", h.SetGroupMute)
 	r.PUT("/:id/members/:user_id/mute", h.SetMemberMute)
 	r.POST("/:id/apply", h.ApplyToJoinGroup)
@@ -163,6 +169,25 @@ func (h *GroupHandler) GetGroup(c *gin.Context) {
 	Respond(c, resp)
 }
 
+// GetGroupsInfo POST /groups/info  body: { group_ids: [] }
+func (h *GroupHandler) GetGroupsInfo(c *gin.Context) {
+	var req pb.GetGroupsInfoReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondError(c, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
+	defer cancel()
+	start := time.Now()
+	resp, err := h.client.GetGroupsInfo(ctx, &req)
+	recordGRPC("group", "GetGroupsInfo", err, start)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
 // InviteUserToGroup POST /groups/:id/members
 func (h *GroupHandler) InviteUserToGroup(c *gin.Context) {
 	var req pb.InviteUserToGroupReq
@@ -243,6 +268,63 @@ func (h *GroupHandler) GetGroupMembers(c *gin.Context) {
 	Respond(c, resp)
 }
 
+// GetGroupMemberUserIDs GET /groups/:id/member-user-ids
+func (h *GroupHandler) GetGroupMemberUserIDs(c *gin.Context) {
+	req := &pb.GetGroupMemberUserIDsReq{GroupId: c.Param("id")}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
+	defer cancel()
+	start := time.Now()
+	resp, err := h.client.GetGroupMemberUserIDs(ctx, req)
+	recordGRPC("group", "GetGroupMemberUserIDs", err, start)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
+// GetIncrementalGroupMember POST /groups/:id/members/incremental
+func (h *GroupHandler) GetIncrementalGroupMember(c *gin.Context) {
+	var body struct {
+		VersionID string `json:"version_id"`
+		Version   uint64 `json:"version"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		RespondError(c, err)
+		return
+	}
+	req := &pb.GetIncrementalGroupMemberReq{
+		GroupId:   c.Param("id"),
+		VersionId: body.VersionID,
+		Version:   body.Version,
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 5*time.Second)
+	defer cancel()
+	start := time.Now()
+	resp, err := h.client.GetIncrementalGroupMember(ctx, req)
+	recordGRPC("group", "GetIncrementalGroupMember", err, start)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
+// GetFullGroupMemberUserIDs POST /groups/:id/members/full-ids
+func (h *GroupHandler) GetFullGroupMemberUserIDs(c *gin.Context) {
+	req := &pb.GetFullGroupMemberUserIDsReq{GroupId: c.Param("id")}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
+	defer cancel()
+	start := time.Now()
+	resp, err := h.client.GetFullGroupMemberUserIDs(ctx, req)
+	recordGRPC("group", "GetFullGroupMemberUserIDs", err, start)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
 // GetJoinedGroups GET /groups/joined?user_id=&offset=0&limit=20
 func (h *GroupHandler) GetJoinedGroups(c *gin.Context) {
 	req := &pb.GetJoinedGroupsReq{
@@ -255,6 +337,48 @@ func (h *GroupHandler) GetJoinedGroups(c *gin.Context) {
 	start := time.Now()
 	resp, err := h.client.GetJoinedGroups(ctx, req)
 	recordGRPC("group", "GetJoinedGroups", err, start)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
+// GetIncrementalJoinGroup POST /groups/joined/incremental
+func (h *GroupHandler) GetIncrementalJoinGroup(c *gin.Context) {
+	var body struct {
+		VersionID string `json:"version_id"`
+		Version   uint64 `json:"version"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		RespondError(c, err)
+		return
+	}
+	req := &pb.GetIncrementalJoinGroupReq{
+		UserId:    userIDFromCtx(c),
+		VersionId: body.VersionID,
+		Version:   body.Version,
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 5*time.Second)
+	defer cancel()
+	start := time.Now()
+	resp, err := h.client.GetIncrementalJoinGroup(ctx, req)
+	recordGRPC("group", "GetIncrementalJoinGroup", err, start)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
+// GetFullJoinGroupIDs POST /groups/joined/full-ids
+func (h *GroupHandler) GetFullJoinGroupIDs(c *gin.Context) {
+	req := &pb.GetFullJoinGroupIDsReq{UserId: userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
+	defer cancel()
+	start := time.Now()
+	resp, err := h.client.GetFullJoinGroupIDs(ctx, req)
+	recordGRPC("group", "GetFullJoinGroupIDs", err, start)
 	if err != nil {
 		RespondError(c, err)
 		return

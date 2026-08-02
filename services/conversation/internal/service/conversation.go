@@ -12,17 +12,25 @@ import (
 	"conversation/internal/types"
 	"conversation/internal/types/interfaces"
 
+	pbmsg "SuIM/proto/messagepb"
+
 	"gorm.io/gorm"
 )
 
+// lastMessageFetcher 从 message 服务拉取最后一条可见消息（不再直查 msg_info）。
+type lastMessageFetcher interface {
+	GetLastMessage(ctx context.Context, conversationIDs []string) (map[string]*pbmsg.MsgData, error)
+}
+
 // conversationService 实现 ConversationService 接口。
 type conversationService struct {
-	repo interfaces.ConversationRepository
+	repo    interfaces.ConversationRepository
+	msgLast lastMessageFetcher
 }
 
 // NewConversationService 创建会话服务实例。
-func NewConversationService(repo interfaces.ConversationRepository) interfaces.ConversationService {
-	return &conversationService{repo: repo}
+func NewConversationService(repo interfaces.ConversationRepository, msgLast lastMessageFetcher) interfaces.ConversationService {
+	return &conversationService{repo: repo, msgLast: msgLast}
 }
 
 // --------------- 辅助函数 ---------------
@@ -319,12 +327,56 @@ func (s *conversationService) UpdateConversationsByUser(ctx context.Context, use
 	return nil
 }
 
-// DeleteConversations 删除用户的指定会话。
-func (s *conversationService) DeleteConversations(ctx context.Context, ownerUserID string, ids []string) error {
-	if err := s.repo.Delete(ctx, ownerUserID, ids); err != nil {
+// DeleteConversations 删除用户的指定会话；needDeleteTime>0 时仅删创建时间不晚于该毫秒时间戳的会话。
+func (s *conversationService) DeleteConversations(ctx context.Context, ownerUserID string, ids []string, needDeleteTime int64) error {
+	if err := s.repo.Delete(ctx, ownerUserID, ids, needDeleteTime); err != nil {
 		return apperrors.NewInternalError("failed to delete conversations").WithDetails(err)
 	}
 	return nil
+}
+
+// ListLatestMsgs 经 message.GetLastMessage 批量查询会话最后一条消息预览。
+func (s *conversationService) ListLatestMsgs(ctx context.Context, userID string, conversationIDs []string) (map[string]types.LatestMsg, error) {
+	_ = userID // 可见性由 message 服务按 JWT 用户校验
+	if s.msgLast == nil || len(conversationIDs) == 0 {
+		return map[string]types.LatestMsg{}, nil
+	}
+	msgs, err := s.msgLast.GetLastMessage(ctx, conversationIDs)
+	if err != nil {
+		return nil, apperrors.NewInternalError("failed to list latest messages").WithDetails(err)
+	}
+	out := make(map[string]types.LatestMsg, len(msgs))
+	for id, m := range msgs {
+		if m == nil {
+			continue
+		}
+		out[id] = types.LatestMsg{
+			ConversationID: id,
+			ServerMsgID:    m.ServerMsgId,
+			ClientMsgID:    m.ClientMsgId,
+			SessionType:    int(m.SessionType),
+			SendID:         m.SendId,
+			RecvID:         m.RecvId,
+			SenderNickname: m.SenderNickname,
+			SenderFaceURL:  m.SenderFaceUrl,
+			GroupID:        m.GroupId,
+			MsgFrom:        int(m.MsgFrom),
+			ContentType:    int(m.ContentType),
+			Content:        m.Content,
+			Ex:             m.Ex,
+			SendTime:       m.SendTime,
+		}
+	}
+	return out, nil
+}
+
+// ListUnreadCounts 批量查询用户未读数（seq_user.max_seq - read_seq）。
+func (s *conversationService) ListUnreadCounts(ctx context.Context, ownerUserID string, conversationIDs []string) (map[string]int64, error) {
+	counts, err := s.repo.ListUnreadCounts(ctx, ownerUserID, conversationIDs)
+	if err != nil {
+		return nil, apperrors.NewInternalError("failed to list unread counts").WithDetails(err)
+	}
+	return counts, nil
 }
 
 // --------------- 通知/推送相关 ---------------

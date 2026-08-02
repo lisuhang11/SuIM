@@ -29,6 +29,8 @@ func (h *MessageHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/history", h.GetHistoryMessages)
 	r.GET("/by-seq", h.GetMessagesBySeq)
 	r.GET("/by-client-ids", h.GetMessagesByClientMsgIDs)
+	r.GET("/max-seqs", h.GetMaxSeq)
+	r.GET("/has-read-and-max-seqs", h.GetConversationsHasReadAndMaxSeq)
 	r.POST("/revoke", h.RevokeMsg)
 	r.POST("/read", h.MarkMsgsAsRead)
 	r.DELETE("", h.DeleteMsgs)
@@ -47,6 +49,10 @@ func (h *MessageHandler) SendMsg(c *gin.Context) {
 	}
 	userID := userIDFromCtx(c)
 	req.MsgData.SendId = userID
+	// 单聊未带 recv_user_ids 时用 recv_id 填充，保证落库游标与在线推送命中接收方。
+	if len(req.MsgData.RecvUserIds) == 0 && req.MsgData.RecvId != "" {
+		req.MsgData.RecvUserIds = []string{req.MsgData.RecvId}
+	}
 	if req.MsgData.ContentType == 2 {
 		var content struct {
 			FileID string `json:"file_id"`
@@ -110,6 +116,40 @@ func (h *MessageHandler) GetMessagesBySeq(c *gin.Context) {
 	start := time.Now()
 	resp, err := h.client.GetMessagesBySeq(ctx, req)
 	recordGRPC("message", "GetMessagesBySeq", err, start)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
+// GetMaxSeq GET /messages/max-seqs?conversation_ids=a,b
+func (h *MessageHandler) GetMaxSeq(c *gin.Context) {
+	req := &pb.GetMaxSeqReq{
+		ConversationIds: splitComma(c.Query("conversation_ids")),
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
+	defer cancel()
+	start := time.Now()
+	resp, err := h.client.GetMaxSeq(ctx, req)
+	recordGRPC("message", "GetMaxSeq", err, start)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	Respond(c, resp)
+}
+
+// GetConversationsHasReadAndMaxSeq GET /messages/has-read-and-max-seqs?conversation_ids=a,b
+func (h *MessageHandler) GetConversationsHasReadAndMaxSeq(c *gin.Context) {
+	req := &pb.GetConversationsHasReadAndMaxSeqReq{
+		ConversationIds: splitComma(c.Query("conversation_ids")),
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
+	defer cancel()
+	start := time.Now()
+	resp, err := h.client.GetConversationsHasReadAndMaxSeq(ctx, req)
+	recordGRPC("message", "GetConversationsHasReadAndMaxSeq", err, start)
 	if err != nil {
 		RespondError(c, err)
 		return

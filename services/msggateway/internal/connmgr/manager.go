@@ -229,6 +229,42 @@ func (m *Manager) OnlineUsers() int {
 	return len(m.conns)
 }
 
+// ListOnlinePlatforms 返回本机 userID → 在线 platformID 列表（供 Redis 续期）。
+func (m *Manager) ListOnlinePlatforms() map[string][]int32 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make(map[string][]int32, len(m.conns))
+	for uid, plats := range m.conns {
+		ids := make([]int32, 0, len(plats))
+		for pid, conns := range plats {
+			if len(conns) > 0 {
+				ids = append(ids, pid)
+			}
+		}
+		if len(ids) > 0 {
+			out[uid] = ids
+		}
+	}
+	return out
+}
+
+// LocalPlatformIDs 返回本机某用户在线平台 ID。
+func (m *Manager) LocalPlatformIDs(userID string) []int32 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	plats := m.conns[userID]
+	if len(plats) == 0 {
+		return nil
+	}
+	out := make([]int32, 0, len(plats))
+	for pid, conns := range plats {
+		if len(conns) > 0 {
+			out = append(out, pid)
+		}
+	}
+	return out
+}
+
 // ---------- 内部辅助 ----------
 
 func (m *Manager) totalConnsLocked() int {

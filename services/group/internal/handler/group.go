@@ -91,6 +91,8 @@ func groupToProto(g *types.Group) *pb.GroupInfo {
 		ApplyMemberFriend:      int32(g.ApplyMemberFriend),
 		NotificationUpdateTime: g.NotificationUpdateTime.UnixMilli(),
 		NotificationUserId:     g.NotificationUserID,
+		MemberCount:            int32(g.MemberCount),
+		OwnerUserId:            g.OwnerUserID,
 	}
 }
 
@@ -167,7 +169,7 @@ func (h *groupHandler) CreateGroup(ctx context.Context, req *pb.CreateGroupReq) 
 		logger.Error(ctx, "create group failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.CreateGroupResp{Success: true, Message: "group created", GroupId: groupID, Group: groupToProto(g)}, nil
+	return &pb.CreateGroupResp{GroupId: groupID, Group: groupToProto(g)}, nil
 }
 
 // DismissGroup 解散群组。
@@ -180,7 +182,7 @@ func (h *groupHandler) DismissGroup(ctx context.Context, req *pb.DismissGroupReq
 		logger.Error(ctx, "dismiss group failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.DismissGroupResp{Success: true, Message: "group dismissed"}, nil
+	return &pb.DismissGroupResp{}, nil
 }
 
 // TransferGroupOwner 转让群主。
@@ -193,7 +195,7 @@ func (h *groupHandler) TransferGroupOwner(ctx context.Context, req *pb.TransferG
 		logger.Error(ctx, "transfer owner failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.TransferGroupOwnerResp{Success: true, Message: "owner transferred"}, nil
+	return &pb.TransferGroupOwnerResp{}, nil
 }
 
 // UpdateGroupInfo 更新群组信息。
@@ -228,7 +230,7 @@ func (h *groupHandler) UpdateGroupInfo(ctx context.Context, req *pb.UpdateGroupI
 		logger.Error(ctx, "update group info failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.UpdateGroupInfoResp{Success: true, Message: "group updated", Group: groupToProto(g)}, nil
+	return &pb.UpdateGroupInfoResp{Group: groupToProto(g)}, nil
 }
 
 func (h *groupHandler) InitiateAvatarUpload(ctx context.Context, req *pb.InitiateGroupAvatarUploadReq) (*pb.InitiateGroupAvatarUploadResp, error) {
@@ -286,7 +288,21 @@ func (h *groupHandler) GetGroup(ctx context.Context, req *pb.GetGroupReq) (*pb.G
 		logger.Error(ctx, "get group failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.GetGroupResp{Success: true, Message: "ok", Group: groupToProto(g)}, nil
+	return &pb.GetGroupResp{Group: groupToProto(g)}, nil
+}
+
+// GetGroupsInfo 批量获取群组信息。
+func (h *groupHandler) GetGroupsInfo(ctx context.Context, req *pb.GetGroupsInfoReq) (*pb.GetGroupsInfoResp, error) {
+	groups, err := h.svc.GetGroupsInfo(ctx, req.GroupIds)
+	if err != nil {
+		logger.Error(ctx, "get groups info failed", "error", err)
+		return nil, appErrorToStatus(err)
+	}
+	out := make([]*pb.GroupInfo, 0, len(groups))
+	for _, g := range groups {
+		out = append(out, groupToProto(g))
+	}
+	return &pb.GetGroupsInfoResp{Groups: out}, nil
 }
 
 // InviteUserToGroup 邀请用户加入群组。
@@ -304,7 +320,7 @@ func (h *groupHandler) InviteUserToGroup(ctx context.Context, req *pb.InviteUser
 		logger.Error(ctx, "invite members failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.InviteUserToGroupResp{Success: true, Message: "members invited"}, nil
+	return &pb.InviteUserToGroupResp{}, nil
 }
 
 // KickGroupMember 踢出群成员。
@@ -317,7 +333,7 @@ func (h *groupHandler) KickGroupMember(ctx context.Context, req *pb.KickGroupMem
 		logger.Error(ctx, "kick member failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.KickGroupMemberResp{Success: true, Message: "member kicked"}, nil
+	return &pb.KickGroupMemberResp{}, nil
 }
 
 // QuitGroup 退出群组。
@@ -330,7 +346,17 @@ func (h *groupHandler) QuitGroup(ctx context.Context, req *pb.QuitGroupReq) (*pb
 		logger.Error(ctx, "quit group failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.QuitGroupResp{Success: true, Message: "quit group"}, nil
+	return &pb.QuitGroupResp{}, nil
+}
+
+// GetGroupMemberUserIDs 获取群全部成员 userID。
+func (h *groupHandler) GetGroupMemberUserIDs(ctx context.Context, req *pb.GetGroupMemberUserIDsReq) (*pb.GetGroupMemberUserIDsResp, error) {
+	ids, err := h.svc.GetGroupMemberUserIDs(ctx, req.GroupId)
+	if err != nil {
+		logger.Error(ctx, "get group member user ids failed", "error", err)
+		return nil, appErrorToStatus(err)
+	}
+	return &pb.GetGroupMemberUserIDsResp{UserIds: ids}, nil
 }
 
 // GetGroupMembers 获取群成员列表。
@@ -367,6 +393,104 @@ func (h *groupHandler) GetJoinedGroups(ctx context.Context, req *pb.GetJoinedGro
 	return &pb.GetJoinedGroupsResp{Groups: pbGroups, Total: int32(total)}, nil
 }
 
+// GetIncrementalJoinGroup 已加入群增量同步。
+func (h *groupHandler) GetIncrementalJoinGroup(ctx context.Context, req *pb.GetIncrementalJoinGroupReq) (*pb.GetIncrementalJoinGroupResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.UserId != "" && req.UserId != userID {
+		return nil, status.Error(codes.PermissionDenied, "user_id must be the authenticated user")
+	}
+	res, err := h.svc.GetIncrementalJoinGroup(ctx, userID, req.VersionId, req.Version)
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	insert := make([]*pb.GroupInfo, 0, len(res.Insert))
+	for _, g := range res.Insert {
+		insert = append(insert, groupToProto(g))
+	}
+	update := make([]*pb.GroupInfo, 0, len(res.Update))
+	for _, g := range res.Update {
+		update = append(update, groupToProto(g))
+	}
+	return &pb.GetIncrementalJoinGroupResp{
+		Version:     res.Version,
+		VersionId:   res.VersionID,
+		Full:        res.Full,
+		Delete:      res.Delete,
+		Insert:      insert,
+		Update:      update,
+		SortVersion: res.SortVersion,
+	}, nil
+}
+
+// GetFullJoinGroupIDs 完整已加入群 ID 列表。
+func (h *groupHandler) GetFullJoinGroupIDs(ctx context.Context, req *pb.GetFullJoinGroupIDsReq) (*pb.GetFullJoinGroupIDsResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.UserId != "" && req.UserId != userID {
+		return nil, status.Error(codes.PermissionDenied, "user_id must be the authenticated user")
+	}
+	ids, err := h.svc.GetFullJoinGroupIDs(ctx, userID)
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	return &pb.GetFullJoinGroupIDsResp{GroupIds: ids}, nil
+}
+
+// GetIncrementalGroupMember 群成员增量同步。
+func (h *groupHandler) GetIncrementalGroupMember(ctx context.Context, req *pb.GetIncrementalGroupMemberReq) (*pb.GetIncrementalGroupMemberResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res, err := h.svc.GetIncrementalGroupMember(ctx, req.GroupId, userID, req.VersionId, req.Version)
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	insert := make([]*pb.GroupMemberFullInfo, 0, len(res.Insert))
+	for _, m := range res.Insert {
+		insert = append(insert, memberToProto(m))
+	}
+	update := make([]*pb.GroupMemberFullInfo, 0, len(res.Update))
+	for _, m := range res.Update {
+		update = append(update, memberToProto(m))
+	}
+	resp := &pb.GetIncrementalGroupMemberResp{
+		Version:     res.Version,
+		VersionId:   res.VersionID,
+		Full:        res.Full,
+		Delete:      res.Delete,
+		Insert:      insert,
+		Update:      update,
+		SortVersion: res.SortVersion,
+	}
+	if res.Group != nil {
+		resp.Group = groupToProto(res.Group)
+	}
+	return resp, nil
+}
+
+// GetFullGroupMemberUserIDs 完整群成员 ID 列表。
+func (h *groupHandler) GetFullGroupMemberUserIDs(ctx context.Context, req *pb.GetFullGroupMemberUserIDsReq) (*pb.GetFullGroupMemberUserIDsResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids, version, versionID, err := h.svc.GetFullGroupMemberUserIDs(ctx, req.GroupId, userID)
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	return &pb.GetFullGroupMemberUserIDsResp{
+		UserIds:   ids,
+		Version:   version,
+		VersionId: versionID,
+	}, nil
+}
+
 // SetGroupMute 设置群全员禁言。
 func (h *groupHandler) SetGroupMute(ctx context.Context, req *pb.SetGroupMuteReq) (*pb.SetGroupMuteResp, error) {
 	userID, authErr := authenticatedUserID(ctx)
@@ -377,7 +501,7 @@ func (h *groupHandler) SetGroupMute(ctx context.Context, req *pb.SetGroupMuteReq
 		logger.Error(ctx, "set group mute failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.SetGroupMuteResp{Success: true, Message: "group mute updated"}, nil
+	return &pb.SetGroupMuteResp{}, nil
 }
 
 // SetMemberMute 设置单个成员禁言。
@@ -390,7 +514,7 @@ func (h *groupHandler) SetMemberMute(ctx context.Context, req *pb.SetMemberMuteR
 		logger.Error(ctx, "set member mute failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.SetMemberMuteResp{Success: true, Message: "member mute updated"}, nil
+	return &pb.SetMemberMuteResp{}, nil
 }
 
 // ApplyToJoinGroup 申请加入群组。
@@ -409,7 +533,7 @@ func (h *groupHandler) ApplyToJoinGroup(ctx context.Context, req *pb.ApplyToJoin
 		logger.Error(ctx, "apply to join failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.ApplyToJoinGroupResp{Success: true, Message: "application submitted"}, nil
+	return &pb.ApplyToJoinGroupResp{}, nil
 }
 
 // GetPendingApplications 获取待处理的入群申请。
@@ -462,7 +586,7 @@ func (h *groupHandler) HandleApplication(ctx context.Context, req *pb.HandleAppl
 		logger.Error(ctx, "handle application failed", "error", err)
 		return nil, appErrorToStatus(err)
 	}
-	return &pb.HandleApplicationResp{Success: true, Message: "application handled"}, nil
+	return &pb.HandleApplicationResp{}, nil
 }
 
 // GetUnhandledApplicationCount 获取未处理的入群申请数量。

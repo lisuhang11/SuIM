@@ -7,32 +7,40 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(" ");
 }
 
-/** 格式化时间 */
+/** 将秒/毫秒时间戳统一为毫秒 */
+export function toEpochMs(value: number | string): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return NaN;
+  // < 1e12 视为秒（当前秒级约 1.7e9，毫秒级约 1.7e12）
+  return n < 1e12 ? n * 1000 : n;
+}
+
+function startOfLocalDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+/** 24 小时制 HH:mm（不用 locale，避免 h11 把 12 点显示成 00:00） */
+function formatClock24(d: Date): string {
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+/** 格式化时间：今天 HH:mm；昨天 HH:mm；更早 YYYY-MM-DD HH:mm */
 export function formatTime(iso: string): string {
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
   const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  const isThisYear = d.getFullYear() === now.getFullYear();
+  const dayDiff = Math.round((startOfLocalDay(now) - startOfLocalDay(d)) / 86400000);
+  const time = formatClock24(d);
 
-  const time = d.toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (dayDiff === 0) return time;
+  if (dayDiff === 1) return `昨天 ${time}`;
 
-  if (isToday) return time;
-
-  const date = d.toLocaleDateString("zh-CN", {
-    month: "short",
-    day: "numeric",
-  });
-
-  if (isThisYear) return `${date} ${time}`;
-
-  return `${d.toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })} ${time}`;
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day} ${time}`;
 }
 
 /** 格式化会话列表时间（简短版） */

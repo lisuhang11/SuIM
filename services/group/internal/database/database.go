@@ -30,8 +30,15 @@ func MustOpen(cfg *config.Config) *gorm.DB {
 	sqlDB.SetMaxOpenConns(25)
 	sqlDB.SetMaxIdleConns(10)
 
-	// 自动迁移群组、群成员和入群请求表结构。
-	if err := db.AutoMigrate(&types.Group{}, &types.GroupMember{}, &types.GroupRequest{}); err != nil {
+	if err := db.AutoMigrate(
+		&types.Group{},
+		&types.GroupMember{},
+		&types.GroupRequest{},
+		&types.JoinGroupVersion{},
+		&types.JoinGroupVersionLog{},
+		&types.GroupMemberVersion{},
+		&types.GroupMemberVersionLog{},
+	); err != nil {
 		panic(fmt.Sprintf("failed to auto-migrate: %v", err))
 	}
 

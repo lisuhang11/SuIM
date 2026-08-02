@@ -2,12 +2,14 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"msggateway/internal/connmgr"
+	"msggateway/internal/online"
 	"msggateway/internal/types"
 
 	"github.com/gorilla/websocket"
@@ -15,10 +17,11 @@ import (
 
 // Server WebSocket 服务端。
 type Server struct {
-	cfg     ServerConfig
-	connMgr *connmgr.Manager
-	authFn  types.AuthFunc
+	cfg       ServerConfig
+	connMgr   *connmgr.Manager
+	authFn    types.AuthFunc
 	onlineChg types.OnlineChangeHook
+	presence  *online.Hub
 }
 
 // ServerConfig WebSocket 服务端配置。
@@ -41,6 +44,12 @@ func (s *Server) SetAuthFunc(fn types.AuthFunc) { s.authFn = fn }
 
 // SetOnlineChangeHook 设置上线/下线通知回调。
 func (s *Server) SetOnlineChangeHook(fn types.OnlineChangeHook) { s.onlineChg = fn }
+
+// SetPresenceHub 设置好友在线状态 hub。
+func (s *Server) SetPresenceHub(h *online.Hub) { s.presence = h }
+
+// Presence 返回 presence hub（供 gRPC handler 查询集群状态）。
+func (s *Server) Presence() *online.Hub { return s.presence }
 
 // ServeHTTP 处理 WebSocket 升级请求。
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -91,12 +100,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // readPump 从客户端读取消息。
 func (s *Server) readPump(conn *Conn) {
 	defer func() {
+		if s.presence != nil {
+			s.presence.DelConn(conn)
+		}
 		s.connMgr.Remove(conn.UserID, conn.PlatformID, conn.ID())
 		s.connMgr.RemoveToken(conn.UserID, conn.PlatformID, conn.Token)
 		conn.Close(types.CloseCodeGoingAway, "")
 		LogConnInfo(conn.UserID, conn.PlatformID, conn.ID(), "disconnected")
 
-		if len(s.connMgr.GetUserConns(conn.UserID)) == 0 && s.onlineChg != nil {
+		// 该平台已无连接 → 平台下线（多端其它平台可仍在线）。
+		if len(s.connMgr.GetUserPlatformConns(conn.UserID, conn.PlatformID)) == 0 && s.onlineChg != nil {
 			s.onlineChg(conn.UserID, conn.PlatformID, false)
 		}
 	}()
@@ -125,10 +138,57 @@ func (s *Server) readPump(conn *Conn) {
 				"conn_id", conn.ID(),
 				"seq_id", msg.SeqID,
 			)
+		case types.MsgTypePresenceSubscribe:
+			s.handlePresenceSubscribe(conn, msg)
+		case types.MsgTypePresenceUnsubscribe:
+			s.handlePresenceUnsubscribe(conn, msg)
 		default:
 			slog.Debug("ws unknown message type", "type", msg.Type, "user_id", conn.UserID)
 		}
 	}
+}
+
+type presenceUserIDs struct {
+	UserIDs []string `json:"user_ids"`
+}
+
+func parsePresenceUserIDs(msg *WSMessage) []string {
+	body := msg.Body()
+	if len(body) == 0 {
+		return nil
+	}
+	var p presenceUserIDs
+	if err := json.Unmarshal(body, &p); err != nil {
+		return nil
+	}
+	return p.UserIDs
+}
+
+func (s *Server) handlePresenceSubscribe(conn *Conn, msg *WSMessage) {
+	if s.presence == nil {
+		return
+	}
+	userIDs := parsePresenceUserIDs(msg)
+	if len(userIDs) == 0 {
+		return
+	}
+	snapshots := s.presence.Subscribe(context.Background(), conn, userIDs)
+	raw, _ := json.Marshal(map[string]any{"statuses": snapshots})
+	_ = conn.WriteMessage(&WSMessage{
+		Type: types.MsgTypePresenceSnapshot,
+		Data: raw,
+	})
+}
+
+func (s *Server) handlePresenceUnsubscribe(conn *Conn, msg *WSMessage) {
+	if s.presence == nil {
+		return
+	}
+	userIDs := parsePresenceUserIDs(msg)
+	if len(userIDs) == 0 {
+		return
+	}
+	s.presence.Unsubscribe(conn, userIDs)
 }
 
 // writePump 向客户端发送心跳 ping。
@@ -148,6 +208,18 @@ func (s *Server) writePump(conn *Conn) {
 				time.Now().Add(s.cfg.WriteTimeout))
 		}
 	}
+}
+
+// WriteConn 向指定连接写一帧（供 presence tip 使用）。
+func (s *Server) WriteConn(conn types.WritableConn, typ string, data json.RawMessage) error {
+	c, ok := conn.(*Conn)
+	if !ok || c == nil || c.IsClosed() {
+		return nil
+	}
+	if typ == types.MsgTypePush {
+		return c.WriteMessage(NewPushMsg(data, generateSeqID()))
+	}
+	return c.WriteMessage(&WSMessage{Type: typ, Data: data})
 }
 
 // PushToUser 向指定用户的所有平台推送消息。

@@ -78,3 +78,33 @@ func (f *FriendNotificationSender) FriendApplicationRejectedNotification(ctx con
 	}
 	f.Notification(ctx, toUserID, fromUserID, notification.FriendApplicationRejectedNotification, tips)
 }
+
+// FriendDeletedNotification 好友删除通知，发给 recvUserID（需同步好友列表的一方）。
+func (f *FriendNotificationSender) FriendDeletedNotification(ctx context.Context, operatorUserID, recvUserID string) {
+	tips := notification.FriendDeletedTips{
+		FromUserID: operatorUserID,
+		ToUserID:   recvUserID,
+		HandleTime: time.Now().UnixMilli(),
+	}
+	f.Notification(ctx, operatorUserID, recvUserID, notification.FriendDeletedNotification, tips)
+}
+
+// FriendInfoChangedNotification 备注/置顶变更，发给 owner（多端同步）。
+func (f *FriendNotificationSender) FriendInfoChangedNotification(ctx context.Context, ownerUserID, friendUserID string) {
+	tips := notification.FriendInfoChangedTips{
+		OwnerUserID:  ownerUserID,
+		FriendUserID: friendUserID,
+		HandleTime:   time.Now().UnixMilli(),
+	}
+	f.Notification(ctx, ownerUserID, ownerUserID, notification.FriendInfoChangedNotification, tips)
+}
+
+// FriendInfoUpdatedNotification 好友资料变更，发给 ownerUserID。
+func (f *FriendNotificationSender) FriendInfoUpdatedNotification(ctx context.Context, changedUserID, ownerUserID string) {
+	tips := notification.FriendInfoUpdatedTips{
+		ChangedUserID: changedUserID,
+		OwnerUserID:   ownerUserID,
+		HandleTime:    time.Now().UnixMilli(),
+	}
+	f.Notification(ctx, changedUserID, ownerUserID, notification.FriendInfoUpdatedNotification, tips)
+}

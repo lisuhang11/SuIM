@@ -30,6 +30,24 @@ type Conversation struct {
 // TableName 覆盖 GORM 默认复数表名。
 func (Conversation) TableName() string { return "conversation" }
 
+// LatestMsg 会话最后一条消息预览（由 message.GetLastMessage 填充，不入 conversation 表）。
+type LatestMsg struct {
+	ConversationID string `gorm:"column:conversation_id"`
+	ServerMsgID    string `gorm:"column:server_msg_id"`
+	ClientMsgID    string `gorm:"column:client_msg_id"`
+	SessionType    int    `gorm:"column:session_type"`
+	SendID         string `gorm:"column:send_id"`
+	RecvID         string `gorm:"column:recv_id"`
+	SenderNickname string `gorm:"column:sender_nickname"`
+	SenderFaceURL  string `gorm:"column:sender_face_url"`
+	GroupID        string `gorm:"column:group_id"`
+	MsgFrom        int    `gorm:"column:msg_from"`
+	ContentType    int    `gorm:"column:content_type"`
+	Content        string `gorm:"column:content"`
+	Ex             string `gorm:"column:ex"`
+	SendTime       int64  `gorm:"column:send_time"`
+}
+
 // ConversationUpdate 携带 UpdateConversation 可选更新字段。
 // nil 指针表示"不修改该字段"。
 type ConversationUpdate struct {

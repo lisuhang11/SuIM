@@ -13,17 +13,21 @@ import (
 
 // Config 保存服务级配置，包括监听地址、数据库连接信息和 JWT 令牌有效期。
 type Config struct {
-	ServerAddr      string        `yaml:"server_addr"`
-	ServiceAddr     string        `yaml:"service_addr"`
-	EtcdEndpoints   []string      `yaml:"etcd_endpoints"`
-	DBHost          string        `yaml:"db_host"`
-	DBPort          int           `yaml:"db_port"`
-	DBUser          string        `yaml:"db_user"`
-	DBPassword      string        `yaml:"db_password"`
-	DBName          string        `yaml:"db_name"`
-	JWTSecret       string        `yaml:"jwt_secret"`
-	AccessTokenTTL  time.Duration `yaml:"access_token_ttl"`
-	RefreshTokenTTL time.Duration `yaml:"refresh_token_ttl"`
+	ServerAddr       string        `yaml:"server_addr"`
+	ServiceAddr      string        `yaml:"service_addr"`
+	EtcdEndpoints    []string      `yaml:"etcd_endpoints"`
+	DBHost           string        `yaml:"db_host"`
+	DBPort           int           `yaml:"db_port"`
+	DBUser           string        `yaml:"db_user"`
+	DBPassword       string        `yaml:"db_password"`
+	DBName           string        `yaml:"db_name"`
+	JWTSecret        string        `yaml:"jwt_secret"`
+	AccessTokenTTL   time.Duration `yaml:"access_token_ttl"`
+	RefreshTokenTTL  time.Duration `yaml:"refresh_token_ttl"`
+	RedisAddr        string        `yaml:"redis_addr"`
+	RedisPassword    string        `yaml:"redis_password"`
+	RedisDB          int           `yaml:"redis_db"`
+	UserInfoCacheTTL time.Duration `yaml:"user_info_cache_ttl"`
 }
 
 // defaults 返回内置默认配置。
@@ -37,9 +41,13 @@ func defaults() *Config {
 		DBUser:          "root",
 		DBPassword:      "",
 		DBName:          "suim",
-		JWTSecret:       "change-me-in-production",
-		AccessTokenTTL:  24 * time.Hour,
-		RefreshTokenTTL: 720 * time.Hour,
+		JWTSecret:        "change-me-in-production",
+		AccessTokenTTL:   24 * time.Hour,
+		RefreshTokenTTL:  720 * time.Hour,
+		RedisAddr:        "127.0.0.1:6379",
+		RedisPassword:    "suim-redis",
+		RedisDB:          0,
+		UserInfoCacheTTL: 12 * time.Hour,
 	}
 }
 
@@ -93,6 +101,22 @@ func LoadFromFile(path string) *Config {
 	if v := os.Getenv("JWT_REFRESH_TTL"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			cfg.RefreshTokenTTL = d
+		}
+	}
+	if v := os.Getenv("REDIS_ADDR"); v != "" {
+		cfg.RedisAddr = v
+	}
+	if v := os.Getenv("REDIS_PASSWORD"); v != "" {
+		cfg.RedisPassword = v
+	}
+	if v := os.Getenv("REDIS_DB"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.RedisDB = n
+		}
+	}
+	if v := os.Getenv("USER_INFO_CACHE_TTL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.UserInfoCacheTTL = d
 		}
 	}
 	return cfg

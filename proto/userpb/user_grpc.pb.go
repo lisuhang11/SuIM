@@ -19,19 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_Register_FullMethodName             = "/user.UserService/Register"
-	UserService_Login_FullMethodName                = "/user.UserService/Login"
-	UserService_GetUser_FullMethodName              = "/user.UserService/GetUser"
-	UserService_GetUsersByIDs_FullMethodName        = "/user.UserService/GetUsersByIDs"
-	UserService_UpdateUser_FullMethodName           = "/user.UserService/UpdateUser"
-	UserService_InitiateAvatarUpload_FullMethodName = "/user.UserService/InitiateAvatarUpload"
-	UserService_CompleteAvatarUpload_FullMethodName = "/user.UserService/CompleteAvatarUpload"
-	UserService_DeleteUser_FullMethodName           = "/user.UserService/DeleteUser"
-	UserService_ChangePassword_FullMethodName       = "/user.UserService/ChangePassword"
-	UserService_ValidateToken_FullMethodName        = "/user.UserService/ValidateToken"
-	UserService_RefreshToken_FullMethodName         = "/user.UserService/RefreshToken"
-	UserService_Logout_FullMethodName               = "/user.UserService/Logout"
-	UserService_SearchUsers_FullMethodName          = "/user.UserService/SearchUsers"
+	UserService_Register_FullMethodName                = "/user.UserService/Register"
+	UserService_Login_FullMethodName                   = "/user.UserService/Login"
+	UserService_GetUser_FullMethodName                 = "/user.UserService/GetUser"
+	UserService_GetUsersByIDs_FullMethodName           = "/user.UserService/GetUsersByIDs"
+	UserService_UpdateUser_FullMethodName              = "/user.UserService/UpdateUser"
+	UserService_InitiateAvatarUpload_FullMethodName    = "/user.UserService/InitiateAvatarUpload"
+	UserService_CompleteAvatarUpload_FullMethodName    = "/user.UserService/CompleteAvatarUpload"
+	UserService_DeleteUser_FullMethodName              = "/user.UserService/DeleteUser"
+	UserService_ChangePassword_FullMethodName          = "/user.UserService/ChangePassword"
+	UserService_ValidateToken_FullMethodName           = "/user.UserService/ValidateToken"
+	UserService_RefreshToken_FullMethodName            = "/user.UserService/RefreshToken"
+	UserService_Logout_FullMethodName                  = "/user.UserService/Logout"
+	UserService_SearchUsers_FullMethodName             = "/user.UserService/SearchUsers"
+	UserService_SetGlobalRecvMessageOpt_FullMethodName = "/user.UserService/SetGlobalRecvMessageOpt"
+	UserService_GetGlobalRecvMessageOpt_FullMethodName = "/user.UserService/GetGlobalRecvMessageOpt"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -39,6 +41,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // UserService provides user management and authentication RPCs.
+// Success/failure is conveyed by gRPC status; response messages carry business data only.
 type UserServiceClient interface {
 	Register(ctx context.Context, in *RegisterReq, opts ...grpc.CallOption) (*RegisterResp, error)
 	Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginResp, error)
@@ -53,6 +56,9 @@ type UserServiceClient interface {
 	RefreshToken(ctx context.Context, in *RefreshTokenReq, opts ...grpc.CallOption) (*RefreshTokenResp, error)
 	Logout(ctx context.Context, in *LogoutReq, opts ...grpc.CallOption) (*LogoutResp, error)
 	SearchUsers(ctx context.Context, in *SearchUsersReq, opts ...grpc.CallOption) (*SearchUsersResp, error)
+	// 全局消息接收选项：0 正常接收 1 不接收消息 2 接收但不推送通知
+	SetGlobalRecvMessageOpt(ctx context.Context, in *SetGlobalRecvMessageOptReq, opts ...grpc.CallOption) (*SetGlobalRecvMessageOptResp, error)
+	GetGlobalRecvMessageOpt(ctx context.Context, in *GetGlobalRecvMessageOptReq, opts ...grpc.CallOption) (*GetGlobalRecvMessageOptResp, error)
 }
 
 type userServiceClient struct {
@@ -193,11 +199,32 @@ func (c *userServiceClient) SearchUsers(ctx context.Context, in *SearchUsersReq,
 	return out, nil
 }
 
+func (c *userServiceClient) SetGlobalRecvMessageOpt(ctx context.Context, in *SetGlobalRecvMessageOptReq, opts ...grpc.CallOption) (*SetGlobalRecvMessageOptResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetGlobalRecvMessageOptResp)
+	err := c.cc.Invoke(ctx, UserService_SetGlobalRecvMessageOpt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) GetGlobalRecvMessageOpt(ctx context.Context, in *GetGlobalRecvMessageOptReq, opts ...grpc.CallOption) (*GetGlobalRecvMessageOptResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGlobalRecvMessageOptResp)
+	err := c.cc.Invoke(ctx, UserService_GetGlobalRecvMessageOpt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
 //
 // UserService provides user management and authentication RPCs.
+// Success/failure is conveyed by gRPC status; response messages carry business data only.
 type UserServiceServer interface {
 	Register(context.Context, *RegisterReq) (*RegisterResp, error)
 	Login(context.Context, *LoginReq) (*LoginResp, error)
@@ -212,6 +239,9 @@ type UserServiceServer interface {
 	RefreshToken(context.Context, *RefreshTokenReq) (*RefreshTokenResp, error)
 	Logout(context.Context, *LogoutReq) (*LogoutResp, error)
 	SearchUsers(context.Context, *SearchUsersReq) (*SearchUsersResp, error)
+	// 全局消息接收选项：0 正常接收 1 不接收消息 2 接收但不推送通知
+	SetGlobalRecvMessageOpt(context.Context, *SetGlobalRecvMessageOptReq) (*SetGlobalRecvMessageOptResp, error)
+	GetGlobalRecvMessageOpt(context.Context, *GetGlobalRecvMessageOptReq) (*GetGlobalRecvMessageOptResp, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -260,6 +290,12 @@ func (UnimplementedUserServiceServer) Logout(context.Context, *LogoutReq) (*Logo
 }
 func (UnimplementedUserServiceServer) SearchUsers(context.Context, *SearchUsersReq) (*SearchUsersResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method SearchUsers not implemented")
+}
+func (UnimplementedUserServiceServer) SetGlobalRecvMessageOpt(context.Context, *SetGlobalRecvMessageOptReq) (*SetGlobalRecvMessageOptResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetGlobalRecvMessageOpt not implemented")
+}
+func (UnimplementedUserServiceServer) GetGlobalRecvMessageOpt(context.Context, *GetGlobalRecvMessageOptReq) (*GetGlobalRecvMessageOptResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGlobalRecvMessageOpt not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -516,6 +552,42 @@ func _UserService_SearchUsers_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_SetGlobalRecvMessageOpt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetGlobalRecvMessageOptReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).SetGlobalRecvMessageOpt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_SetGlobalRecvMessageOpt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).SetGlobalRecvMessageOpt(ctx, req.(*SetGlobalRecvMessageOptReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_GetGlobalRecvMessageOpt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGlobalRecvMessageOptReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetGlobalRecvMessageOpt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetGlobalRecvMessageOpt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetGlobalRecvMessageOpt(ctx, req.(*GetGlobalRecvMessageOptReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -574,6 +646,14 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchUsers",
 			Handler:    _UserService_SearchUsers_Handler,
+		},
+		{
+			MethodName: "SetGlobalRecvMessageOpt",
+			Handler:    _UserService_SetGlobalRecvMessageOpt_Handler,
+		},
+		{
+			MethodName: "GetGlobalRecvMessageOpt",
+			Handler:    _UserService_GetGlobalRecvMessageOpt_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

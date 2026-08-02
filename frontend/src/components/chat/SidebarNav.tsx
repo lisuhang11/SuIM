@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useChat } from "@/contexts/ChatContext";
 import { cn } from "@/lib/utils";
 import UserAvatar from "../shared/UserAvatar";
+import { ThemeToggle } from "../shared/ThemeToggle";
 
 export type NavSection = "chats" | "friends" | "groups";
 
@@ -22,38 +23,40 @@ export default function SidebarNav({ activeSection, onNavigate, onOpenProfile }:
   const items = [
     { id: "chats" as const, label: "消息", icon: MessageCircle, badge: unread },
     { id: "friends" as const, label: "通讯录", icon: UserRound, badge: friendRequestBadge },
-    { id: "groups" as const, label: "群组", icon: UsersRound, badge: 1 },
+    { id: "groups" as const, label: "群组", icon: UsersRound, badge: 0 },
   ];
 
   return (
-    <aside className="z-30 flex h-16 w-full flex-shrink-0 items-center border-t border-slate-800 bg-[#172033] px-3 text-slate-300 md:h-full md:w-[76px] md:flex-col md:border-r md:border-t-0 md:px-0 md:py-4">
+    <aside className="z-30 flex h-16 w-full flex-shrink-0 items-center border-t border-white/10 bg-rail px-3 text-zinc-400 md:h-full md:w-[72px] md:flex-col md:border-r md:border-t-0 md:border-white/10 md:px-0 md:py-4">
       <button
         onClick={onOpenProfile}
-        className="group relative hidden h-11 w-11 items-center justify-center rounded-full md:flex"
+        className="group relative hidden h-10 w-10 items-center justify-center rounded-control md:flex"
         title="个人信息"
       >
-        <UserAvatar src={user?.avatar} name={user?.displayName || "我"} size="md" className="ring-2 ring-white/20" />
-        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#172033] bg-emerald-400" />
+        <UserAvatar src={user?.avatar} name={user?.displayName || "我"} size="md" className="rounded-control ring-1 ring-white/15" />
+        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-rail bg-accent" />
       </button>
 
-      <nav className="flex flex-1 items-center justify-around md:mt-5 md:w-full md:flex-none md:flex-col md:gap-2">
+      <nav className="flex flex-1 items-center justify-around md:mt-5 md:w-full md:flex-none md:flex-col md:gap-1.5">
         {items.map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
             className={cn(
-              "relative flex h-14 min-w-[64px] flex-col items-center justify-center gap-1 rounded-md text-[11px] transition-colors md:h-14 md:w-[60px] md:min-w-0",
+              "ui-press relative flex h-14 min-w-[64px] flex-col items-center justify-center gap-1 rounded-control text-[11px] transition duration-ui md:h-14 md:w-[56px] md:min-w-0",
               activeSection === item.id
                 ? "bg-white/10 text-white"
-                : "text-slate-400 hover:bg-white/5 hover:text-white"
+                : "text-zinc-500 hover:bg-white/5 hover:text-zinc-200"
             )}
             title={item.label}
           >
-            {activeSection === item.id && <span className="absolute left-0 hidden h-6 w-[3px] rounded-r bg-emerald-400 md:block" />}
-            <item.icon className="h-5 w-5" />
+            {activeSection === item.id && (
+              <span className="absolute left-0 hidden h-5 w-[3px] rounded-r bg-accent md:block" />
+            )}
+            <item.icon className="h-5 w-5" strokeWidth={1.75} />
             <span>{item.label}</span>
             {item.badge > 0 && (
-              <span className="absolute right-2 top-1 min-w-[17px] rounded-full bg-rose-500 px-1 text-center text-[10px] font-semibold leading-[17px] text-white md:right-1">
+              <span className="absolute right-2 top-1 min-w-[17px] rounded-full bg-danger px-1 text-center text-[10px] font-semibold leading-[17px] text-white md:right-1">
                 {item.badge > 99 ? "99+" : item.badge}
               </span>
             )}
@@ -61,20 +64,32 @@ export default function SidebarNav({ activeSection, onNavigate, onOpenProfile }:
         ))}
       </nav>
 
-      <button onClick={onOpenProfile} className="relative ml-1 flex h-11 w-11 items-center justify-center md:hidden" title="个人信息">
-        <UserAvatar src={user?.avatar} name={user?.displayName || "我"} size="sm" className="ring-2 ring-white/20" />
-        <span className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-[#172033] bg-emerald-400" />
+      <button
+        onClick={onOpenProfile}
+        className="relative ml-1 flex h-11 w-11 items-center justify-center md:hidden"
+        title="个人信息"
+      >
+        <UserAvatar src={user?.avatar} name={user?.displayName || "我"} size="sm" className="rounded-control ring-1 ring-white/15" />
+        <span className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-rail bg-accent" />
       </button>
 
       <div className="hidden flex-1 md:block" />
       <div className="hidden flex-col items-center gap-2 md:flex">
-        <button className="relative flex h-10 w-10 items-center justify-center rounded-md text-slate-400 hover:bg-white/5 hover:text-white" title="通知中心">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-500" />
+        <ThemeToggle compact />
+        <button
+          className="relative flex h-9 w-9 items-center justify-center rounded-control text-zinc-500 hover:bg-white/5 hover:text-zinc-200"
+          title="通知中心"
+        >
+          <Bell className="h-4 w-4" strokeWidth={1.75} />
+          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-danger" />
         </button>
         <div className="my-1 h-px w-8 bg-white/10" />
-        <button onClick={logout} className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-rose-500/10 hover:text-rose-400" title="退出登录">
-          <LogOut className="h-4 w-4" />
+        <button
+          onClick={logout}
+          className="flex h-9 w-9 items-center justify-center rounded-control text-zinc-500 hover:bg-danger/10 hover:text-danger"
+          title="退出登录"
+        >
+          <LogOut className="h-4 w-4" strokeWidth={1.75} />
         </button>
       </div>
     </aside>

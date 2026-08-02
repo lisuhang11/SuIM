@@ -30,8 +30,14 @@ func MustOpen(cfg *config.Config) *gorm.DB {
 	sqlDB.SetMaxOpenConns(25)
 	sqlDB.SetMaxIdleConns(10)
 
-	// 自动迁移好友请求、好友和拉黑表结构。
-	if err := db.AutoMigrate(&types.FriendRequest{}, &types.Friend{}, &types.Black{}); err != nil {
+	// 自动迁移好友请求、好友、拉黑与好友 version 表结构。
+	if err := db.AutoMigrate(
+		&types.FriendRequest{},
+		&types.Friend{},
+		&types.Black{},
+		&types.FriendVersion{},
+		&types.FriendVersionLog{},
+	); err != nil {
 		panic(fmt.Sprintf("failed to auto-migrate: %v", err))
 	}
 

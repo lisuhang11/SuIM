@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 
+	"group/internal/cache"
 	"group/internal/client"
 	"group/internal/config"
 	"group/internal/database"
@@ -84,9 +85,19 @@ func main() {
 	defer fileConn.Close()
 	fileClient := filePB.NewFileServiceClient(fileConn)
 
+	rdb, err := cache.NewRedisClient(cache.Options{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+		DB:       cfg.RedisDB,
+	})
+	if err != nil {
+		slog.Warn("redis unavailable, group info cache disabled", "error", err)
+	}
+	groupCache := cache.NewGroupInfoCache(rdb, cfg.GroupInfoCacheTTL)
+
 	// 组合根：将按功能聚合的仓库和 user 校验器注入到服务层。
 	groupRepo := repository.NewGroupRepository(db)
-	groupSvc := service.NewGroupService(groupRepo, userVerifier, eventPublisher)
+	groupSvc := service.NewGroupService(groupRepo, userVerifier, groupCache, eventPublisher)
 
 	grpcSvr := grpc.NewServer(
 		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor(userVerifier)),

@@ -58,6 +58,11 @@ func NewNotificationSender(opts ...Option) *NotificationSender {
 // 内部异步执行（goroutine），绝不阻塞业务主流程。
 func (s *NotificationSender) Notification(ctx context.Context, sendID, recvID string, contentType int32, payload any) {
 	sessionType := s.sessionTypeConf[contentType]
+	s.NotificationWithSessionType(ctx, sendID, recvID, contentType, sessionType, payload)
+}
+
+// NotificationWithSessionType 与 Notification 相同，但显式指定 sessionType（群撤回等场景）。
+func (s *NotificationSender) NotificationWithSessionType(ctx context.Context, sendID, recvID string, contentType, sessionType int32, payload any) {
 	go s.send(ctx, sendID, recvID, contentType, sessionType, payload)
 }
 
@@ -76,7 +81,7 @@ func (s *NotificationSender) send(ctx context.Context, sendID, recvID string, co
 		return
 	}
 
-	// 2. 组装 MsgData
+	// 2. 组装 MsgData（conversation_id 可由 tip payload 自带，客户端从 content 解析）
 	now := time.Now().UnixMilli()
 	msg := &messagepb.MsgData{
 		ClientMsgId: uuid.NewString(),
@@ -88,6 +93,12 @@ func (s *NotificationSender) send(ctx context.Context, sendID, recvID string, co
 		Content:     string(contentJSON),
 		SendTime:    now,
 		CreateTime:  now,
+	}
+	var probe struct {
+		ConversationID string `json:"conversation_id"`
+	}
+	if json.Unmarshal(contentJSON, &probe) == nil && probe.ConversationID != "" {
+		msg.ConversationId = probe.ConversationID
 	}
 
 	// 3. 可选：填充发送者昵称/头像

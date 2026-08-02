@@ -31,8 +31,9 @@ SuIM/                              # 仓库根（go.work 聚合）
             ├── handler/           # 传输层适配（gRPC handler）
             ├── logger/            # 结构化日志封装（slog，携带 request-id）
             ├── middleware/        # gRPC 拦截器（recovery / 日志 / 链路）
-            ├── repository/        # 数据访问层（GORM 实现，按领域聚合）
-            ├── service/           # 业务逻辑层
+            ├── repository/        # 数据访问层（GORM 实现，按领域聚合；不碰 Redis）
+            ├── service/           # 业务逻辑层（含 cache-aside 编排）
+            ├── cache/             # 可选：Redis key / 序列化 / Get·Set·Del 助手
             └── types/             # 领域类型（GORM 模型）
                 └── interfaces/    # Service / Repository 接口契约
 ```
@@ -47,11 +48,11 @@ SuIM/                              # 仓库根（go.work 聚合）
 ┌─────────────────────────────────────────┐
 │  proto / handler（传输层）               │  ← proto 类型 ↔ 领域类型转换
 ├─────────────────────────────────────────┤
-│  service（业务逻辑层）                   │  ← 纯业务逻辑，依赖接口
+│  service（业务逻辑层）                   │  ← 业务 + cache-aside；可持有 *redis.Client
 ├─────────────────────────────────────────┤
-│  repository（数据访问层）                │  ← GORM 实现，满足接口契约
+│  repository（数据访问层）                │  ← 纯 GORM，不感知缓存
 ├─────────────────────────────────────────┤
-│  database（基础设施 / config / logger）  │  ← 连接池、迁移、配置
+│  cache / database / config / logger      │  ← Redis 助手、连接池、配置
 └─────────────────────────────────────────┘
 ```
 
@@ -61,6 +62,8 @@ SuIM/                              # 仓库根（go.work 聚合）
 handler ──▶ service interface ──▶ repository interface
    │              ↑                     ↑
    │         service impl          repository impl
+   │              │
+   │              └──▶ cache helpers / *redis.Client（可选）
    └──────────────┴─────────────────────┘
            全部经由 types/interfaces/ 做依赖倒置
 ```
@@ -70,6 +73,50 @@ handler ──▶ service interface ──▶ repository interface
 - **types/interfaces/** 定义所有接口契约，是各层之间的唯一耦合点。
 - **禁止上层直接依赖下层实现**（如 handler 直接 import `repository` 包）。
 - 依赖装配（wire）集中在 `cmd/server/main.go` 组合根，不使用 DI 框架，全部手动构造函数注入（与 WeKnora 一致）。
+
+---
+
+## 二.A、缓存约定（对齐 WeKnora，非 OpenIM 装饰 Repository）
+
+> WeKnora：**repository 只碰 DB**；`*redis.Client` 注入 **service**（或独立 `stream` / `ratelimit` 包）做临时状态与旁路缓存。本项目用户资料读缓存采用同一风格。
+
+### 原则
+
+1. **repository 禁止依赖 Redis**，不写 cache-aside，不在 repo 内 Get/Set。
+2. **cache-aside 编排放在 service**：读先缓存 → miss 调 repository → 回填；写成功后删键（不主动回填）。
+3. **handler 不碰 Redis**。
+4. Redis key / JSON 编解码可抽到 `internal/cache`，由 service 调用；避免在 service 里散落魔法字符串。
+5. Redis 不可用时（client 为 nil 或 Get 失败）：**降级直读 DB**，不阻断主路径；写失效失败只打日志。
+6. **禁止缓存密钥字段**：`password_hash`、明文 token 等不得写入 Redis。用户资料缓存仅放可对外字段（与 `UserInfo` / `json:"-"` 一致）。
+
+### Cache-aside 伪代码（GetUsersByIDs）
+
+```go
+func (s *userService) GetUsersByIDs(ctx context.Context, ids []string) (map[string]*types.User, error) {
+    // 1) 批量尝试缓存
+    // 2) missIDs → s.userRepo.GetUsersByIDs
+    // 3) 回填缓存（带 TTL）
+    // 4) 合并返回；缺失 ID 不出现在 map 中
+}
+```
+
+写路径（`UpdateUser` / `DeleteUser` / `SetGlobalRecvMessageOpt` / 头像完成后的资料更新）在 DB 成功后：
+
+```go
+_ = s.userCache.Del(ctx, userID) // 删 USER_INFO:{userID}
+```
+
+### Key 约定
+
+| Key | 值 | TTL 建议 |
+|-----|----|----------|
+| `USER_INFO:{userID}` | 用户公开资料 JSON（无密码） | 如 12h |
+
+跨服务进程本地缓存（OpenIM `rpccache`）另议，不在本层混入。
+
+### 用户资料 REST 读路径
+
+对外只保留批量读：`GET /api/v1/users/batch?ids=...`（对齐 OpenIM `getDesignateUsers`）。本人资料用 `ids=<loginUserID>`；**不**再提供 `GET /users/me` / `GET /users/:id` 作为读接口。写接口（如 `PUT /users/me`、头像）可保留。
 
 ---
 

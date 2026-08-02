@@ -6,8 +6,12 @@ etcd_endpoints:
 db_host: "127.0.0.1"
 db_port: 3306
 db_user: "root"
-db_password: ""
+db_password: "suim123"
 db_name: "suim"
 jwt_secret: "change-me-in-production"
 access_token_ttl: "24h"
 refresh_token_ttl: "720h"
+redis_addr: "127.0.0.1:6379"
+redis_password: "suim-redis"
+redis_db: 0
+user_info_cache_ttl: "12h"

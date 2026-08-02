@@ -4,7 +4,7 @@ etcd_endpoints: ["127.0.0.1:2379"]
 db_host: "127.0.0.1"
 db_port: 3306
 db_user: "root"
-db_password: ""
+db_password: "suim123"
 db_name: "suim"
 jwt_secret: "change-me-in-production"
 minio_endpoint: "127.0.0.1:10005"

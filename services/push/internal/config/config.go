@@ -20,6 +20,7 @@ type Config struct {
 	DBUser        string   `yaml:"db_user"`
 	DBPassword    string   `yaml:"db_password"`
 	DBName        string   `yaml:"db_name"`
+	JWTSecret     string   `yaml:"jwt_secret"`
 }
 
 // defaults 返回内置默认配置。
@@ -33,6 +34,7 @@ func defaults() *Config {
 		DBUser:        "root",
 		DBPassword:    "",
 		DBName:        "suim",
+		JWTSecret:     "change-me-in-production",
 	}
 }
 
@@ -74,6 +76,9 @@ func LoadFromFile(path string) *Config {
 	}
 	if v := os.Getenv("DB_NAME"); v != "" {
 		cfg.DBName = v
+	}
+	if v := os.Getenv("JWT_SECRET"); v != "" {
+		cfg.JWTSecret = v
 	}
 	return cfg
 }

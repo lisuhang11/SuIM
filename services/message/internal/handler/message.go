@@ -50,8 +50,11 @@ func appErrorToStatus(err error) error {
 		code = codes.InvalidArgument
 	case apperrors.CodeMessageNotFound, apperrors.CodeNotFound:
 		code = codes.NotFound
-	case apperrors.CodeRevokePermission:
+	case apperrors.CodeRevokePermission, apperrors.CodeBlockedByPeer,
+		apperrors.CodeNotFriend, apperrors.CodeNotGroupMember:
 		code = codes.PermissionDenied
+	case apperrors.CodeRevokeExpired:
+		code = codes.FailedPrecondition
 	default:
 		code = codes.Internal
 	}
@@ -217,6 +220,7 @@ func (h *messageHandler) SendMsg(ctx context.Context, req *pb.SendMsgReq) (*pb.S
 		SendTime:    saved.SendTime,
 		DocId:       saved.DocID,
 		MsgIndex:    int32(saved.MsgIndex),
+		ClientMsgId: saved.ClientMsgID,
 	}, nil
 }
 
@@ -293,6 +297,42 @@ func (h *messageHandler) MarkMsgsAsRead(ctx context.Context, req *pb.MarkMsgsAsR
 	return &pb.MarkMsgsAsReadResp{}, nil
 }
 
+// GetMaxSeq 获取会话最大/最小 seq。
+func (h *messageHandler) GetMaxSeq(ctx context.Context, req *pb.GetMaxSeqReq) (*pb.GetMaxSeqResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m, err := h.svc.GetMaxSeq(ctx, userID, req.GetConversationIds())
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	maxSeqs := make(map[string]int64, len(m))
+	minSeqs := make(map[string]int64, len(m))
+	for id, b := range m {
+		maxSeqs[id] = b.MaxSeq
+		minSeqs[id] = b.MinSeq
+	}
+	return &pb.GetMaxSeqResp{MaxSeqs: maxSeqs, MinSeqs: minSeqs}, nil
+}
+
+// GetConversationsHasReadAndMaxSeq 获取会话已读 seq 与最大 seq。
+func (h *messageHandler) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *pb.GetConversationsHasReadAndMaxSeqReq) (*pb.GetConversationsHasReadAndMaxSeqResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m, err := h.svc.GetConversationsHasReadAndMaxSeq(ctx, userID, req.GetConversationIds())
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	out := make(map[string]*pb.Seqs, len(m))
+	for id, p := range m {
+		out[id] = &pb.Seqs{MaxSeq: p.MaxSeq, HasReadSeq: p.HasReadSeq, MaxSeqTime: p.MaxSeqTime}
+	}
+	return &pb.GetConversationsHasReadAndMaxSeqResp{Seqs: out}, nil
+}
+
 // DeleteMsgs 删除消息。
 func (h *messageHandler) DeleteMsgs(ctx context.Context, req *pb.DeleteMsgsReq) (*pb.DeleteMsgsResp, error) {
 	userID, err := authenticatedUserID(ctx)
@@ -304,4 +344,43 @@ func (h *messageHandler) DeleteMsgs(ctx context.Context, req *pb.DeleteMsgsReq) 
 		return nil, appErrorToStatus(err)
 	}
 	return &pb.DeleteMsgsResp{}, nil
+}
+
+// GetActiveConversation 获取活跃会话摘要（max_seq + last_time）。
+func (h *messageHandler) GetActiveConversation(ctx context.Context, req *pb.GetActiveConversationReq) (*pb.GetActiveConversationResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list, err := h.svc.GetActiveConversation(ctx, userID, req.GetConversationIds(), req.GetLimit())
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	out := make([]*pb.ActiveConversation, 0, len(list))
+	for _, c := range list {
+		out = append(out, &pb.ActiveConversation{
+			ConversationId: c.ConversationID,
+			MaxSeq:         c.MaxSeq,
+			LastTime:       c.LastTime,
+		})
+	}
+	return &pb.GetActiveConversationResp{Conversations: out}, nil
+}
+
+// GetLastMessage 获取每个会话最后一条可见消息。
+func (h *messageHandler) GetLastMessage(ctx context.Context, req *pb.GetLastMessageReq) (*pb.GetLastMessageResp, error) {
+	userID, err := authenticatedUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	msgs, err := h.svc.GetLastMessage(ctx, userID, req.GetConversationIds())
+	if err != nil {
+		return nil, appErrorToStatus(err)
+	}
+	out := make(map[string]*pb.MsgData, len(msgs))
+	for id, m := range msgs {
+		msg := m
+		out[id] = messageToProto(&msg)
+	}
+	return &pb.GetLastMessageResp{Msgs: out}, nil
 }

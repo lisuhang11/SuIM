@@ -57,7 +57,10 @@ func (h *ConversationHandler) SetConversation(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	if req.Conversation != nil {
+		req.Conversation.OwnerUserId = userIDFromCtx(c)
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.SetConversation(ctx, &req)
@@ -72,10 +75,10 @@ func (h *ConversationHandler) SetConversation(c *gin.Context) {
 // GetConversation GET /conversations/:id?owner_user_id=
 func (h *ConversationHandler) GetConversation(c *gin.Context) {
 	req := &pb.GetConversationReq{
-		OwnerUserId:    c.Query("owner_user_id"),
+		OwnerUserId:    userIDFromCtx(c),
 		ConversationId: c.Param("id"),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetConversation(ctx, req)
@@ -90,10 +93,10 @@ func (h *ConversationHandler) GetConversation(c *gin.Context) {
 // GetConversations GET /conversations/batch?owner_user_id=&ids=1,2,3
 func (h *ConversationHandler) GetConversations(c *gin.Context) {
 	req := &pb.GetConversationsReq{
-		OwnerUserId:     c.Query("owner_user_id"),
+		OwnerUserId:     userIDFromCtx(c),
 		ConversationIds: splitComma(c.Query("ids")),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetConversations(ctx, req)
@@ -107,8 +110,8 @@ func (h *ConversationHandler) GetConversations(c *gin.Context) {
 
 // GetAllConversations GET /conversations/all?owner_user_id=
 func (h *ConversationHandler) GetAllConversations(c *gin.Context) {
-	req := &pb.GetAllConversationsReq{OwnerUserId: c.Query("owner_user_id")}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req := &pb.GetAllConversationsReq{OwnerUserId: userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetAllConversations(ctx, req)
@@ -123,12 +126,12 @@ func (h *ConversationHandler) GetAllConversations(c *gin.Context) {
 // GetSortedConversationList GET /conversations/sorted?user_id=&ids=1,2,3&offset=0&limit=20
 func (h *ConversationHandler) GetSortedConversationList(c *gin.Context) {
 	req := &pb.GetSortedConversationListReq{
-		UserId:          firstNonEmpty(c.Query("user_id"), userIDFromCtx(c)),
+		UserId:          userIDFromCtx(c),
 		ConversationIds: splitComma(c.Query("ids")),
 		Offset:          parseInt32(c.Query("offset"), 0),
 		Limit:           parseInt32(c.Query("limit"), 20),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetSortedConversationList(ctx, req)
@@ -147,7 +150,11 @@ func (h *ConversationHandler) CreateSingleChatConversations(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.SendId = userIDFromCtx(c)
+	if req.ConversationType == 0 {
+		req.ConversationType = 1
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.CreateSingleChatConversations(ctx, &req)
@@ -166,7 +173,7 @@ func (h *ConversationHandler) CreateGroupChatConversations(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.CreateGroupChatConversations(ctx, &req)
@@ -186,7 +193,8 @@ func (h *ConversationHandler) SetConversationMaxSeq(c *gin.Context) {
 		return
 	}
 	req.ConversationId = c.Param("id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.OwnerUserIds = []string{userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.SetConversationMaxSeq(ctx, &req)
@@ -206,7 +214,8 @@ func (h *ConversationHandler) SetConversationMinSeq(c *gin.Context) {
 		return
 	}
 	req.ConversationId = c.Param("id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.OwnerUserIds = []string{userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.SetConversationMinSeq(ctx, &req)
@@ -220,8 +229,8 @@ func (h *ConversationHandler) SetConversationMinSeq(c *gin.Context) {
 
 // GetConversationIDs GET /conversations/ids?user_id=
 func (h *ConversationHandler) GetConversationIDs(c *gin.Context) {
-	req := &pb.GetConversationIDsReq{UserId: firstNonEmpty(c.Query("user_id"), userIDFromCtx(c))}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req := &pb.GetConversationIDsReq{UserId: userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetConversationIDs(ctx, req)
@@ -240,7 +249,8 @@ func (h *ConversationHandler) SetConversations(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.UserIds = []string{userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.SetConversations(ctx, &req)
@@ -260,7 +270,8 @@ func (h *ConversationHandler) UpdateConversation(c *gin.Context) {
 		return
 	}
 	req.ConversationId = c.Param("id")
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.UserIds = []string{userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.UpdateConversation(ctx, &req)
@@ -277,7 +288,7 @@ func (h *ConversationHandler) GetConversationsByConversationID(c *gin.Context) {
 	req := &pb.GetConversationsByConversationIDReq{
 		ConversationIds: splitComma(c.Query("ids")),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetConversationsByConversationID(ctx, req)
@@ -292,7 +303,7 @@ func (h *ConversationHandler) GetConversationsByConversationID(c *gin.Context) {
 // GetRecvMsgNotNotifyUserIDs GET /conversations/:id/not-notify-users?group_id=
 func (h *ConversationHandler) GetRecvMsgNotNotifyUserIDs(c *gin.Context) {
 	req := &pb.GetRecvMsgNotNotifyUserIDsReq{GroupId: c.Query("group_id")}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetRecvMsgNotNotifyUserIDs(ctx, req)
@@ -308,9 +319,9 @@ func (h *ConversationHandler) GetRecvMsgNotNotifyUserIDs(c *gin.Context) {
 func (h *ConversationHandler) GetConversationOfflinePushUserIDs(c *gin.Context) {
 	req := &pb.GetConversationOfflinePushUserIDsReq{
 		ConversationId: c.Param("id"),
-		UserIds:        splitComma(c.Query("user_ids")),
+		UserIds:        []string{userIDFromCtx(c)},
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetConversationOfflinePushUserIDs(ctx, req)
@@ -327,7 +338,7 @@ func (h *ConversationHandler) GetConversationNotReceiveMessageUserIDs(c *gin.Con
 	req := &pb.GetConversationNotReceiveMessageUserIDsReq{
 		ConversationId: c.Param("id"),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetConversationNotReceiveMessageUserIDs(ctx, req)
@@ -341,8 +352,8 @@ func (h *ConversationHandler) GetConversationNotReceiveMessageUserIDs(c *gin.Con
 
 // GetPinnedConversationIDs GET /conversations/pinned?user_id=
 func (h *ConversationHandler) GetPinnedConversationIDs(c *gin.Context) {
-	req := &pb.GetPinnedConversationIDsReq{UserId: firstNonEmpty(c.Query("user_id"), userIDFromCtx(c))}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req := &pb.GetPinnedConversationIDsReq{UserId: userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetPinnedConversationIDs(ctx, req)
@@ -356,8 +367,8 @@ func (h *ConversationHandler) GetPinnedConversationIDs(c *gin.Context) {
 
 // GetNotNotifyConversationIDs GET /conversations/not-notify?user_id=
 func (h *ConversationHandler) GetNotNotifyConversationIDs(c *gin.Context) {
-	req := &pb.GetNotNotifyConversationIDsReq{UserId: firstNonEmpty(c.Query("user_id"), userIDFromCtx(c))}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req := &pb.GetNotNotifyConversationIDsReq{UserId: userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetNotNotifyConversationIDs(ctx, req)
@@ -376,7 +387,8 @@ func (h *ConversationHandler) DeleteConversations(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.OwnerUserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.DeleteConversations(ctx, &req)
@@ -395,7 +407,8 @@ func (h *ConversationHandler) UpdateConversationsByUser(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.UserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.UpdateConversationsByUser(ctx, &req)
@@ -409,8 +422,8 @@ func (h *ConversationHandler) UpdateConversationsByUser(c *gin.Context) {
 
 // GetUserConversationIDsHash GET /conversations/hash?owner_user_id=
 func (h *ConversationHandler) GetUserConversationIDsHash(c *gin.Context) {
-	req := &pb.GetUserConversationIDsHashReq{OwnerUserId: c.Query("owner_user_id")}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req := &pb.GetUserConversationIDsHashReq{OwnerUserId: userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetUserConversationIDsHash(ctx, req)
@@ -425,11 +438,11 @@ func (h *ConversationHandler) GetUserConversationIDsHash(c *gin.Context) {
 // GetOwnerConversation GET /conversations/owner?user_id=&offset=0&limit=20
 func (h *ConversationHandler) GetOwnerConversation(c *gin.Context) {
 	req := &pb.GetOwnerConversationReq{
-		UserId: firstNonEmpty(c.Query("user_id"), userIDFromCtx(c)),
+		UserId: userIDFromCtx(c),
 		Offset: parseInt32(c.Query("offset"), 0),
 		Limit:  parseInt32(c.Query("limit"), 20),
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetOwnerConversation(ctx, req)
@@ -448,7 +461,7 @@ func (h *ConversationHandler) ClearUserConversationMsg(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.ClearUserConversationMsg(ctx, &req)
@@ -462,7 +475,7 @@ func (h *ConversationHandler) ClearUserConversationMsg(c *gin.Context) {
 
 // GetConversationsNeedClearMsg GET /conversations/need-clear
 func (h *ConversationHandler) GetConversationsNeedClearMsg(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetConversationsNeedClearMsg(ctx, &pb.GetConversationsNeedClearMsgReq{})
@@ -476,8 +489,8 @@ func (h *ConversationHandler) GetConversationsNeedClearMsg(c *gin.Context) {
 
 // GetFullOwnerConversationIDs GET /conversations/full-ids?user_id=
 func (h *ConversationHandler) GetFullOwnerConversationIDs(c *gin.Context) {
-	req := &pb.GetFullOwnerConversationIDsReq{UserId: firstNonEmpty(c.Query("user_id"), userIDFromCtx(c))}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req := &pb.GetFullOwnerConversationIDsReq{UserId: userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetFullOwnerConversationIDs(ctx, req)
@@ -491,8 +504,8 @@ func (h *ConversationHandler) GetFullOwnerConversationIDs(c *gin.Context) {
 
 // GetIncrementalConversation GET /conversations/incremental?user_id=
 func (h *ConversationHandler) GetIncrementalConversation(c *gin.Context) {
-	req := &pb.GetIncrementalConversationReq{UserId: firstNonEmpty(c.Query("user_id"), userIDFromCtx(c))}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req := &pb.GetIncrementalConversationReq{UserId: userIDFromCtx(c)}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.GetIncrementalConversation(ctx, req)

@@ -48,7 +48,7 @@ func main() {
 	pushSvc := service.NewPushService(pushRepo)
 
 	grpcSvr := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor()),
+		grpc.UnaryInterceptor(middleware.UnaryServerInterceptor(cfg.JWTSecret)),
 	)
 	pb.RegisterPushMsgServiceServer(grpcSvr, handler.NewPushHandler(pushSvc))
 	reflection.Register(grpcSvr) // 启用 grpcurl 调试支持

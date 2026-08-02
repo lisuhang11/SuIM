@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "SuIM/proto/userpb"
+	"apigateway/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,18 +27,20 @@ func NewUserHandler(client pb.UserServiceClient) *UserHandler {
 func (h *UserHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/register", h.handleRegister)
 	r.POST("/login", h.Login)
-	r.GET("/me", h.GetCurrentUser) // 从 JWT 上下文获取当前用户
+	// 用户资料读统一走 batch（对齐 OpenIM getDesignateUsers）；本人用 ids=<self>。
+	r.GET("/batch", h.GetUsersByIDs)
 	r.POST("/me/avatar/initiate", h.InitiateAvatarUpload)
 	r.POST("/me/avatar/:file_id/complete", h.CompleteAvatarUpload)
-	r.GET("/:id", h.GetUser)
-	r.GET("/batch", h.GetUsersByIDs)
-	r.PUT("/:id", h.UpdateUser)
-	r.DELETE("/:id", h.DeleteUser)
+	r.GET("/me/global-recv-msg-opt", h.GetGlobalRecvMessageOpt)
+	r.PUT("/me/global-recv-msg-opt", h.SetGlobalRecvMessageOpt)
+	r.GET("/search", h.SearchUsers)
 	r.PUT("/password", h.ChangePassword)
 	r.POST("/validate-token", h.ValidateToken)
 	r.POST("/refresh-token", h.RefreshToken)
 	r.POST("/logout", h.Logout)
-	r.GET("/search", h.SearchUsers)
+	r.PUT("/me", h.UpdateMe)
+	r.PUT("/:id", h.UpdateUser)
+	r.DELETE("/:id", h.DeleteUser)
 }
 
 func (h *UserHandler) InitiateAvatarUpload(c *gin.Context) {
@@ -105,19 +108,18 @@ func (h *UserHandler) Login(c *gin.Context) {
 	Respond(c, resp)
 }
 
-// GetCurrentUser GET /users/me — 从 JWT 鉴权上下文中获取当前登录用户信息
-func (h *UserHandler) GetCurrentUser(c *gin.Context) {
+// GetGlobalRecvMessageOpt GET /users/me/global-recv-msg-opt
+func (h *UserHandler) GetGlobalRecvMessageOpt(c *gin.Context) {
 	userID := userIDFromCtx(c)
 	if userID == "" {
-		c.JSON(401, gin.H{"code": 401, "message": "not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "not authenticated"})
 		return
 	}
-	req := &pb.GetUserReq{UserId: userID}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
-	resp, err := h.client.GetUser(ctx, req)
-	recordGRPC("user", "GetUser", err, start)
+	resp, err := h.client.GetGlobalRecvMessageOpt(ctx, &pb.GetGlobalRecvMessageOptReq{UserId: userID})
+	recordGRPC("user", "GetGlobalRecvMessageOpt", err, start)
 	if err != nil {
 		RespondError(c, err)
 		return
@@ -125,14 +127,38 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	Respond(c, resp)
 }
 
-// GetUser GET /users/:id
-func (h *UserHandler) GetUser(c *gin.Context) {
-	req := &pb.GetUserReq{UserId: c.Param("id")}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+// SetGlobalRecvMessageOpt PUT /users/me/global-recv-msg-opt
+func (h *UserHandler) SetGlobalRecvMessageOpt(c *gin.Context) {
+	userID := userIDFromCtx(c)
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "not authenticated"})
+		return
+	}
+	var body struct {
+		GlobalRecvMsgOpt *int32 `json:"global_recv_msg_opt"`
+		// OpenIM 兼容字段名
+		GlobalRecvMsgOptCamel *int32 `json:"globalRecvMsgOpt"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		RespondError(c, err)
+		return
+	}
+	opt := body.GlobalRecvMsgOpt
+	if opt == nil {
+		opt = body.GlobalRecvMsgOptCamel
+	}
+	if opt == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "global_recv_msg_opt is required"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
-	resp, err := h.client.GetUser(ctx, req)
-	recordGRPC("user", "GetUser", err, start)
+	resp, err := h.client.SetGlobalRecvMessageOpt(ctx, &pb.SetGlobalRecvMessageOptReq{
+		UserId:           userID,
+		GlobalRecvMsgOpt: *opt,
+	})
+	recordGRPC("user", "SetGlobalRecvMessageOpt", err, start)
 	if err != nil {
 		RespondError(c, err)
 		return
@@ -140,10 +166,10 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	Respond(c, resp)
 }
 
-// GetUsersByIDs GET /users/batch?ids=1,2,3
+// GetUsersByIDs GET /users/batch?ids=1,2,3 — 唯一用户资料读接口
 func (h *UserHandler) GetUsersByIDs(c *gin.Context) {
-	idsStr := c.Query("ids")
-	if idsStr == "" {
+	queryIDs := c.QueryArray("ids")
+	if len(queryIDs) == 0 {
 		// 也支持 JSON body
 		var req pb.GetUsersByIDsReq
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -163,8 +189,11 @@ func (h *UserHandler) GetUsersByIDs(c *gin.Context) {
 		Respond(c, resp)
 		return
 	}
-	// 从逗号分隔的 query 参数构建请求
-	ids := splitComma(idsStr)
+	// 同时支持 ids=a,b 和 ids=a&ids=b。
+	ids := make([]string, 0, len(queryIDs))
+	for _, value := range queryIDs {
+		ids = append(ids, splitComma(value)...)
+	}
 	req := &pb.GetUsersByIDsReq{UserIds: ids}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 	defer cancel()
@@ -178,11 +207,18 @@ func (h *UserHandler) GetUsersByIDs(c *gin.Context) {
 	Respond(c, resp)
 }
 
-// UpdateUser PUT /users/:id
+// UpdateMe PUT /users/me — 更新当前登录用户资料
+func (h *UserHandler) UpdateMe(c *gin.Context) {
+	c.Params = append(c.Params, gin.Param{Key: "id", Value: "me"})
+	h.UpdateUser(c)
+}
+
+// UpdateUser PUT /users/:id|/me — 仅提交要改的字段，服务端 UpdateByMap。
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	var body struct {
 		Nickname  *string      `json:"nickname"`
 		AvatarURL *string      `json:"avatar_url"`
+		Ex        *string      `json:"ex"`
 		User      *pb.UserInfo `json:"user"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -194,39 +230,40 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "only your own profile can be updated"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
-	defer cancel()
-	current, err := h.client.GetUser(ctx, &pb.GetUserReq{UserId: userID})
-	if err != nil {
-		RespondError(c, err)
-		return
-	}
-	if current.User == nil {
-		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "user not found"})
-		return
-	}
 	if body.User != nil {
-		if body.Nickname == nil {
+		if body.Nickname == nil && body.User.Nickname != "" {
 			body.Nickname = &body.User.Nickname
 		}
-		if body.AvatarURL == nil {
+		if body.AvatarURL == nil && body.User.AvatarUrl != "" {
 			body.AvatarURL = &body.User.AvatarUrl
 		}
+		if body.Ex == nil && body.User.Ex != "" {
+			body.Ex = &body.User.Ex
+		}
 	}
+	info := &pb.UserInfo{UserId: userID}
 	if body.Nickname != nil {
 		nickname := strings.TrimSpace(*body.Nickname)
 		if nickname == "" || len([]rune(nickname)) > 64 {
 			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "nickname must be between 1 and 64 characters"})
 			return
 		}
-		current.User.Nickname = nickname
+		info.Nickname = nickname
 	}
 	if body.AvatarURL != nil {
-		current.User.AvatarUrl = *body.AvatarURL
+		info.AvatarUrl = *body.AvatarURL
 	}
-	req := pb.UpdateUserReq{User: current.User}
+	if body.Ex != nil {
+		info.Ex = *body.Ex
+	}
+	if info.Nickname == "" && info.AvatarUrl == "" && info.Ex == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "at least one field must be updated"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
+	defer cancel()
 	start := time.Now()
-	resp, err := h.client.UpdateUser(ctx, &req)
+	resp, err := h.client.UpdateUser(ctx, &pb.UpdateUserReq{User: info})
 	recordGRPC("user", "UpdateUser", err, start)
 	if err != nil {
 		RespondError(c, err)
@@ -237,8 +274,13 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 // DeleteUser DELETE /users/:id
 func (h *UserHandler) DeleteUser(c *gin.Context) {
-	req := &pb.DeleteUserReq{UserId: c.Param("id")}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	userID := userIDFromCtx(c)
+	if c.Param("id") != userID {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "only your own account can be deleted"})
+		return
+	}
+	req := &pb.DeleteUserReq{UserId: userID}
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.DeleteUser(ctx, req)
@@ -257,7 +299,8 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+	req.UserId = userIDFromCtx(c)
+	ctx, cancel := context.WithTimeout(authenticatedGRPCContext(c), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := h.client.ChangePassword(ctx, &req)
@@ -309,9 +352,9 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 
 // Logout POST /users/logout
 func (h *UserHandler) Logout(c *gin.Context) {
-	var req pb.LogoutReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		RespondError(c, err)
+	req := pb.LogoutReq{Token: middleware.GetToken(c)}
+	if req.Token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "not authenticated"})
 		return
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)

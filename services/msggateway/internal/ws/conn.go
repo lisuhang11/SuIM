@@ -21,8 +21,20 @@ type WSMessage struct {
 	Type    string          `json:"type"`
 	SeqID   string          `json:"seq_id,omitempty"`
 	Data    json.RawMessage `json:"data,omitempty"`
+	Payload json.RawMessage `json:"payload,omitempty"` // 前端别名，与 Data 等价
 	ErrCode int32           `json:"err_code,omitempty"`
 	ErrMsg  string          `json:"err_msg,omitempty"`
+}
+
+// Body 返回业务载荷（优先 data，其次 payload）。
+func (m *WSMessage) Body() json.RawMessage {
+	if m == nil {
+		return nil
+	}
+	if len(m.Data) > 0 {
+		return m.Data
+	}
+	return m.Payload
 }
 
 // HeartbeatMsg 心跳消息体。

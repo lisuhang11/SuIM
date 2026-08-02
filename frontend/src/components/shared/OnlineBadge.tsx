@@ -5,7 +5,6 @@
 // ============================================================
 import React from "react";
 import type { UserStatus } from "@/types";
-import { getStatusColor } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 interface OnlineBadgeProps {
@@ -20,18 +19,24 @@ const sizeMap = {
   lg: "w-3 h-3",
 };
 
+const statusColorMap: Record<UserStatus, string> = {
+  online: "bg-accent",
+  away: "bg-amber-400",
+  busy: "bg-danger",
+  offline: "bg-ink-muted/40",
+};
+
 export default function OnlineBadge({ status, size = "md", className }: OnlineBadgeProps) {
-  const color = getStatusColor(status);
   const sizeClass = sizeMap[size];
 
   return (
     <span
       className={cn(
         sizeClass,
-        "rounded-full border-2 border-white dark:border-gray-800 flex-shrink-0",
+        statusColorMap[status],
+        "rounded-full border-2 border-surface-elevated flex-shrink-0",
         className
       )}
-      style={{ backgroundColor: color }}
       title={status}
     />
   );

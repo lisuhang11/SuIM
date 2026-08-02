@@ -4,6 +4,7 @@ frontend/.next/
 frontend/.env*.local
 frontend/out/
 frontend/.turbo/
+*.tsbuildinfo
 
 # ===== Go =====
 *.exe

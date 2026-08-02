@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package rtc;
+
+option go_package = "SuIM/proto/rtcpb";
+
+service RtcService {
+  rpc Invite(InviteReq) returns (InviteResp);
+  rpc Accept(AcceptReq) returns (AcceptResp);
+  rpc Reject(RejectReq) returns (RejectResp);
+  rpc Cancel(CancelReq) returns (CancelResp);
+  rpc Hangup(HangupReq) returns (HangupResp);
+  rpc GetCall(GetCallReq) returns (GetCallResp);
+  rpc RefreshToken(RefreshTokenReq) returns (RefreshTokenResp);
+}
+
+message CallInfo {
+  string call_id = 1;
+  string conversation_id = 2;
+  string caller_id = 3;
+  string callee_id = 4;
+  string media_type = 5;
+  string status = 6;
+  string end_reason = 7;
+  string room_name = 8;
+  int64 started_at = 9;
+  int64 answered_at = 10;
+  int64 ended_at = 11;
+  int32 duration_sec = 12;
+}
+
+message InviteReq {
+  string caller_id = 1;
+  string callee_id = 2;
+  string media_type = 3;
+}
+
+message InviteResp {
+  CallInfo call = 1;
+  string token = 2;
+  string livekit_url = 3;
+}
+
+message AcceptReq {
+  string user_id = 1;
+  string call_id = 2;
+}
+
+message AcceptResp {
+  CallInfo call = 1;
+  string token = 2;
+  string livekit_url = 3;
+}
+
+message RejectReq {
+  string user_id = 1;
+  string call_id = 2;
+}
+
+message RejectResp {
+  CallInfo call = 1;
+}
+
+message CancelReq {
+  string user_id = 1;
+  string call_id = 2;
+}
+
+message CancelResp {
+  CallInfo call = 1;
+}
+
+message HangupReq {
+  string user_id = 1;
+  string call_id = 2;
+}
+
+message HangupResp {
+  CallInfo call = 1;
+}
+
+message GetCallReq {
+  string user_id = 1;
+  string call_id = 2;
+}
+
+message GetCallResp {
+  CallInfo call = 1;
+}
+
+message RefreshTokenReq {
+  string user_id = 1;
+  string call_id = 2;
+}
+
+message RefreshTokenResp {
+  string token = 1;
+  string room_name = 2;
+  string livekit_url = 3;
+}

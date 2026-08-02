@@ -49,6 +49,22 @@ func (r *relationRepository) GetPendingBetween(ctx context.Context, userA, userB
 	return &req, nil
 }
 
+// ResetFriendRequestPending 将历史申请（已同意/已拒绝）覆盖为待处理，并刷新留言与时间。
+func (r *relationRepository) ResetFriendRequestPending(ctx context.Context, fromUserID, toUserID, reqMsg string) error {
+	now := time.Now()
+	return r.db.WithContext(ctx).
+		Model(&types.FriendRequest{}).
+		Where("from_user_id = ? AND to_user_id = ?", fromUserID, toUserID).
+		Updates(map[string]any{
+			"handle_result":   types.FriendRequestPending,
+			"req_msg":         reqMsg,
+			"create_time":     now,
+			"handler_user_id": "",
+			"handle_msg":      "",
+			"handle_time":     nil,
+		}).Error
+}
+
 // UpdateFriendRequestStatus 更新好友请求的处理状态。
 func (r *relationRepository) UpdateFriendRequestStatus(ctx context.Context, fromUserID, toUserID, handlerUserID string, status types.FriendRequestHandleResult, handleMsg string) error {
 	now := time.Now()
@@ -82,7 +98,14 @@ func (r *relationRepository) AcceptFriendRequest(ctx context.Context, fromUserID
 			{OwnerUserID: fromUserID, FriendUserID: toUserID, CreateTime: now, AddSource: 0, OperatorUserID: handlerUserID},
 			{OwnerUserID: toUserID, FriendUserID: fromUserID, CreateTime: now, AddSource: 0, OperatorUserID: handlerUserID},
 		}
-		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&friends).Error
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&friends).Error; err != nil {
+			return err
+		}
+		// 双方好友列表各记一条 Insert changelog。
+		if err := incrVersionTx(tx, fromUserID, []string{toUserID}, types.VersionStateInsert, false); err != nil {
+			return err
+		}
+		return incrVersionTx(tx, toUserID, []string{fromUserID}, types.VersionStateInsert, false)
 	})
 }
 

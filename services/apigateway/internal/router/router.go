@@ -42,11 +42,15 @@ func NewEngine(cfg *config.GatewayConfig, clients *grpc.Clients, authMW *middlew
 
 	// user 服务 — 公开路由：register、login 无需鉴权
 	userHandler := handler.NewUserHandler(clients.User)
-	userHandler.RegisterRoutes(api.Group("/users"))
+	usersGroup := api.Group("/users")
+	userHandler.RegisterRoutes(usersGroup)
+	if clients.MsgGateway != nil {
+		handler.NewPresenceHandler(clients.MsgGateway).RegisterRoutes(usersGroup)
+	}
 
 	// relation 服务
 	if clients.Relation != nil {
-		relHandler := handler.NewRelationHandler(clients.Relation)
+		relHandler := handler.NewRelationHandler(clients.Relation, clients.Conversation)
 		relHandler.RegisterRoutes(api.Group("/relations"))
 	}
 
@@ -71,6 +75,23 @@ func NewEngine(cfg *config.GatewayConfig, clients *grpc.Clients, authMW *middlew
 	if clients.File != nil {
 		fileHandler := handler.NewFileHandler(clients.File)
 		fileHandler.RegisterRoutes(api.Group("/files"))
+	}
+
+	if clients.Rtc != nil {
+		callHandler := handler.NewCallHandler(clients.Rtc)
+		callHandler.RegisterRoutes(api.Group("/calls"))
+	}
+
+	// BFF 聚合（对齐 OpenIM jssdk）
+	if clients.Conversation != nil && clients.Message != nil {
+		bffHandler := handler.NewBFFHandler(
+			clients.Conversation,
+			clients.Message,
+			clients.User,
+			clients.Relation,
+			clients.Group,
+		)
+		bffHandler.RegisterRoutes(api.Group("/bff"))
 	}
 
 	return engine

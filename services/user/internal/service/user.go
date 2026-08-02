@@ -16,7 +16,9 @@ import (
 
 	apperrors "user/internal/errors"
 
+	"user/internal/cache"
 	"user/internal/config"
+	"user/internal/repository"
 	"user/internal/types"
 	"user/internal/types/interfaces"
 
@@ -74,23 +76,34 @@ func (s *userService) getJwtSecret() string {
 	return jwtSecret
 }
 
+// ProfileChangeNotifier 用户昵称/头像变更后通知 relation（可选依赖）。
+type ProfileChangeNotifier interface {
+	NotificationUserInfoUpdate(ctx context.Context, userID string) error
+}
+
 // userService 实现 UserService 接口，封装用户业务逻辑。
 type userService struct {
 	userRepo  interfaces.UserRepository
 	tokenRepo interfaces.AuthTokenRepository
+	userCache *cache.UserInfoCache
 	config    *config.Config
+	relation  ProfileChangeNotifier
 }
 
-// NewUserService 创建用户服务实例。
+// NewUserService 创建用户服务实例。userCache 可为 nil（禁用旁路缓存，直读 DB）。
 func NewUserService(
 	userRepo interfaces.UserRepository,
 	tokenRepo interfaces.AuthTokenRepository,
+	userCache *cache.UserInfoCache,
 	cfg *config.Config,
+	relation ProfileChangeNotifier,
 ) interfaces.UserService {
 	return &userService{
 		userRepo:  userRepo,
 		tokenRepo: tokenRepo,
+		userCache: userCache,
 		config:    cfg,
+		relation:  relation,
 	}
 }
 
@@ -190,14 +203,65 @@ func (s *userService) Login(ctx context.Context, email, password string) (*types
 	return user, accessToken, refreshToken, nil
 }
 
-// GetUserByID 根据 ID 获取用户信息。
+// GetUserByID 根据 ID 获取用户信息（走批量 cache-aside）。
 func (s *userService) GetUserByID(ctx context.Context, id string) (*types.User, error) {
-	return s.userRepo.GetUserByID(ctx, id)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, repository.ErrUserNotFound
+	}
+	users, err := s.GetUsersByIDs(ctx, []string{id})
+	if err != nil {
+		return nil, err
+	}
+	u, ok := users[id]
+	if !ok || u == nil {
+		return nil, repository.ErrUserNotFound
+	}
+	return u, nil
 }
 
-// GetUsersByIDs 批量获取用户信息。
+// GetUsersByIDs 批量获取用户：缓存 → miss 查库 → 回填（对齐 WeKnora：编排在 service）。
 func (s *userService) GetUsersByIDs(ctx context.Context, ids []string) (map[string]*types.User, error) {
-	return s.userRepo.GetUsersByIDs(ctx, ids)
+	unique := uniqueNonEmpty(ids)
+	out := make(map[string]*types.User, len(unique))
+	if len(unique) == 0 {
+		return out, nil
+	}
+
+	hit, miss := s.userCache.MGet(ctx, unique)
+	for id, u := range hit {
+		out[id] = u
+	}
+	if len(miss) == 0 {
+		return out, nil
+	}
+
+	fromDB, err := s.userRepo.GetUsersByIDs(ctx, miss)
+	if err != nil {
+		return nil, err
+	}
+	for id, u := range fromDB {
+		out[id] = u
+		s.userCache.Set(ctx, u)
+	}
+	return out, nil
+}
+
+func uniqueNonEmpty(ids []string) []string {
+	seen := make(map[string]struct{}, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
 }
 
 // GetUserByEmail 根据邮箱获取用户信息。
@@ -205,44 +269,168 @@ func (s *userService) GetUserByEmail(ctx context.Context, email string) (*types.
 	return s.userRepo.GetUserByEmail(ctx, email)
 }
 
-// UpdateUser 更新用户信息，自动设置更新时间。
+// UpdateUser 全量保存（改密等）；资料局部更新请用 UpdateUserProfile。
 func (s *userService) UpdateUser(ctx context.Context, user *types.User) error {
+	if user == nil || strings.TrimSpace(user.UserID) == "" {
+		return apperrors.NewValidationError("user is required")
+	}
 	user.UpdatedAt = time.Now()
-	return s.userRepo.UpdateUser(ctx, user)
+	if err := s.userRepo.UpdateUser(ctx, user); err != nil {
+		return err
+	}
+	s.userCache.Del(ctx, user.UserID)
+	return nil
+}
+
+// UpdateUserProfile 部分字段更新：先 UpdateByMap 写库，再删 Redis 缓存（对齐 OpenIM）。
+func (s *userService) UpdateUserProfile(ctx context.Context, userID string, patch *types.UserProfilePatch) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return apperrors.NewValidationError("user_id is required")
+	}
+	if patch == nil {
+		return apperrors.NewValidationError("update patch is required")
+	}
+
+	fields := make(map[string]any, 3)
+	if patch.Nickname != nil {
+		nickname := strings.TrimSpace(*patch.Nickname)
+		if nickname == "" || utf8.RuneCountInString(nickname) > 64 {
+			return apperrors.NewValidationError("nickname must be between 1 and 64 characters")
+		}
+		fields["nickname"] = nickname
+	}
+	if patch.AvatarURL != nil {
+		fields["avatar_url"] = *patch.AvatarURL
+	}
+	if patch.Ex != nil {
+		fields["ex"] = *patch.Ex
+	}
+	if len(fields) == 0 {
+		return apperrors.NewValidationError("at least one field must be updated")
+	}
+
+	before, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return apperrors.NewUserNotFoundError()
+		}
+		return apperrors.NewInternalError("failed to load user").WithDetails(err)
+	}
+	nickChanged := false
+	avatarChanged := false
+	if v, ok := fields["nickname"].(string); ok && v != before.Nickname {
+		nickChanged = true
+	}
+	if v, ok := fields["avatar_url"].(string); ok && v != before.AvatarURL {
+		avatarChanged = true
+	}
+	if err := s.userRepo.UpdateUserByMap(ctx, userID, fields); err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return apperrors.NewUserNotFoundError()
+		}
+		return apperrors.NewInternalError("failed to update user profile").WithDetails(err)
+	}
+	s.userCache.Del(ctx, userID)
+	if (nickChanged || avatarChanged) && s.relation != nil {
+		_ = s.relation.NotificationUserInfoUpdate(ctx, userID)
+	}
+	return nil
+}
+
+// SetGlobalRecvMessageOpt 设置用户全局消息接收选项（对齐 OpenIM setGlobalRecvMessageOpt）。
+func (s *userService) SetGlobalRecvMessageOpt(ctx context.Context, userID string, opt int) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return apperrors.NewValidationError("user_id is required")
+	}
+	if !types.ValidGlobalRecvMsgOpt(opt) {
+		return apperrors.NewValidationError("global_recv_msg_opt must be 0, 1, or 2")
+	}
+	if _, err := s.userRepo.GetUserByID(ctx, userID); err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return apperrors.NewUserNotFoundError()
+		}
+		return apperrors.NewInternalError("failed to load user").WithDetails(err)
+	}
+	if err := s.userRepo.UpdateGlobalRecvMsgOpt(ctx, userID, opt); err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return apperrors.NewUserNotFoundError()
+		}
+		return apperrors.NewInternalError("failed to update global recv msg opt").WithDetails(err)
+	}
+	s.userCache.Del(ctx, userID)
+	return nil
+}
+
+// GetGlobalRecvMessageOpt 获取用户全局消息接收选项。
+func (s *userService) GetGlobalRecvMessageOpt(ctx context.Context, userID string) (int, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return 0, apperrors.NewValidationError("user_id is required")
+	}
+	user, err := s.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return 0, apperrors.NewUserNotFoundError()
+		}
+		return 0, apperrors.NewInternalError("failed to load user").WithDetails(err)
+	}
+	return user.GlobalRecvMsgOpt, nil
 }
 
 // DeleteUser 删除指定用户。
 func (s *userService) DeleteUser(ctx context.Context, id string) error {
-	return s.userRepo.DeleteUser(ctx, id)
+	if err := s.userRepo.DeleteUser(ctx, id); err != nil {
+		return err
+	}
+	s.userCache.Del(ctx, id)
+	return nil
 }
 
 // ChangePassword 修改用户密码：验证旧密码 → 哈希新密码 → 保存 → 吊销所有旧令牌。
 func (s *userService) ChangePassword(ctx context.Context, userID string, oldPassword, newPassword string) error {
+	if strings.TrimSpace(userID) == "" || oldPassword == "" || newPassword == "" {
+		return apperrors.NewValidationError("old password and new password are required")
+	}
+	if err := ValidatePasswordPolicy(newPassword); err != nil {
+		return apperrors.NewPasswordPolicyError()
+	}
+	if oldPassword == newPassword {
+		return apperrors.NewValidationError("new password must be different from old password")
+	}
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
-		return err
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return apperrors.NewUserNotFoundError()
+		}
+		return apperrors.NewInternalError("failed to load user").WithDetails(err)
 	}
 
 	// 验证旧密码。
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
-		return errors.New("invalid old password")
+		return apperrors.NewPasswordInvalidError()
 	}
 
 	// 哈希新密码。
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return apperrors.NewInternalError("failed to process password").WithDetails(err)
 	}
 
 	user.PasswordHash = string(hashedPassword)
 	user.UpdatedAt = time.Now()
 
 	if err := s.userRepo.UpdateUser(ctx, user); err != nil {
-		return err
+		return apperrors.NewInternalError("failed to update password").WithDetails(err)
 	}
+	s.userCache.Del(ctx, userID)
 
 	// 吊销所有旧令牌，防止密码变更后被窃取的令牌继续有效。
-	return s.tokenRepo.RevokeTokensByUserID(ctx, userID)
+	if err := s.tokenRepo.RevokeTokensByUserID(ctx, userID); err != nil {
+		return apperrors.NewInternalError("failed to revoke old sessions").WithDetails(err)
+	}
+	return nil
 }
 
 // ValidatePassword 验证用户密码是否正确。
@@ -459,7 +647,7 @@ func (s *userService) RevokeToken(ctx context.Context, tokenString string) error
 	return s.tokenRepo.UpdateToken(ctx, tokenRecord)
 }
 
-// SearchUsers 按昵称或邮箱搜索用户。
+// SearchUsers 按用户 ID 精确查找。
 func (s *userService) SearchUsers(ctx context.Context, query string, limit int) ([]*types.User, error) {
 	if query == "" {
 		return []*types.User{}, nil

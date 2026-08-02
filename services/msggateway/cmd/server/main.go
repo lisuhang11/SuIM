@@ -11,14 +11,20 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	pb "SuIM/proto/msggatewaypb"
 	"SuIM/pkg/discovery"
+	"msggateway/internal/auth"
 	"msggateway/internal/config"
 	"msggateway/internal/connmgr"
 	"msggateway/internal/handler"
+	"msggateway/internal/middleware"
+	"msggateway/internal/online"
 	"msggateway/internal/ws"
 
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -51,11 +57,50 @@ func main() {
 		PingInterval: cfg.PingInterval,
 	}, connManager)
 
-	// 可选：设置上线/下线日志回调。
-	wsServer.SetOnlineChangeHook(func(userID string, platformID int32, online bool) {
+	// JWT 鉴权：把连接挂到真实 user_id 下，OnlinePush 才能命中。
+	jwtSecret := cfg.JWTSecret
+	wsServer.SetAuthFunc(func(token string) (string, int32, error) {
+		return auth.ParseAccessToken(token, jwtSecret)
+	})
+
+	// -------- Redis 在线状态（可选）--------
+	instanceID := uuid.NewString()
+	var store *online.Store
+	if cfg.RedisAddr != "" {
+		rdb := redis.NewClient(&redis.Options{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPassword,
+			DB:       cfg.RedisDB,
+		})
+		pingCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		err := rdb.Ping(pingCtx).Err()
+		cancel()
+		if err != nil {
+			slog.Warn("redis unavailable, presence falls back to local only",
+				"addr", cfg.RedisAddr, "error", err)
+			_ = rdb.Close()
+		} else {
+			store = online.NewStore(rdb, instanceID)
+			slog.Info("redis connected for online presence", "addr", cfg.RedisAddr)
+			defer rdb.Close()
+		}
+	}
+
+	presenceHub := online.NewHub(store, connManager.LocalPlatformIDs, wsServer.WriteConn)
+	wsServer.SetPresenceHub(presenceHub)
+
+	bgCtx, bgCancel := context.WithCancel(context.Background())
+	defer bgCancel()
+	go presenceHub.StartRedisSubscriber(bgCtx)
+	go presenceHub.StartRenewal(bgCtx, connManager.ListOnlinePlatforms, online.OnlineExpire/3)
+
+	wsServer.SetOnlineChangeHook(func(userID string, platformID int32, onlineFlag bool) {
 		action := "offline"
-		if online {
+		if onlineFlag {
 			action = "online"
+			presenceHub.OnConnect(context.Background(), userID, platformID)
+		} else {
+			presenceHub.OnDisconnect(context.Background(), userID, platformID)
 		}
 		slog.Info("user status changed",
 			"user_id", userID,
@@ -67,7 +112,9 @@ func main() {
 	})
 
 	// -------- gRPC 服务 --------
-	grpcSvr := grpc.NewServer()
+	grpcSvr := grpc.NewServer(
+		grpc.UnaryInterceptor(middleware.UnaryJWT(jwtSecret)),
+	)
 	msgGwHandler := handler.NewMsgGatewayHandler(wsServer)
 	pb.RegisterMsgGatewayServer(grpcSvr, msgGwHandler)
 	reflection.Register(grpcSvr)
@@ -134,6 +181,7 @@ func main() {
 		"ws_addr", cfg.WSAddr,
 		"grpc_addr", cfg.GRPCAddr,
 		"metrics_addr", cfg.MetricsAddr,
+		"presence_redis", store != nil && store.Enabled(),
 	)
 
 	// -------- 优雅关闭 --------
@@ -142,6 +190,7 @@ func main() {
 	<-quit
 
 	slog.Info("shutting down...")
+	bgCancel()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GracefulShutdownTimeout)
 	defer cancel()

@@ -66,7 +66,7 @@ func (h *MsgGatewayHandler) OnlinePushMsg(ctx context.Context, req *pb.OnlinePus
 	return &pb.OnlinePushMsgResp{Resp: results}, nil
 }
 
-// GetUsersOnlineStatus 批量查询用户在线状态。
+// GetUsersOnlineStatus 批量查询用户在线状态（优先 Redis 集群真相，回退本机连接表）。
 func (h *MsgGatewayHandler) GetUsersOnlineStatus(ctx context.Context, req *pb.GetUsersOnlineStatusReq) (*pb.GetUsersOnlineStatusResp, error) {
 	if len(req.UserIds) == 0 {
 		return &pb.GetUsersOnlineStatusResp{}, nil
@@ -74,38 +74,42 @@ func (h *MsgGatewayHandler) GetUsersOnlineStatus(ctx context.Context, req *pb.Ge
 
 	var successResults []*pb.SuccessResult
 	var failedResults []*pb.FailedDetail
+	hub := h.wsServer.Presence()
 
 	for _, userID := range req.UserIds {
-		status, platforms := h.wsServer.ConnMgr().GetOnlineStatus(userID)
+		var status int32
+		var details []*pb.SuccessDetail
+
+		if hub != nil {
+			snap := hub.GetStatus(ctx, userID)
+			status = snap.Status
+			for _, pid := range snap.PlatformIDs {
+				details = append(details, &pb.SuccessDetail{PlatformId: pid})
+			}
+		} else {
+			st, platforms := h.wsServer.ConnMgr().GetOnlineStatus(userID)
+			status = st
+			for _, p := range platforms {
+				for i := range p.Tokens {
+					details = append(details, &pb.SuccessDetail{
+						PlatformId:   p.PlatformID,
+						IsBackground: i > 0,
+					})
+				}
+				if len(p.Tokens) == 0 {
+					details = append(details, &pb.SuccessDetail{PlatformId: p.PlatformID})
+				}
+			}
+		}
 
 		if status == 0 {
-			// 离线视为查询失败（用户不在线）。
 			failedResults = append(failedResults, &pb.FailedDetail{UserId: userID})
 			continue
 		}
 
-		var details []*pb.SuccessDetail
-		for _, p := range platforms {
-			isBackground := false
-			// 多 token 时，第一个为前台，其余为后台。
-			for i, token := range p.Tokens {
-				isBg := isBackground
-				if i > 0 {
-					isBg = true
-				}
-				details = append(details, &pb.SuccessDetail{
-					PlatformId:   p.PlatformID,
-					ConnId:       "", // 使用 token 粒度的 conn 占位。
-					IsBackground: isBg,
-					Token:        token,
-				})
-			}
-			_ = p.ConnIDs // 暂不暴露 connID 细节。
-		}
-
 		successResults = append(successResults, &pb.SuccessResult{
-			UserId:                userID,
-			Status:                status,
+			UserId:               userID,
+			Status:               status,
 			DetailPlatformStatus: details,
 		})
 	}

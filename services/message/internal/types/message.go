@@ -11,6 +11,18 @@ const (
 	MsgStatusRevoke = 1 // 已撤回
 )
 
+// 会话类型（与 proto MsgData.session_type 一致：1=single 2=group）。
+const (
+	SessionTypeSingle = 1
+	SessionTypeGroup  = 2
+)
+
+// 通知类 contentType 区间：单聊拉黑校验时跳过（对齐 OpenIM NotificationBegin/End）。
+const (
+	ContentTypeNotificationBegin = 1000
+	ContentTypeNotificationEnd   = 5000
+)
+
 // MsgDataModel 单条聊天消息的核心内容。
 type MsgDataModel struct {
 	SendID           string `gorm:"column:send_id;size:64;not null;uniqueIndex:uk_sender_client_msg"`                   // 发送者 ID
@@ -110,6 +122,26 @@ func (MessageDelete) TableName() string { return "msg_delete" }
 
 // TableName 覆盖 GORM 默认复数命名。
 func (SeqUser) TableName() string { return TableSeqUser }
+
+// SeqPair is the per-conversation max + has-read cursor returned to clients.
+type SeqPair struct {
+	MaxSeq     int64
+	HasReadSeq int64
+	MaxSeqTime int64 // max_seq 对应消息 send_time（ms），无则 0
+}
+
+// SeqBounds is per-conversation max/min seq (对齐 OpenIM GetMaxSeqResp).
+type SeqBounds struct {
+	MaxSeq int64
+	MinSeq int64
+}
+
+// ActiveConversation 活跃会话摘要（对齐 OpenIM ActiveConversation）。
+type ActiveConversation struct {
+	ConversationID string
+	MaxSeq         int64
+	LastTime       int64 // max_seq 对应消息 send_time (ms)
+}
 
 // Message 是领域层使用的存储消息模型别名。仓库层以上通过此名称引用消息。
 type Message = MsgInfoModel

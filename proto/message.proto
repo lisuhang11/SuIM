@@ -55,11 +55,9 @@ message MsgData {
   string doc_id = 24;          // conversationID:docIndex (batching)
   int32  msg_index = 25;       // index within the document
 
-  // Deprecated transport field. Recipient resolution will move entirely to
-  // the server; until then, trusted internal senders may provide this list.
-  // Recipients whose seq_user.max_seq should advance. Excludes
-  // the sender. For single chat use [recv_id]; for group chat use the member
-  // list (provided by the caller / gateway).
+  // Deprecated: clients should not rely on this. Single chat falls back to
+  // recv_id; group chat recipients are resolved server-side via
+  // group.GetGroupMemberUserIDs (OpenIM-aligned).
   repeated string recv_user_ids = 26 [deprecated = true];
   int64 create_time = 27;
 }
@@ -74,6 +72,7 @@ message SendMsgResp {
   int64  send_time = 3;
   string doc_id = 4;
   int32  msg_index = 5;
+  string client_msg_id = 6; // 对齐 OpenIM SendMsgResp.clientMsgID
 }
 
 // --------------- GetHistoryMessages ---------------
@@ -133,6 +132,51 @@ message DeleteMsgsReq {
 }
 message DeleteMsgsResp {}
 
+// --------------- GetMaxSeq ---------------
+message GetMaxSeqReq {
+  repeated string conversation_ids = 1; // empty = all seq_user rows for caller
+}
+message GetMaxSeqResp {
+  map<string, int64> max_seqs = 1; // conversation_id → max_seq
+  map<string, int64> min_seqs = 2; // conversation_id → min_seq（对齐 OpenIM）
+}
+
+// --------------- GetConversationsHasReadAndMaxSeq ---------------
+message Seqs {
+  int64 max_seq = 1;
+  int64 has_read_seq = 2;
+  int64 max_seq_time = 3; // max_seq 对应消息的 send_time（ms），无则 0
+}
+message GetConversationsHasReadAndMaxSeqReq {
+  repeated string conversation_ids = 1; // empty = all
+}
+message GetConversationsHasReadAndMaxSeqResp {
+  map<string, Seqs> seqs = 1;
+}
+
+// --------------- GetActiveConversation (对齐 OpenIM msg.GetActiveConversation) ---------------
+message GetActiveConversationReq {
+  repeated string conversation_ids = 1;
+  int64 limit = 2; // 0 = 不截断；>0 时按 last_time 降序截断
+}
+message ActiveConversation {
+  string conversation_id = 1;
+  int64 last_time = 2; // max_seq 对应消息 send_time (ms)
+  int64 max_seq = 3;
+}
+message GetActiveConversationResp {
+  repeated ActiveConversation conversations = 1;
+}
+
+// --------------- GetLastMessage (对齐 OpenIM msg.GetLastMessage) ---------------
+message GetLastMessageReq {
+  string user_id = 1; // handler 以 JWT 用户为准覆盖
+  repeated string conversation_ids = 2;
+}
+message GetLastMessageResp {
+  map<string, MsgData> msgs = 1; // conversation_id → 最后一条对用户可见的消息
+}
+
 // --------------- service ---------------
 service message {
   rpc SendMsg(SendMsgReq) returns (SendMsgResp);
@@ -142,4 +186,8 @@ service message {
   rpc RevokeMsg(RevokeMsgReq) returns (RevokeMsgResp);
   rpc MarkMsgsAsRead(MarkMsgsAsReadReq) returns (MarkMsgsAsReadResp);
   rpc DeleteMsgs(DeleteMsgsReq) returns (DeleteMsgsResp);
+  rpc GetMaxSeq(GetMaxSeqReq) returns (GetMaxSeqResp);
+  rpc GetConversationsHasReadAndMaxSeq(GetConversationsHasReadAndMaxSeqReq) returns (GetConversationsHasReadAndMaxSeqResp);
+  rpc GetActiveConversation(GetActiveConversationReq) returns (GetActiveConversationResp);
+  rpc GetLastMessage(GetLastMessageReq) returns (GetLastMessageResp);
 }

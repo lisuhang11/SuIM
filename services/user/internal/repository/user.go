@@ -4,6 +4,8 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
+	"time"
 	"user/internal/types"
 	"user/internal/types/interfaces"
 
@@ -72,9 +74,48 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*typ
 	return &user, nil
 }
 
-// UpdateUser 更新用户信息。
+// UpdateUser 全量保存用户行（改密等场景）。
 func (r *userRepository) UpdateUser(ctx context.Context, user *types.User) error {
 	return r.db.WithContext(ctx).Save(user).Error
+}
+
+// UpdateUserByMap 仅更新指定列，对齐 OpenIM storage UpdateByMap。
+func (r *userRepository) UpdateUserByMap(ctx context.Context, userID string, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	patch := make(map[string]any, len(fields)+1)
+	for k, v := range fields {
+		patch[k] = v
+	}
+	patch["updated_at"] = time.Now()
+	result := r.db.WithContext(ctx).Model(&types.User{}).
+		Where("user_id = ?", userID).
+		Updates(patch)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+// UpdateGlobalRecvMsgOpt 仅更新 global_recv_msg_opt 字段。
+func (r *userRepository) UpdateGlobalRecvMsgOpt(ctx context.Context, userID string, opt int) error {
+	result := r.db.WithContext(ctx).Model(&types.User{}).
+		Where("user_id = ?", userID).
+		Updates(map[string]any{
+			"global_recv_msg_opt": opt,
+			"updated_at":          time.Now(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrUserNotFound
+	}
+	return nil
 }
 
 // DeleteUser 根据 ID 删除用户。
@@ -100,20 +141,21 @@ func (r *userRepository) ListUsers(ctx context.Context, offset, limit int) ([]*t
 	return users, nil
 }
 
-// SearchUsers 仅按用户ID匹配活跃用户（添加好友专用）。
+// SearchUsers 按用户 ID 精确查找活跃用户（添加好友专用，不支持昵称/邮箱）。
 func (r *userRepository) SearchUsers(ctx context.Context, query string, limit int) ([]*types.User, error) {
 	var users []*types.User
-	searchPattern := "%" + query + "%"
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return users, nil
+	}
 
 	dbQuery := r.db.WithContext(ctx).
-		Where("user_id LIKE ?", searchPattern).
-		Where("is_active = ?", true).
-		Order("user_id ASC")
+		Where("user_id = ? AND is_active = ?", query, true)
 
 	if limit > 0 {
 		dbQuery = dbQuery.Limit(limit)
 	} else {
-		dbQuery = dbQuery.Limit(20)
+		dbQuery = dbQuery.Limit(1)
 	}
 
 	if err := dbQuery.Find(&users).Error; err != nil {

@@ -13,11 +13,14 @@ const (
 // ---------- 消息类型 ----------
 
 const (
-	MsgTypePush      = "push"
-	MsgTypeAck       = "ack"
-	MsgTypeHeartbeat = "heartbeat"
-	MsgTypeKick      = "kick"
-	MsgTypeSync      = "sync"
+	MsgTypePush                 = "push"
+	MsgTypeAck                  = "ack"
+	MsgTypeHeartbeat            = "heartbeat"
+	MsgTypeKick                 = "kick"
+	MsgTypeSync                 = "sync"
+	MsgTypePresenceSubscribe    = "presence.subscribe"
+	MsgTypePresenceUnsubscribe  = "presence.unsubscribe"
+	MsgTypePresenceSnapshot     = "presence.snapshot"
 )
 
 // ---------- Conn 接口 ----------

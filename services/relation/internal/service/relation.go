@@ -3,7 +3,9 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
+	"unicode/utf8"
 
 	apperrors "relation/internal/errors"
 	"relation/internal/logger"
@@ -56,6 +58,21 @@ func (s *relationService) SendFriendRequest(ctx context.Context, fromUserID, toU
 	// 如果任意方向已存在待处理的请求，拒绝重复发送。
 	if _, err := s.repo.GetPendingBetween(ctx, fromUserID, toUserID); err == nil {
 		return apperrors.NewAlreadyRequestedError()
+	}
+
+	// 同方向已有历史申请（已同意/已拒绝）：覆盖为 pending，避免主键冲突。
+	if _, err := s.repo.GetFriendRequest(ctx, fromUserID, toUserID); err == nil {
+		if err := s.repo.ResetFriendRequestPending(ctx, fromUserID, toUserID, msg); err != nil {
+			logger.Error(ctx, "[relation] reset friend request failed", "error", err)
+			return apperrors.NewInternalError("failed to send friend request").WithDetails(err)
+		}
+		if s.notifier != nil {
+			s.notifier.FriendApplicationNotification(ctx, fromUserID, toUserID, msg)
+		}
+		logger.Info(ctx, "[relation] friend request re-sent")
+		return nil
+	} else if !errors.Is(err, ErrFriendRequestNotFound) {
+		return apperrors.NewInternalError("check friend request failed").WithDetails(err)
 	}
 
 	now := time.Now()
@@ -144,24 +161,68 @@ func (s *relationService) DeleteFriend(ctx context.Context, userID, friendID str
 		logger.Error(ctx, "[relation] delete friend failed", "error", err)
 		return apperrors.NewInternalError("failed to delete friend").WithDetails(err)
 	}
+	if s.notifier != nil {
+		s.notifier.FriendDeletedNotification(ctx, userID, friendID)
+		s.notifier.FriendDeletedNotification(ctx, friendID, userID)
+	}
 
 	logger.Info(ctx, "[relation] friend deleted")
 	return nil
 }
 
-// GetFriends 获取用户的好友 ID 列表（分页）。
-func (s *relationService) GetFriends(ctx context.Context, userID string, offset, limit int) ([]string, int, error) {
+// GetFriends 获取用户的好友列表（分页，含备注/置顶）。
+func (s *relationService) GetFriends(ctx context.Context, userID string, offset, limit int) ([]*types.Friend, int, error) {
 	friends, total, err := s.repo.ListFriends(ctx, userID, offset, limit)
 	if err != nil {
 		logger.Error(ctx, "[relation] get friends failed", "error", err)
 		return nil, 0, apperrors.NewInternalError("failed to get friends").WithDetails(err)
 	}
+	return friends, int(total), nil
+}
 
-	friendIDs := make([]string, 0, len(friends))
-	for _, f := range friends {
-		friendIDs = append(friendIDs, f.FriendUserID)
+const maxFriendRemarkRunes = 64
+
+// UpdateFriend 局部更新好友备注 / 置顶。
+func (s *relationService) UpdateFriend(ctx context.Context, ownerUserID, friendUserID string, remark *string, isPinned *bool) error {
+	if ownerUserID == "" || friendUserID == "" {
+		return apperrors.NewValidationError("owner_user_id and friend_user_id required")
 	}
-	return friendIDs, int(total), nil
+	if remark == nil && isPinned == nil {
+		return apperrors.NewValidationError("at least one of remark or is_pinned required")
+	}
+	if remark != nil && utf8.RuneCountInString(*remark) > maxFriendRemarkRunes {
+		return apperrors.NewValidationError("remark too long")
+	}
+
+	ok, err := s.repo.FriendExists(ctx, ownerUserID, friendUserID)
+	if err != nil {
+		return apperrors.NewInternalError("check friend failed").WithDetails(err)
+	}
+	if !ok {
+		return apperrors.NewRelationNotFoundError()
+	}
+
+	fields := make(map[string]any, 2)
+	if remark != nil {
+		fields["remark"] = *remark
+	}
+	if isPinned != nil {
+		fields["is_pinned"] = *isPinned
+	}
+	if err := s.repo.UpdateFriend(ctx, ownerUserID, friendUserID, fields); err != nil {
+		logger.Error(ctx, "[relation] update friend failed", "error", err)
+		return apperrors.NewInternalError("failed to update friend").WithDetails(err)
+	}
+	isSort := isPinned != nil
+	if err := s.repo.IncrVersion(ctx, ownerUserID, []string{friendUserID}, types.VersionStateUpdate, isSort); err != nil {
+		logger.Error(ctx, "[relation] incr version after update friend failed", "error", err)
+		return apperrors.NewInternalError("failed to update friend version").WithDetails(err)
+	}
+	if s.notifier != nil {
+		s.notifier.FriendInfoChangedNotification(ctx, ownerUserID, friendUserID)
+	}
+	logger.Info(ctx, "[relation] friend updated", "owner", ownerUserID, "friend", friendUserID)
+	return nil
 }
 
 // GetIncomingApplyTo 分页获取收到的好友请求，handleResults 为空则不过滤状态。
@@ -194,7 +255,7 @@ func (s *relationService) GetUnhandledApplyCount(ctx context.Context, userID str
 	return count, nil
 }
 
-// BlockUser 拉黑指定用户，同时删除双方的好友关系。
+// BlockUser 拉黑指定用户（保留好友关系，不从好友列表移除）。
 func (s *relationService) BlockUser(ctx context.Context, userID, blockedUserID string) error {
 	logger.Info(ctx, "[relation] block user", "user_id", userID, "blocked_user_id", blockedUserID)
 
@@ -206,9 +267,6 @@ func (s *relationService) BlockUser(ctx context.Context, userID, blockedUserID s
 	if _, err := s.repo.FindBlock(ctx, userID, blockedUserID); err == nil {
 		return apperrors.NewAlreadyBlockedError()
 	}
-
-	// 好友和拉黑互斥：删除任意方向的已有好友关系。
-	_ = s.repo.DeleteFriendPair(ctx, userID, blockedUserID)
 
 	now := time.Now()
 	b := &types.Black{
@@ -244,19 +302,14 @@ func (s *relationService) UnblockUser(ctx context.Context, userID, blockedUserID
 	return nil
 }
 
-// GetBlockedUsers 获取已拉黑的用户 ID 列表（分页）。
-func (s *relationService) GetBlockedUsers(ctx context.Context, userID string, offset, limit int) ([]string, int, error) {
+// GetBlockedUsers 获取已拉黑列表（分页，含关系字段）。
+func (s *relationService) GetBlockedUsers(ctx context.Context, userID string, offset, limit int) ([]*types.Black, int, error) {
 	blocks, total, err := s.repo.ListBlocks(ctx, userID, offset, limit)
 	if err != nil {
 		logger.Error(ctx, "[relation] get blocked users failed", "error", err)
 		return nil, 0, apperrors.NewInternalError("failed to get blocked users").WithDetails(err)
 	}
-
-	blockedIDs := make([]string, 0, len(blocks))
-	for _, b := range blocks {
-		blockedIDs = append(blockedIDs, b.BlockUserID)
-	}
-	return blockedIDs, int(total), nil
+	return blocks, int(total), nil
 }
 
 // IsFriend 返回 user1 与 user2 之间的双向好友关系详情。

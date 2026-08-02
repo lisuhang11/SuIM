@@ -185,12 +185,42 @@ func (r *conversationRepository) ListNotNotifyIDsByOwner(ctx context.Context, ow
 }
 
 // Delete 删除用户的指定会话记录。
-func (r *conversationRepository) Delete(ctx context.Context, ownerUserID string, ids []string) error {
+func (r *conversationRepository) Delete(ctx context.Context, ownerUserID string, ids []string, needDeleteTime int64) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	return r.db.WithContext(ctx).Where("owner_user_id = ? AND conversation_id IN ?", ownerUserID, ids).
-		Delete(&types.Conversation{}).Error
+	q := r.db.WithContext(ctx).Where("owner_user_id = ? AND conversation_id IN ?", ownerUserID, ids)
+	if needDeleteTime > 0 {
+		// need_delete_time 为毫秒时间戳时与 create_time 比较
+		q = q.Where("create_time <= FROM_UNIXTIME(? / 1000)", needDeleteTime)
+	}
+	return q.Delete(&types.Conversation{}).Error
+}
+
+// ListUnreadCounts 未读数 = seq_user.max_seq - seq_user.read_seq（对齐 OpenIM）。
+func (r *conversationRepository) ListUnreadCounts(ctx context.Context, ownerUserID string, conversationIDs []string) (map[string]int64, error) {
+	out := make(map[string]int64, len(conversationIDs))
+	if ownerUserID == "" || len(conversationIDs) == 0 {
+		return out, nil
+	}
+	type unreadRow struct {
+		ConversationID string `gorm:"column:conversation_id"`
+		Unread         int64  `gorm:"column:unread"`
+	}
+	var rows []unreadRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT conversation_id,
+			CASE WHEN max_seq > read_seq THEN max_seq - read_seq ELSE 0 END AS unread
+		FROM seq_user
+		WHERE user_id = ? AND conversation_id IN ?
+	`, ownerUserID, conversationIDs).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ConversationID] = row.Unread
+	}
+	return out, nil
 }
 
 // UpdateExByOwner 更新用户所有会话的扩展字段。

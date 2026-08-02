@@ -23,6 +23,10 @@ type Config struct {
 	ReadTimeout             time.Duration `yaml:"read_timeout"`
 	WriteTimeout            time.Duration `yaml:"write_timeout"`
 	GracefulShutdownTimeout time.Duration `yaml:"graceful_shutdown_timeout"`
+	JWTSecret               string        `yaml:"jwt_secret"`
+	RedisAddr               string        `yaml:"redis_addr"`
+	RedisPassword           string        `yaml:"redis_password"`
+	RedisDB                 int           `yaml:"redis_db"`
 }
 
 // defaults 返回内置默认配置。
@@ -38,6 +42,10 @@ func defaults() *Config {
 		ReadTimeout:             60 * time.Second,
 		WriteTimeout:            10 * time.Second,
 		GracefulShutdownTimeout: 30 * time.Second,
+		JWTSecret:               "change-me-in-production",
+		RedisAddr:               "127.0.0.1:6379",
+		RedisPassword:           "",
+		RedisDB:                 0,
 	}
 }
 
@@ -92,6 +100,23 @@ func LoadFromFile(path string) *Config {
 	if v := os.Getenv("MSGGW_SHUTDOWN_TIMEOUT"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			cfg.GracefulShutdownTimeout = d
+		}
+	}
+	if v := os.Getenv("MSGGW_JWT_SECRET"); v != "" {
+		cfg.JWTSecret = v
+	}
+	if v := os.Getenv("JWT_SECRET"); v != "" {
+		cfg.JWTSecret = v
+	}
+	if v := os.Getenv("REDIS_ADDR"); v != "" {
+		cfg.RedisAddr = v
+	}
+	if v := os.Getenv("REDIS_PASSWORD"); v != "" {
+		cfg.RedisPassword = v
+	}
+	if v := os.Getenv("REDIS_DB"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.RedisDB = n
 		}
 	}
 	return cfg

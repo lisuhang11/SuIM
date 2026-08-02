@@ -26,7 +26,7 @@ func (b *etcdResolverBuilder) Build(target resolver.Target, cc resolver.ClientCo
 	// target.URL.Host 为服务名，如 "etcd:///user"
 	serviceName := strings.TrimPrefix(target.URL.Path, "/")
 	if serviceName == "" {
-		return nil, fmt.Errorf("etcd resolver: service name is empty in target %q", target.URL)
+		return nil, fmt.Errorf("etcd resolver: service name is empty in target %q", target.URL.String())
 	}
 
 	endpoints := getEndpoints()
@@ -94,9 +94,9 @@ func (r *etcdResolver) watch() {
 			"service", r.serviceName, "error", err)
 	}
 
-	// 启动 watch。
+	// 启动 watch。etcd Watch 只推送启动后的变更，不会回放已有 key，
+	// 因此每个事件都要重新 Get 刷新地址（不能跳过首个事件）。
 	watchCh := cli.Watch(context.Background(), prefix, clientv3.WithPrefix())
-	isFirst := true
 
 	for {
 		select {
@@ -132,12 +132,6 @@ func (r *etcdResolver) watch() {
 			if wresp.Err() != nil {
 				slog.Error("[discovery] watch error",
 					"service", r.serviceName, "error", wresp.Err())
-				continue
-			}
-
-			if isFirst {
-				// 首次 watch 事件不更新（已在 updateAddrs 中获取）。
-				isFirst = false
 				continue
 			}
 

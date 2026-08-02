@@ -15,7 +15,10 @@ type UserService interface {
 	GetUserByID(ctx context.Context, id string) (*types.User, error)
 	GetUsersByIDs(ctx context.Context, ids []string) (map[string]*types.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*types.User, error)
+	// UpdateUser 全量保存用户（如改密）；资料局部更新请用 UpdateUserProfile。
 	UpdateUser(ctx context.Context, user *types.User) error
+	// UpdateUserProfile 按字段 patch 更新资料（对齐 OpenIM UpdateByMap）。
+	UpdateUserProfile(ctx context.Context, userID string, patch *types.UserProfilePatch) error
 	DeleteUser(ctx context.Context, id string) error
 	ChangePassword(ctx context.Context, userID string, oldPassword, newPassword string) error
 	ValidatePassword(ctx context.Context, userID string, password string) error
@@ -25,6 +28,10 @@ type UserService interface {
 	RevokeToken(ctx context.Context, token string) (err error)
 	Logout(ctx context.Context, token string) (err error)
 	SearchUsers(ctx context.Context, query string, limit int) ([]*types.User, error)
+	// SetGlobalRecvMessageOpt 设置用户全局消息接收选项（0/1/2）。
+	SetGlobalRecvMessageOpt(ctx context.Context, userID string, opt int) error
+	// GetGlobalRecvMessageOpt 获取用户全局消息接收选项。
+	GetGlobalRecvMessageOpt(ctx context.Context, userID string) (int, error)
 }
 
 // UserRepository 定义用户持久化操作的接口契约。
@@ -37,13 +44,17 @@ type UserRepository interface {
 	GetUsersByIDs(ctx context.Context, ids []string) (map[string]*types.User, error)
 	// GetUserByEmail 根据邮箱获取用户。
 	GetUserByEmail(ctx context.Context, email string) (*types.User, error)
-	// UpdateUser 更新用户信息。
+	// UpdateUser 全量保存。
 	UpdateUser(ctx context.Context, user *types.User) error
+	// UpdateUserByMap 仅更新 map 中出现的列（OpenIM UpdateByMap 语义）。
+	UpdateUserByMap(ctx context.Context, userID string, fields map[string]any) error
+	// UpdateGlobalRecvMsgOpt 仅更新全局消息接收选项。
+	UpdateGlobalRecvMsgOpt(ctx context.Context, userID string, opt int) error
 	// DeleteUser 删除用户。
 	DeleteUser(ctx context.Context, id string) error
 	// ListUsers 分页查询用户列表。
 	ListUsers(ctx context.Context, offset, limit int) ([]*types.User, error)
-	// SearchUsers 按昵称或邮箱模糊搜索。
+	// SearchUsers 按用户 ID 精确查找。
 	SearchUsers(ctx context.Context, query string, limit int) ([]*types.User, error)
 }
 

@@ -1,4 +1,4 @@
-.PHONY: build run test proto clean lint
+.PHONY: build run test proto tidy fmt clean lint
 
 # Go parameters
 GOCMD    := go
@@ -7,6 +7,9 @@ GOTEST   := $(GOCMD) test
 GOCLEAN  := $(GOCMD) clean
 GOMOD    := $(GOCMD) mod
 BINARY   := user-server
+
+# Monorepo root (shared proto definitions live in ../../proto).
+ROOT := ../..
 
 # Build the server binary.
 build:
@@ -20,11 +23,13 @@ run: build
 test:
 	$(GOTEST) -v -race -count=1 ./...
 
-# Generate protobuf code.
+# Generate protobuf into repo-root proto/userpb (source of truth: proto/user.proto).
+# Requires protoc-gen-go and protoc-gen-go-grpc on PATH.
 proto:
-	protoc --go_out=. --go_opt=paths=source_relative \
-		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		proto/user.proto
+	protoc --go_out=$(ROOT) --go_opt=module=SuIM \
+		--go-grpc_out=$(ROOT) --go-grpc_opt=module=SuIM \
+		-I $(ROOT)/proto \
+		$(ROOT)/proto/user.proto $(ROOT)/proto/file.proto
 
 # Tidy dependencies.
 tidy:

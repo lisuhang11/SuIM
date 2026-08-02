@@ -1,11 +1,9 @@
 "use client";
 
-// ============================================================
-// UserAvatar — 用户头像组件（首字母 Fallback）
-// ============================================================
+// UserAvatar — photo or initials fallback
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { resolveAvatarURL } from "@/services/api";
+import { IMSDK } from "@/suim-sdk";
 
 interface UserAvatarProps {
   src?: string;
@@ -22,9 +20,14 @@ const sizeMap = {
 };
 
 const colors = [
-  "bg-blue-500", "bg-emerald-500", "bg-violet-500",
-  "bg-amber-500", "bg-rose-500", "bg-cyan-500",
-  "bg-indigo-500", "bg-teal-500",
+  "bg-accent",
+  "bg-teal-600",
+  "bg-cyan-600",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-blue-500",
+  "bg-sky-600",
+  "bg-zinc-600",
 ];
 
 function getColor(name: string): string {
@@ -47,15 +50,42 @@ export default function UserAvatar({
 }: UserAvatarProps) {
   const sizeClass = sizeMap[size];
   const [failed, setFailed] = useState(false);
-  const [resolvedSrc, setResolvedSrc] = useState(src || "");
+  const [resolvedSrc, setResolvedSrc] = useState("");
 
   useEffect(() => {
     let active = true;
     setFailed(false);
-    setResolvedSrc("");
-    if (!src) return () => { active = false; };
-    resolveAvatarURL(src).then((value) => { if (active) setResolvedSrc(value); }).catch(() => { if (active) setFailed(true); });
-    return () => { active = false; };
+
+    if (!src) {
+      setResolvedSrc("");
+      return;
+    }
+
+    // Optimistic: show http(s)/blob immediately while API paths resolve
+    if (
+      src.startsWith("blob:") ||
+      src.startsWith("data:") ||
+      /^https?:\/\//i.test(src)
+    ) {
+      setResolvedSrc(src);
+    }
+
+    void IMSDK.resolveAvatarURL(src)
+      .then((value) => {
+        if (!active) return;
+        setResolvedSrc(value || src);
+      })
+      .catch(() => {
+        if (!active) return;
+        // Keep direct http(s) src if resolve failed; otherwise mark failed
+        if (!/^https?:\/\//i.test(src) && !src.startsWith("blob:") && !src.startsWith("data:")) {
+          setFailed(true);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [src]);
 
   if (resolvedSrc && !failed) {
@@ -63,7 +93,7 @@ export default function UserAvatar({
       <img
         src={resolvedSrc}
         alt={name}
-        className={cn(sizeClass, "rounded-full object-cover flex-shrink-0", className)}
+        className={cn(sizeClass, "rounded-control object-cover flex-shrink-0", className)}
         onError={() => setFailed(true)}
       />
     );
@@ -74,7 +104,7 @@ export default function UserAvatar({
       className={cn(
         sizeClass,
         getColor(name),
-        "rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0 select-none",
+        "rounded-control flex items-center justify-center text-white font-semibold flex-shrink-0 select-none",
         className
       )}
     >

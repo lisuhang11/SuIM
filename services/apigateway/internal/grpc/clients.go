@@ -14,7 +14,9 @@ import (
 	pbFile "SuIM/proto/filepb"
 	pbGroup "SuIM/proto/grouppb"
 	pbMsg "SuIM/proto/messagepb"
+	pbMsgGw "SuIM/proto/msggatewaypb"
 	pbRel "SuIM/proto/relationpb"
+	pbRtc "SuIM/proto/rtcpb"
 	pbUser "SuIM/proto/userpb"
 
 	"google.golang.org/grpc"
@@ -30,6 +32,8 @@ type Clients struct {
 	Conversation pbConv.ConversationClient
 	Message      pbMsg.MessageClient
 	File         pbFile.FileServiceClient
+	MsgGateway   pbMsgGw.MsgGatewayClient
+	Rtc          pbRtc.RtcServiceClient
 
 	mu    sync.RWMutex
 	conns map[string]*grpc.ClientConn
@@ -52,6 +56,8 @@ func NewClients(cfg *config.GatewayConfig) (*Clients, error) {
 		{"conversation", func(c *Clients, conn *grpc.ClientConn) { c.Conversation = pbConv.NewConversationClient(conn) }},
 		{"message", func(c *Clients, conn *grpc.ClientConn) { c.Message = pbMsg.NewMessageClient(conn) }},
 		{"file", func(c *Clients, conn *grpc.ClientConn) { c.File = pbFile.NewFileServiceClient(conn) }},
+		{"msggateway", func(c *Clients, conn *grpc.ClientConn) { c.MsgGateway = pbMsgGw.NewMsgGatewayClient(conn) }},
+		{"rtc", func(c *Clients, conn *grpc.ClientConn) { c.Rtc = pbRtc.NewRtcServiceClient(conn) }},
 	}
 
 	for _, b := range backends {
@@ -96,6 +102,8 @@ func (c *Clients) Reload(ctx context.Context, newCfg *config.GatewayConfig) erro
 		{"conversation", func(c *Clients, conn *grpc.ClientConn) { c.Conversation = pbConv.NewConversationClient(conn) }},
 		{"message", func(c *Clients, conn *grpc.ClientConn) { c.Message = pbMsg.NewMessageClient(conn) }},
 		{"file", func(c *Clients, conn *grpc.ClientConn) { c.File = pbFile.NewFileServiceClient(conn) }},
+		{"msggateway", func(c *Clients, conn *grpc.ClientConn) { c.MsgGateway = pbMsgGw.NewMsgGatewayClient(conn) }},
+		{"rtc", func(c *Clients, conn *grpc.ClientConn) { c.Rtc = pbRtc.NewRtcServiceClient(conn) }},
 	}
 
 	for _, b := range backends {
@@ -116,6 +124,8 @@ func (c *Clients) Reload(ctx context.Context, newCfg *config.GatewayConfig) erro
 	c.Conversation = newClients.Conversation
 	c.Message = newClients.Message
 	c.File = newClients.File
+	c.MsgGateway = newClients.MsgGateway
+	c.Rtc = newClients.Rtc
 	c.conns = newClients.conns
 	c.mu.Unlock()
 

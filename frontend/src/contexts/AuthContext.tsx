@@ -1,13 +1,11 @@
 "use client";
 
-// ============================================================
-// AuthContext — 认证状态全局管理
-// ============================================================
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+// AuthContext ? session / auth state (IMSDK)
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import type { User, LoginRequest, RegisterRequest } from "@/types";
-import * as api from "@/services/api";
+import { IMSDK } from "@/suim-sdk";
 import * as storage from "@/services/storage";
-import { wsManager } from "@/services/websocket";
+import { onAuthExpired } from "@/services/auth-events";
 import { isMockMode, mockCurrentUser } from "@/services/mock-data";
 
 interface AuthState {
@@ -21,11 +19,18 @@ interface AuthContextValue extends AuthState {
   login: (data: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   updateProfile: (data: { nickname: string; avatarFile?: File }) => Promise<User>;
   clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function clearSessionLocally() {
+  IMSDK.disconnect();
+  IMSDK.markLoggedIn(false);
+  storage.clearAll();
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -34,43 +39,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: false,
     error: null,
   });
+  const loggingOutRef = useRef(false);
 
-  // 启动时检查本地是否有缓存的 token
+  const forceLogout = useCallback((message?: string) => {
+    if (loggingOutRef.current) return;
+    loggingOutRef.current = true;
+    clearSessionLocally();
+    setState({
+      user: null,
+      isLoading: false,
+      isAuthenticated: false,
+      error: message || null,
+    });
+    loggingOutRef.current = false;
+  }, []);
+
   useEffect(() => {
+    let cancelled = false;
     const init = async () => {
       if (isMockMode) {
-        setState({
-          user: mockCurrentUser,
-          isLoading: false,
-          isAuthenticated: true,
-          error: null,
-        });
+        if (!cancelled) {
+          setState({
+            user: mockCurrentUser,
+            isLoading: false,
+            isAuthenticated: true,
+            error: null,
+          });
+        }
         return;
       }
 
       const token = storage.getToken();
       if (!token) {
-        // 没有 token，清除可能的脏数据
         storage.removeCachedUser();
-        setState((s) => ({ ...s, isLoading: false }));
+        if (!cancelled) setState((s) => ({ ...s, isLoading: false }));
         return;
       }
 
       try {
-        // 先用 API 验证 token 是否仍然有效
-        const user = await api.getCurrentUser();
+        const user = await IMSDK.getSelfUserInfo();
+        if (cancelled) return;
         storage.setCachedUser(user);
+        IMSDK.markLoggedIn(true);
         setState({
           user,
           isLoading: false,
           isAuthenticated: true,
           error: null,
         });
-        // token 验证通过后才建立 WebSocket 连接
-        wsManager.connect();
+        IMSDK.connect();
       } catch {
-        // Token 过期或无效 — 清除并回到未登录状态
-        storage.clearAll();
+        if (cancelled) return;
+        clearSessionLocally();
         setState({
           user: null,
           isLoading: false,
@@ -80,8 +100,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    init();
+    void init();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    const unsubAuth = onAuthExpired((reason) => {
+      forceLogout(
+        reason === "kick"
+          ? "Account logged in elsewhere or session expired"
+          : "Session expired, please login again"
+      );
+    });
+    const unsubKick = IMSDK.on("kick", () => {
+      forceLogout("Account logged in elsewhere or session expired");
+    });
+    return () => {
+      unsubAuth();
+      unsubKick();
+    };
+  }, [forceLogout]);
 
   const login = useCallback(async (data: LoginRequest) => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
@@ -90,8 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      // 联调模式：直接调用真实 API（dev 模式下也走真实请求）
-      const res = await api.login(data);
+      const res = await IMSDK.login(data);
+      if (!res.token || !res.user?.userId) {
+        throw new Error("Invalid login response");
+      }
       storage.setToken(res.token);
       storage.setCachedUser(res.user);
       setState({
@@ -100,9 +142,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: true,
         error: null,
       });
-      wsManager.connect();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "登录失败，请检查后端服务";
+      const message = err instanceof Error ? err.message : "Login failed";
       setState((s) => ({ ...s, isLoading: false, error: message }));
       throw err;
     }
@@ -112,7 +153,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, isLoading: true, error: null }));
     if (isMockMode) {
       setState({
-        user: { ...mockCurrentUser, username: data.username, displayName: data.displayName || data.username, email: data.email },
+        user: {
+          ...mockCurrentUser,
+          username: data.username,
+          displayName: data.displayName || data.username,
+          email: data.email,
+        },
         isLoading: false,
         isAuthenticated: true,
         error: null,
@@ -120,40 +166,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      // 联调模式：直接调用真实 API
-      const res = await api.register(data);
-      // 注册后自动登录以获取 token（后端注册接口不返回 token）
+      const res = await IMSDK.register(data);
       if (!res.token) {
-        const loginRes = await api.login({
+        const loginRes = await IMSDK.login({
           username: data.email,
           password: data.password,
         });
-        if (loginRes.token) {
-          storage.setToken(loginRes.token);
-          storage.setCachedUser(loginRes.user);
-          setState({
-            user: loginRes.user,
-            isLoading: false,
-            isAuthenticated: true,
-            error: null,
-          });
-          wsManager.connect();
-          return;
+        if (!loginRes.token || !loginRes.user?.userId) {
+          throw new Error("Registered but login failed, please login manually");
         }
-        // auto-login 没拿到 token，强制回登录页
-        throw new Error("注册成功但登录失败，请手动登录");
+        storage.setToken(loginRes.token);
+        storage.setCachedUser(loginRes.user);
+        setState({
+          user: loginRes.user,
+          isLoading: false,
+          isAuthenticated: true,
+          error: null,
+        });
+        return;
       }
-      if (res.token) storage.setToken(res.token);
+      storage.setToken(res.token);
       storage.setCachedUser(res.user);
+      IMSDK.markLoggedIn(true);
+      IMSDK.connect();
       setState({
         user: res.user,
         isLoading: false,
         isAuthenticated: true,
         error: null,
       });
-      wsManager.connect();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "注册失败，请检查后端服务";
+      const message = err instanceof Error ? err.message : "Register failed";
       setState((s) => ({ ...s, isLoading: false, error: message }));
       throw err;
     }
@@ -161,16 +204,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     if (isMockMode) {
-      setState({ user: mockCurrentUser, isLoading: false, isAuthenticated: true, error: null });
+      setState({ user: null, isLoading: false, isAuthenticated: false, error: null });
       return;
     }
     try {
-      await api.logout();
+      await IMSDK.logout();
     } catch {
-      // 登出 API 调用失败也不影响本地清理
+      // ignore
     }
-    wsManager.disconnect();
-    storage.clearAll();
+    clearSessionLocally();
     setState({
       user: null,
       isLoading: false,
@@ -183,23 +225,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, error: null }));
   }, []);
 
-  const updateProfile = useCallback(async (data: { nickname: string; avatarFile?: File }) => {
-    if (!state.user) throw new Error("尚未登录");
-    if (isMockMode) {
-      const next = { ...state.user, displayName: data.nickname, username: data.nickname, avatar: data.avatarFile ? URL.createObjectURL(data.avatarFile) : state.user.avatar };
-      setState((s) => ({ ...s, user: next }));
-      return next;
-    }
-    if (data.avatarFile) await api.uploadAvatar(data.avatarFile, { type: "user", id: state.user.userId });
-    const next = await api.updateCurrentUser({ nickname: data.nickname });
-    storage.setCachedUser(next);
-    setState((s) => ({ ...s, user: next }));
-    return next;
-  }, [state.user]);
+  const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
+    if (isMockMode) return;
+    await IMSDK.changePassword(oldPassword, newPassword);
+    clearSessionLocally();
+    setState({ user: null, isLoading: false, isAuthenticated: false, error: null });
+  }, []);
+
+  const updateProfile = useCallback(
+    async (data: { nickname: string; avatarFile?: File }) => {
+      if (!state.user) throw new Error("Not logged in");
+      if (isMockMode) {
+        const next = {
+          ...state.user,
+          displayName: data.nickname,
+          username: data.nickname,
+          avatar: data.avatarFile ? URL.createObjectURL(data.avatarFile) : state.user.avatar,
+        };
+        setState((s) => ({ ...s, user: next }));
+        return next;
+      }
+      let avatarUrl: string | undefined;
+      if (data.avatarFile) {
+        avatarUrl = await IMSDK.uploadAvatar(data.avatarFile, {
+          type: "user",
+          id: state.user.userId,
+        });
+      }
+      const next = await IMSDK.setSelfInfo({
+        nickname: data.nickname,
+        ...(avatarUrl ? { avatarUrl } : {}),
+      });
+      // Ensure avatar is present even if GET /me lags
+      const merged = avatarUrl && !next.avatar ? { ...next, avatar: avatarUrl } : next;
+      storage.setCachedUser(merged);
+      setState((s) => ({ ...s, user: merged }));
+      return merged;
+    },
+    [state.user]
+  );
 
   return (
     <AuthContext.Provider
-      value={{ ...state, login, register, logout, updateProfile, clearError }}
+      value={{ ...state, login, register, logout, changePassword, updateProfile, clearError }}
     >
       {children}
     </AuthContext.Provider>

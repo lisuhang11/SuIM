@@ -25,6 +25,8 @@ message Conversation {
   int64  latest_msg_destruct_time = 16;
   bool   is_msg_destruct         = 17;
   int64  create_time             = 18;
+  // SuIM 扩展：列表预览用最后一条消息（OpenIM Conversation 无此字段；排序列表见 ConversationElem.msg_info）
+  MsgInfo msg_info               = 19;
 }
 
 // ConversationReq carries the fields that may be partially updated. Every field
@@ -48,11 +50,33 @@ message ConversationReq {
   optional int64  latest_msg_destruct_time = 16;
 }
 
+// MsgInfo 对齐 OpenIM ConversationElem.msgInfo：排序会话列表中的最后一条消息预览。
+message MsgInfo {
+  string server_msg_id = 1;
+  string client_msg_id = 2;
+  int32  session_type = 3;
+  string send_id = 4;
+  string recv_id = 5;
+  string sender_name = 6;
+  string face_url = 7;
+  string group_id = 8;
+  string group_name = 9;
+  string group_face_url = 10;
+  int32  group_type = 11;
+  uint32 group_member_count = 12;
+  int64  latest_msg_recv_time = 13;
+  int32  msg_from = 14;
+  int32  content_type = 15;
+  string content = 16;
+  string ex = 17;
+}
+
 message ConversationElem {
   string conversation_id = 1;
   int32  recv_msg_opt    = 2;
   int64  unread_count    = 3;
   bool   is_pinned       = 4;
+  MsgInfo msg_info       = 5;
 }
 
 // --------------- SetConversation ---------------
@@ -95,7 +119,7 @@ message GetSortedConversationListReq {
   int32  limit                    = 4;
 }
 message GetSortedConversationListResp {
-  int64 total          = 1;
+  int64 total          = 1; // 同 OpenIM conversationTotal
   int64 unread_total   = 2;
   repeated ConversationElem conversation_elems = 3;
 }
@@ -143,7 +167,7 @@ message GetConversationIDsResp {
 // --------------- SetConversations ---------------
 message SetConversationsReq {
   repeated string user_ids = 1;
-  Conversation conversation = 2;
+  ConversationReq conversation = 2; // 对齐 OpenIM：部分字段更新
 }
 message SetConversationsResp {}
 
@@ -208,6 +232,7 @@ message GetNotNotifyConversationIDsResp {
 message DeleteConversationsReq {
   string owner_user_id          = 1;
   repeated string conversation_ids = 2;
+  int64  need_delete_time       = 3; // 对齐 OpenIM：可选，>0 时仅删 create_time 早于该时刻的会话
 }
 message DeleteConversationsResp {}
 

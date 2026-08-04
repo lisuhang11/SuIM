@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package push;
+
+import "message.proto";
+
+option go_package = "SuIM/proto/pushpb";
+
+// PushMsgReq is the request for pushing a message notification to specified users.
+message PushMsgReq {
+  .message.MsgData msg_data = 1;
+  string conversation_id = 2;
+  repeated string user_ids = 3;
+}
+
+message PushMsgResp {}
+
+// SetUserPushTokenReq stores a user's push token for a given platform.
+message SetUserPushTokenReq {
+  string user_id = 1;
+  int32 platform_id = 2;
+  string token = 3;
+}
+
+message SetUserPushTokenResp {}
+
+// DelUserPushTokenReq deletes a user's push token for a given platform.
+message DelUserPushTokenReq {
+  string user_id = 1;
+  int32 platform_id = 2;
+}
+
+message DelUserPushTokenResp {}
+
+service PushMsgService {
+  rpc PushMsg(PushMsgReq) returns (PushMsgResp);
+  rpc SetUserPushToken(SetUserPushTokenReq) returns (SetUserPushTokenResp);
+  rpc DelUserPushToken(DelUserPushTokenReq) returns (DelUserPushTokenResp);
+}

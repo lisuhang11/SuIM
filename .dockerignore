@@ -1,0 +1,9 @@
+# SuIM Docker build ignore
+.git
+.gitignore
+deploy/
+*.md
+migrations/
+*.jpg
+*.png
+*.svg

@@ -1,0 +1,239 @@
+syntax = "proto3";
+
+package relation;
+
+option go_package = "SuIM/proto/relationpb";
+
+// RelationService manages friend relationships and blocks between users.
+service RelationService {
+  // Friend request operations
+  rpc SendFriendRequest(SendFriendRequestReq) returns (SendFriendRequestResp);
+  rpc RespondFriendApply(RespondFriendApplyReq) returns (RespondFriendApplyResp);
+  rpc GetIncomingApplyTo(GetIncomingApplyToReq) returns (GetIncomingApplyToResp);
+  rpc GetOutgoingApplyFrom(GetOutgoingApplyFromReq) returns (GetOutgoingApplyFromResp);
+  rpc GetUnhandledApplyCount(GetUnhandledApplyCountReq) returns (GetUnhandledApplyCountResp);
+
+  // Friend management
+  rpc DeleteFriend(DeleteFriendReq) returns (DeleteFriendResp);
+  rpc GetFriends(GetFriendsReq) returns (GetFriendsResp);
+  rpc UpdateFriend(UpdateFriendReq) returns (UpdateFriendResp);
+  rpc GetIncrementalFriends(GetIncrementalFriendsReq) returns (GetIncrementalFriendsResp);
+  rpc GetFullFriendUserIDs(GetFullFriendUserIDsReq) returns (GetFullFriendUserIDsResp);
+
+  // Internal: user profile change → bump friend versions for owners who friended this user
+  rpc NotificationUserInfoUpdate(NotificationUserInfoUpdateReq) returns (NotificationUserInfoUpdateResp);
+
+  // Block management
+  rpc BlockUser(BlockUserReq) returns (BlockUserResp);
+  rpc UnblockUser(UnblockUserReq) returns (UnblockUserResp);
+  rpc GetBlockedUsers(GetBlockedUsersReq) returns (GetBlockedUsersResp);
+
+  // Bidirectional relation checks
+  rpc IsFriend(IsFriendReq) returns (IsFriendResp);
+  rpc IsBlack(IsBlackReq) returns (IsBlackResp);
+}
+
+// --------------- FriendRequestInfo ---------------
+// status: 0 = pending, 1 = accepted, -1 = rejected
+message FriendRequestInfo {
+  string from_user_id = 1;
+  string to_user_id   = 2;
+  string message      = 3;
+  string handle_msg   = 4;
+  int32  status       = 5;
+  int64  created_at   = 6;
+  int64  updated_at   = 7;
+}
+
+// --------------- SendFriendRequest ---------------
+message SendFriendRequestReq {
+  string from_user_id = 1;
+  string to_user_id   = 2;
+  string message      = 3;
+}
+
+// empty: success is implied by gRPC status OK
+message SendFriendRequestResp {}
+
+// --------------- RespondFriendApply ---------------
+// Accept or reject a friend request. handle_result: 1 = accepted, -1 = rejected.
+message RespondFriendApplyReq {
+  string from_user_id  = 1; // sender of the friend request
+  string to_user_id    = 2; // receiver of the friend request (must equal the current user)
+  int32  handle_result = 3; // 1 = accept, -1 = reject
+  string handle_msg    = 4;
+}
+
+message RespondFriendApplyResp {}
+
+// --------------- GetIncomingApplyTo ---------------
+// Get received friend requests. handle_results filters by status; e.g. [0] = pending only.
+message GetIncomingApplyToReq {
+  string        user_id        = 1;
+  int32         limit          = 2;
+  int32         offset         = 3;
+  repeated int32 handle_results = 4; // 0=pending, 1=accepted, -1=rejected
+}
+
+message GetIncomingApplyToResp {
+  repeated FriendRequestInfo requests = 1;
+  int32                      total    = 2;
+}
+
+// --------------- GetOutgoingApplyFrom ---------------
+// Get sent friend requests. handle_results filters by status; e.g. [0] = pending only.
+message GetOutgoingApplyFromReq {
+  string        user_id        = 1;
+  int32         limit          = 2;
+  int32         offset         = 3;
+  repeated int32 handle_results = 4; // 0=pending, 1=accepted, -1=rejected
+}
+
+message GetOutgoingApplyFromResp {
+  repeated FriendRequestInfo requests = 1;
+  int32                      total    = 2;
+}
+
+// --------------- GetUnhandledApplyCount ---------------
+message GetUnhandledApplyCountReq {
+  string user_id = 1;
+}
+
+message GetUnhandledApplyCountResp {
+  int64 count = 1;
+}
+
+// --------------- DeleteFriend ---------------
+message DeleteFriendReq {
+  string user_id   = 1;
+  string friend_id = 2;
+}
+
+message DeleteFriendResp {}
+
+// --------------- FriendInfo ---------------
+message FriendInfo {
+  string friend_user_id = 1;
+  string remark         = 2;
+  bool   is_pinned      = 3;
+  int64  create_time    = 4; // unix milliseconds
+  // Display fields joined at read time (not stored on friend row).
+  string nickname       = 5;
+  string avatar_url     = 6;
+}
+
+// --------------- GetIncrementalFriends ---------------
+message GetIncrementalFriendsReq {
+  string user_id    = 1;
+  string version_id = 2;
+  uint64 version    = 3;
+}
+
+message GetIncrementalFriendsResp {
+  uint64 version      = 1;
+  string version_id   = 2;
+  bool   full         = 3;
+  repeated string delete = 4;
+  repeated FriendInfo insert = 5;
+  repeated FriendInfo update = 6;
+  uint64 sort_version = 7;
+}
+
+// --------------- GetFullFriendUserIDs ---------------
+message GetFullFriendUserIDsReq {
+  string user_id = 1;
+}
+
+message GetFullFriendUserIDsResp {
+  repeated string user_ids = 1;
+}
+
+// --------------- NotificationUserInfoUpdate ---------------
+message NotificationUserInfoUpdateReq {
+  string user_id = 1; // user whose nickname/avatar changed
+}
+
+message NotificationUserInfoUpdateResp {}
+
+// --------------- GetFriends ---------------
+message GetFriendsReq {
+  string user_id = 1;
+  int32  limit   = 2;
+  int32  offset  = 3;
+}
+
+message GetFriendsResp {
+  repeated FriendInfo friends = 1;
+  int32               total   = 2;
+}
+
+// --------------- UpdateFriend ---------------
+// Partial update: only set fields are applied. remark="" clears remark.
+message UpdateFriendReq {
+  string owner_user_id  = 1;
+  string friend_user_id = 2;
+  optional string remark    = 3;
+  optional bool   is_pinned = 4;
+}
+
+message UpdateFriendResp {}
+
+// --------------- BlockUser ---------------
+message BlockUserReq {
+  string user_id         = 1;
+  string blocked_user_id = 2;
+}
+
+message BlockUserResp {}
+
+// --------------- UnblockUser ---------------
+message UnblockUserReq {
+  string user_id         = 1;
+  string blocked_user_id = 2;
+}
+
+message UnblockUserResp {}
+
+// --------------- BlackInfo ---------------
+message BlackInfo {
+  string blocked_user_id  = 1;
+  int64  create_time      = 2; // unix milliseconds
+  int32  add_source       = 3;
+  string operator_user_id = 4;
+  string ex               = 5;
+}
+
+// --------------- GetBlockedUsers ---------------
+message GetBlockedUsersReq {
+  string user_id = 1;
+  int32  limit   = 2;
+  int32  offset  = 3;
+}
+
+message GetBlockedUsersResp {
+  repeated BlackInfo blacks = 1;
+  int32              total  = 2;
+}
+
+// --------------- IsFriend ---------------
+// Both directions are queried independently; caller decides what "friend" means.
+message IsFriendReq {
+  string user1 = 1;
+  string user2 = 2;
+}
+
+message IsFriendResp {
+  bool in_user1_friends = 1; // user2 is in user1's friend list
+  bool in_user2_friends = 2; // user1 is in user2's friend list
+}
+
+// --------------- IsBlack ---------------
+message IsBlackReq {
+  string user1 = 1;
+  string user2 = 2;
+}
+
+message IsBlackResp {
+  bool in_user1_blacklist = 1; // user1 has blocked user2
+  bool in_user2_blacklist = 2; // user2 has blocked user1
+}

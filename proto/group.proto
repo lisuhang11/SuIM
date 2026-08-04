@@ -1,0 +1,364 @@
+syntax = "proto3";
+
+import "file.proto";
+
+package group;
+
+option go_package = "SuIM/proto/grouppb";
+
+// GroupService manages groups, their members, and join requests.
+// Success/failure is conveyed by gRPC status; response messages carry business data only.
+service GroupService {
+  // Group lifecycle
+  rpc CreateGroup(CreateGroupReq) returns (CreateGroupResp);
+  rpc DismissGroup(DismissGroupReq) returns (DismissGroupResp);
+  rpc TransferGroupOwner(TransferGroupOwnerReq) returns (TransferGroupOwnerResp);
+  rpc UpdateGroupInfo(UpdateGroupInfoReq) returns (UpdateGroupInfoResp);
+  rpc InitiateAvatarUpload(InitiateGroupAvatarUploadReq) returns (InitiateGroupAvatarUploadResp);
+  rpc CompleteAvatarUpload(CompleteGroupAvatarUploadReq) returns (CompleteGroupAvatarUploadResp);
+  rpc GetGroup(GetGroupReq) returns (GetGroupResp);
+  rpc GetGroupsInfo(GetGroupsInfoReq) returns (GetGroupsInfoResp);
+
+  // Members
+  rpc InviteUserToGroup(InviteUserToGroupReq) returns (InviteUserToGroupResp);
+  rpc KickGroupMember(KickGroupMemberReq) returns (KickGroupMemberResp);
+  rpc QuitGroup(QuitGroupReq) returns (QuitGroupResp);
+  rpc GetGroupMembers(GetGroupMembersReq) returns (GetGroupMembersResp);
+  rpc GetGroupMemberUserIDs(GetGroupMemberUserIDsReq) returns (GetGroupMemberUserIDsResp);
+  rpc GetJoinedGroups(GetJoinedGroupsReq) returns (GetJoinedGroupsResp);
+
+  // Incremental joined-group sync (OpenIM GetIncrementalJoinGroup)
+  rpc GetIncrementalJoinGroup(GetIncrementalJoinGroupReq) returns (GetIncrementalJoinGroupResp);
+  rpc GetFullJoinGroupIDs(GetFullJoinGroupIDsReq) returns (GetFullJoinGroupIDsResp);
+
+  // Incremental group-member sync (OpenIM GetIncrementalGroupMember)
+  rpc GetIncrementalGroupMember(GetIncrementalGroupMemberReq) returns (GetIncrementalGroupMemberResp);
+  rpc GetFullGroupMemberUserIDs(GetFullGroupMemberUserIDsReq) returns (GetFullGroupMemberUserIDsResp);
+
+  // Mute
+  rpc SetGroupMute(SetGroupMuteReq) returns (SetGroupMuteResp);
+  rpc SetMemberMute(SetMemberMuteReq) returns (SetMemberMuteResp);
+
+  // Join requests
+  rpc ApplyToJoinGroup(ApplyToJoinGroupReq) returns (ApplyToJoinGroupResp);
+  rpc GetPendingApplications(GetPendingApplicationsReq) returns (GetPendingApplicationsResp);
+  rpc GetUserApplications(GetUserApplicationsReq) returns (GetUserApplicationsResp);
+  rpc HandleApplication(HandleApplicationReq) returns (HandleApplicationResp);
+  rpc GetUnhandledApplicationCount(GetUnhandledApplicationCountReq) returns (GetUnhandledApplicationCountResp);
+}
+
+// --------------- GroupInfo ---------------
+message GroupInfo {
+  string group_id = 1;
+  string group_name = 2;
+  string notification = 3;
+  string introduction = 4;
+  string face_url = 5;
+  int64  create_time = 6;
+  string ex = 7;
+  int32  status = 8;             // bit0: 全员禁言
+  string creator_user_id = 9;
+  int32  group_type = 10;
+  int32  need_verification = 11; // 加群是否需要验证
+  int32  look_member_info = 12;  // 是否允许查看成员信息
+  int32  apply_member_friend = 13; // 是否允许成员互加好友
+  int64  notification_update_time = 14;
+  string notification_user_id = 15;
+  // 对齐 OpenIM：不落 group 表，读时由 group_member 聚合填充。
+  int32  member_count = 16;
+  // 对齐 OpenIM ownerUserID：当前群主，读时由 role=owner 的成员填充（可与 creator 不同）。
+  string owner_user_id = 17;
+}
+
+// --------------- GroupMemberFullInfo ---------------
+message GroupMemberFullInfo {
+  string group_id = 1;
+  string user_id = 2;
+  string nickname = 3;
+  string face_url = 4;
+  int32  role_level = 5;         // 0普通 1管理员 2群主
+  int64  join_time = 6;
+  int32  join_source = 7;
+  string inviter_user_id = 8;
+  string operator_user_id = 9;
+  int64  mute_end_time = 10;     // 0=未禁言
+  string ex = 11;
+}
+
+// --------------- GroupRequestInfo ---------------
+message GroupRequestInfo {
+  string user_id = 1;
+  string group_id = 2;
+  int32  handle_result = 3;      // 0未处理 1同意 -1拒绝
+  string req_msg = 4;
+  string handled_msg = 5;
+  int64  req_time = 6;
+  string handle_user_id = 7;
+  int64  handled_time = 8;
+  int32  join_source = 9;
+  string inviter_user_id = 10;
+  string ex = 11;
+}
+
+// --------------- CreateGroup ---------------
+message CreateGroupReq {
+  string creator_user_id = 1;
+  string group_name = 2;
+  string notification = 3;
+  string introduction = 4;
+  string face_url = 5;
+  int32  group_type = 6;
+  int32  need_verification = 7;
+  int32  look_member_info = 8;
+  int32  apply_member_friend = 9;
+  repeated string member_ids = 10; // 初始成员(由创建者邀请)
+  string ex = 11;
+}
+message CreateGroupResp {
+  string group_id = 1;
+  GroupInfo group = 2;
+}
+
+// --------------- DismissGroup ---------------
+message DismissGroupReq {
+  string group_id = 1;
+  string op_user_id = 2; // 必须为群主
+}
+message DismissGroupResp {}
+
+// --------------- TransferGroupOwner ---------------
+message TransferGroupOwnerReq {
+  string group_id = 1;
+  string op_user_id = 2;          // 当前群主
+  string new_owner_user_id = 3;
+}
+message TransferGroupOwnerResp {}
+
+// --------------- UpdateGroupInfo ---------------
+message UpdateGroupInfoReq {
+  string group_id = 1;
+  string op_user_id = 2;          // deprecated: 服务端使用认证上下文中的用户
+  optional string group_name = 3;
+  optional string notification = 4;
+  optional string introduction = 5;
+  optional string face_url = 6;
+  optional int32  need_verification = 7;
+  optional int32  look_member_info = 8;
+  optional int32  apply_member_friend = 9;
+  optional string ex = 10;
+}
+message UpdateGroupInfoResp {
+  GroupInfo group = 1;
+}
+
+message InitiateGroupAvatarUploadReq {
+  string group_id = 1;
+  string name = 2;
+  string content_type = 3;
+  int64 size = 4;
+  string sha256 = 5;
+}
+
+message InitiateGroupAvatarUploadResp {
+  file.InitiateUploadResp upload = 1;
+}
+
+message CompleteGroupAvatarUploadReq {
+  string group_id = 1;
+  string file_id = 2;
+}
+
+message CompleteGroupAvatarUploadResp {
+  string avatar_url = 1;
+  GroupInfo group = 2;
+  file.FileInfo file = 3;
+}
+
+// --------------- GetGroup ---------------
+message GetGroupReq {
+  string group_id = 1;
+}
+message GetGroupResp {
+  GroupInfo group = 1;
+}
+
+// --------------- GetGroupsInfo ---------------
+message GetGroupsInfoReq {
+  repeated string group_ids = 1;
+}
+message GetGroupsInfoResp {
+  repeated GroupInfo groups = 1;
+}
+
+// --------------- InviteUserToGroup ---------------
+message InviteUserToGroupReq {
+  string group_id = 1;
+  string op_user_id = 2;          // 群主/管理员
+  repeated string user_ids = 3;
+  string reason = 4;
+}
+message InviteUserToGroupResp {}
+
+// --------------- KickGroupMember ---------------
+message KickGroupMemberReq {
+  string group_id = 1;
+  string op_user_id = 2;          // 群主/管理员
+  string user_id = 3;             // 被踢成员
+}
+message KickGroupMemberResp {}
+
+// --------------- QuitGroup ---------------
+message QuitGroupReq {
+  string group_id = 1;
+  string user_id = 2;             // 退群者(不能是群主)
+}
+message QuitGroupResp {}
+
+// --------------- GetGroupMembers ---------------
+message GetGroupMembersReq {
+  string group_id = 1;
+  int32 offset = 2;
+  int32 limit = 3;
+}
+message GetGroupMembersResp {
+  repeated GroupMemberFullInfo members = 1;
+  int32 total = 2;
+}
+
+// --------------- GetGroupMemberUserIDs（对齐 OpenIM getGroupMemberUserIDs） ---------------
+message GetGroupMemberUserIDsReq {
+  string group_id = 1;
+}
+message GetGroupMemberUserIDsResp {
+  repeated string user_ids = 1;
+}
+
+// --------------- GetJoinedGroups ---------------
+message GetJoinedGroupsReq {
+  string user_id = 1;
+  int32 offset = 2;
+  int32 limit = 3;
+}
+message GetJoinedGroupsResp {
+  repeated GroupInfo groups = 1;
+  int32 total = 2;
+}
+
+// --------------- SetGroupMute ---------------
+message SetGroupMuteReq {
+  string group_id = 1;
+  string op_user_id = 2;          // 群主/管理员
+  bool is_muted = 3;
+}
+message SetGroupMuteResp {}
+
+// --------------- SetMemberMute ---------------
+message SetMemberMuteReq {
+  string group_id = 1;
+  string op_user_id = 2;          // 群主/管理员
+  string user_id = 3;             // 被禁言成员
+  int64 mute_end_time = 4;        // 0=取消禁言, 否则禁言到该时间戳(ms)
+}
+message SetMemberMuteResp {}
+
+// --------------- ApplyToJoinGroup ---------------
+message ApplyToJoinGroupReq {
+  string group_id = 1;
+  string user_id = 2;
+  string req_msg = 3;
+  int32 join_source = 4;
+  string inviter_user_id = 5;
+}
+message ApplyToJoinGroupResp {}
+
+// --------------- GetPendingApplications ---------------
+message GetPendingApplicationsReq {
+  string group_id = 1;
+  string op_user_id = 2;          // 群主/管理员
+  int32 offset = 3;
+  int32 limit = 4;
+}
+message GetPendingApplicationsResp {
+  repeated GroupRequestInfo requests = 1;
+  int32 total = 2;
+}
+
+// --------------- GetUserApplications ---------------
+message GetUserApplicationsReq {
+  string user_id = 1;
+  int32 offset = 2;
+  int32 limit = 3;
+}
+message GetUserApplicationsResp {
+  repeated GroupRequestInfo requests = 1;
+  int32 total = 2;
+}
+
+// --------------- HandleApplication ---------------
+message HandleApplicationReq {
+  string group_id = 1;
+  string user_id = 2;            // 申请人
+  string op_user_id = 3;         // 群主/管理员
+  int32 handle_result = 4;       // 1同意 -1拒绝
+  string handled_msg = 5;
+}
+message HandleApplicationResp {}
+
+// --------------- GetUnhandledApplicationCount ---------------
+message GetUnhandledApplicationCountReq {
+  string group_id = 1;
+}
+message GetUnhandledApplicationCountResp {
+  int32 count = 1;
+}
+
+// --------------- GetIncrementalJoinGroup ---------------
+message GetIncrementalJoinGroupReq {
+  string user_id    = 1;
+  string version_id = 2;
+  uint64 version    = 3;
+}
+message GetIncrementalJoinGroupResp {
+  uint64 version      = 1;
+  string version_id   = 2;
+  bool   full         = 3;
+  repeated string delete = 4;
+  repeated GroupInfo insert = 5;
+  repeated GroupInfo update = 6;
+  uint64 sort_version = 7;
+}
+
+// --------------- GetFullJoinGroupIDs ---------------
+message GetFullJoinGroupIDsReq {
+  string user_id = 1;
+}
+message GetFullJoinGroupIDsResp {
+  repeated string group_ids = 1;
+}
+
+// --------------- GetIncrementalGroupMember ---------------
+message GetIncrementalGroupMemberReq {
+  string group_id   = 1;
+  string version_id = 2;
+  uint64 version    = 3;
+}
+message GetIncrementalGroupMemberResp {
+  uint64 version      = 1;
+  string version_id   = 2;
+  bool   full         = 3;
+  repeated string delete = 4;
+  repeated GroupMemberFullInfo insert = 5;
+  repeated GroupMemberFullInfo update = 6;
+  GroupInfo group = 7;
+  uint64 sort_version = 8;
+}
+
+// --------------- GetFullGroupMemberUserIDs ---------------
+message GetFullGroupMemberUserIDsReq {
+  string group_id = 1;
+}
+message GetFullGroupMemberUserIDsResp {
+  repeated string user_ids = 1;
+  uint64 version = 2;
+  string version_id = 3;
+}

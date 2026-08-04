@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package file;
+
+option go_package = "SuIM/proto/filepb";
+
+message FileInfo {
+  string file_id = 1;
+  string owner_id = 2;
+  string name = 3;
+  string content_type = 4;
+  int64 size = 5;
+  string sha256 = 6;
+  string category = 7;
+  string status = 8;
+  int64 created_at = 9;
+  int64 expires_at = 10;
+  string purpose = 11;
+}
+
+message InitiateUploadReq {
+  string user_id = 1;
+  string name = 2;
+  string content_type = 3;
+  int64 size = 4;
+  string sha256 = 5;
+  string purpose = 6;
+}
+
+message InitiateUploadResp {
+  FileInfo file = 1;
+  string upload_url = 2;
+  map<string, string> headers = 3;
+  int64 upload_expires_at = 4;
+  bool already_uploaded = 5;
+}
+
+message CompleteUploadReq {
+  string user_id = 1;
+  string file_id = 2;
+}
+
+message CompleteUploadResp { FileInfo file = 1; }
+
+message BindFileReq {
+  string user_id = 1;
+  string file_id = 2;
+  string conversation_id = 3;
+}
+
+message BindFileResp { FileInfo file = 1; }
+
+message GetDownloadURLReq {
+  string user_id = 1;
+  string file_id = 2;
+}
+
+message GetDownloadURLResp {
+  FileInfo file = 1;
+  string download_url = 2;
+  int64 expires_at = 3;
+}
+
+message GetFileReq {
+  string user_id = 1;
+  string file_id = 2;
+}
+
+message GetFileResp { FileInfo file = 1; }
+
+message DeleteFileReq {
+  string user_id = 1;
+  string file_id = 2;
+}
+
+message DeleteFileResp {}
+
+message ActivateAvatarReq {
+  string user_id = 1;
+  string file_id = 2;
+  string target_type = 3;
+  string target_id = 4;
+}
+
+message ActivateAvatarResp { FileInfo file = 1; }
+
+service FileService {
+  rpc InitiateUpload(InitiateUploadReq) returns (InitiateUploadResp);
+  rpc CompleteUpload(CompleteUploadReq) returns (CompleteUploadResp);
+  rpc BindFile(BindFileReq) returns (BindFileResp);
+  rpc GetDownloadURL(GetDownloadURLReq) returns (GetDownloadURLResp);
+  rpc GetFile(GetFileReq) returns (GetFileResp);
+  rpc DeleteFile(DeleteFileReq) returns (DeleteFileResp);
+  rpc ActivateAvatar(ActivateAvatarReq) returns (ActivateAvatarResp);
+}

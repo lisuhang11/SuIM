@@ -1,0 +1,180 @@
+syntax = "proto3";
+
+import "file.proto";
+
+package user;
+
+option go_package = "SuIM/proto/userpb";
+
+// UserService provides user management and authentication RPCs.
+// Success/failure is conveyed by gRPC status; response messages carry business data only.
+service UserService {
+  rpc Register(RegisterReq) returns (RegisterResp);
+  rpc Login(LoginReq) returns (LoginResp);
+  rpc GetUser(GetUserReq) returns (GetUserResp);
+  rpc GetUsersByIDs(GetUsersByIDsReq) returns (GetUsersByIDsResp);
+  rpc UpdateUser(UpdateUserReq) returns (UpdateUserResp);
+  rpc InitiateAvatarUpload(InitiateUserAvatarUploadReq) returns (InitiateUserAvatarUploadResp);
+  rpc CompleteAvatarUpload(CompleteUserAvatarUploadReq) returns (CompleteUserAvatarUploadResp);
+  rpc DeleteUser(DeleteUserReq) returns (DeleteUserResp);
+  rpc ChangePassword(ChangePasswordReq) returns (ChangePasswordResp);
+  rpc ValidateToken(ValidateTokenReq) returns (ValidateTokenResp);
+  rpc RefreshToken(RefreshTokenReq) returns (RefreshTokenResp);
+  rpc Logout(LogoutReq) returns (LogoutResp);
+  rpc SearchUsers(SearchUsersReq) returns (SearchUsersResp);
+  // 全局消息接收选项：0 正常接收 1 不接收消息 2 接收但不推送通知
+  rpc SetGlobalRecvMessageOpt(SetGlobalRecvMessageOptReq) returns (SetGlobalRecvMessageOptResp);
+  rpc GetGlobalRecvMessageOpt(GetGlobalRecvMessageOptReq) returns (GetGlobalRecvMessageOptResp);
+}
+
+// --------------- User message ---------------
+message UserInfo {
+  string user_id             = 1;
+  string nickname            = 2;
+  string email               = 3;
+  string avatar_url          = 4;
+  string ex                  = 5;
+  int32  app_manger_level    = 6;
+  int32  global_recv_msg_opt = 7;
+  bool   is_active           = 8;
+  int64  create_time         = 9;
+  int64  updated_at          = 10;
+}
+
+// --------------- Register ---------------
+message RegisterReq {
+  string username = 1;
+  string email    = 2;
+  string password = 3;
+}
+
+message RegisterResp {
+  UserInfo user = 1;
+}
+
+// --------------- Login ---------------
+message LoginReq {
+  string email    = 1;
+  string password = 2;
+}
+
+message LoginResp {
+  UserInfo user          = 1;
+  string   access_token  = 2;
+  string   refresh_token = 3;
+}
+
+// --------------- GetUser ---------------
+message GetUserReq {
+  string user_id = 1;
+}
+
+message GetUserResp {
+  UserInfo user = 1;
+}
+
+// --------------- GetUsersByIDs ---------------
+message GetUsersByIDsReq {
+  repeated string user_ids = 1;
+}
+
+message GetUsersByIDsResp {
+  map<string, UserInfo> users = 1;
+}
+
+// --------------- UpdateUser ---------------
+message UpdateUserReq {
+  UserInfo user = 1;
+}
+
+message UpdateUserResp {}
+
+message InitiateUserAvatarUploadReq {
+  string name = 1;
+  string content_type = 2;
+  int64 size = 3;
+  string sha256 = 4;
+}
+
+message InitiateUserAvatarUploadResp {
+  file.InitiateUploadResp upload = 1;
+}
+
+message CompleteUserAvatarUploadReq { string file_id = 1; }
+
+message CompleteUserAvatarUploadResp {
+  string avatar_url = 1;
+  UserInfo user = 2;
+  file.FileInfo file = 3;
+}
+
+// --------------- DeleteUser ---------------
+message DeleteUserReq {
+  string user_id = 1;
+}
+
+message DeleteUserResp {}
+
+// --------------- ChangePassword ---------------
+message ChangePasswordReq {
+  string user_id      = 1;
+  string old_password = 2;
+  string new_password = 3;
+}
+
+message ChangePasswordResp {}
+
+// --------------- ValidateToken ---------------
+message ValidateTokenReq {
+  string token = 1;
+}
+
+message ValidateTokenResp {
+  bool     valid = 1;
+  UserInfo user  = 2;
+}
+
+// --------------- RefreshToken ---------------
+message RefreshTokenReq {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResp {
+  string access_token   = 1;
+  string refresh_token  = 2;
+}
+
+// --------------- Logout ---------------
+message LogoutReq {
+  string token = 1;
+}
+
+message LogoutResp {}
+
+// --------------- SearchUsers ---------------
+// query 为用户 ID，仅精确匹配（添加好友场景）。
+message SearchUsersReq {
+  string query = 1;
+  int32  limit = 2;
+}
+
+message SearchUsersResp {
+  repeated UserInfo users = 1;
+}
+
+// --------------- GlobalRecvMessageOpt ---------------
+// global_recv_msg_opt: 0=ReceiveMessage 1=NotReceiveMessage 2=ReceiveNotNotifyMessage
+message SetGlobalRecvMessageOptReq {
+  string user_id             = 1;
+  int32  global_recv_msg_opt = 2;
+}
+
+message SetGlobalRecvMessageOptResp {}
+
+message GetGlobalRecvMessageOptReq {
+  string user_id = 1;
+}
+
+message GetGlobalRecvMessageOptResp {
+  int32 global_recv_msg_opt = 1;
+}

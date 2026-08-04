@@ -1,0 +1,25 @@
+-- 会话表
+CREATE TABLE `conversation` (
+                                `owner_user_id`            VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '会话所属用户ID',
+                                `conversation_id`         VARCHAR(128)  NOT NULL DEFAULT '' COMMENT '会话ID',
+                                `conversation_type`       INT           NOT NULL DEFAULT 0 COMMENT '会话类型(单聊/群聊等)',
+                                `user_id`                 VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '对端用户ID(单聊时使用)',
+                                `group_id`                VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '群组ID(群聊时使用)',
+                                `recv_msg_opt`            INT           NOT NULL DEFAULT 0 COMMENT '消息接收选项',
+                                `is_pinned`               TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '是否置顶',
+                                `is_private_chat`         TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '是否私聊',
+                                `burn_duration`           INT           NOT NULL DEFAULT 0 COMMENT '阅后即焚时长(秒)',
+                                `group_at_type`           INT           NOT NULL DEFAULT 0 COMMENT '群@类型',
+                                `attached_info`           VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '附加信息',
+                                `ex`                      VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '扩展字段(json)',
+                                `max_seq`                 BIGINT        NOT NULL DEFAULT 0 COMMENT '最大seq',
+                                `min_seq`                 BIGINT        NOT NULL DEFAULT 0 COMMENT '最小seq',
+                                `create_time`             DATETIME      NOT NULL COMMENT '创建时间',
+                                `is_msg_destruct`         TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '是否开启消息销毁',
+                                `msg_destruct_time`       BIGINT        NOT NULL DEFAULT 0 COMMENT '消息销毁时间(秒)',
+                                `latest_msg_destruct_time` DATETIME     NOT NULL COMMENT '最近一条消息销毁时间',
+                                PRIMARY KEY (`owner_user_id`, `conversation_id`),
+                                UNIQUE KEY `uk_owner_conversation` (`owner_user_id`, `conversation_id`),
+                                KEY `idx_user_id` (`user_id`),
+                                KEY `idx_conversation_id` (`conversation_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户会话表';

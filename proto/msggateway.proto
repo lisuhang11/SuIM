@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package msggateway;
+
+import "message.proto";
+
+option go_package = "SuIM/proto/msggatewaypb";
+
+message OnlinePushMsgReq {
+  .message.MsgData msg_data = 1;
+  string push_to_user_id = 2;
+}
+
+message OnlinePushMsgResp {
+  repeated SingleMsgToUserPlatform resp = 1;
+}
+
+message SingleMsgToUserResults {
+  string user_id = 1;
+  repeated SingleMsgToUserPlatform resp = 2;
+  bool online_push = 3;
+}
+
+message OnlineBatchPushOneMsgReq {
+  .message.MsgData msg_data = 1;
+  repeated string push_to_user_ids = 2;
+}
+
+message OnlineBatchPushOneMsgResp {
+  repeated SingleMsgToUserResults single_push_result = 1;
+}
+
+message SingleMsgToUserPlatform {
+  int64 result_code = 1;
+  string recv_id = 2;
+  int32 recv_platform_id = 3;
+}
+
+message GetUsersOnlineStatusReq {
+  repeated string user_ids = 1;
+}
+
+message GetUsersOnlineStatusResp {
+  repeated SuccessResult success_result = 1;
+  repeated FailedDetail failed_result = 2;
+}
+
+message SuccessResult {
+  string user_id = 1;
+  int32 status = 2;
+  repeated SuccessDetail detail_platform_status = 3;
+}
+
+message SuccessDetail {
+  int32 platform_id = 1;
+  string conn_id = 2;
+  bool is_background = 3;
+  string token = 4;
+}
+
+message FailedDetail {
+  string user_id = 1;
+}
+
+message SingleDetail {
+  string user_id = 1;
+  int32 status = 2;
+  repeated SinglePlatformToken single_platform_token = 3;
+}
+
+message SinglePlatformToken {
+  int32 platform_id = 1;
+  int32 total = 2;
+  repeated string token = 3;
+}
+
+message KickUserOfflineReq {
+  int32 platform_id = 1;
+  repeated string kick_user_id_list = 2;
+}
+
+message KickUserOfflineResp {}
+
+message MultiTerminalLoginCheckReq {
+  string user_id = 1;
+  int32 platform_id = 2;
+  string token = 3;
+}
+
+message MultiTerminalLoginCheckResp {}
+
+service MsgGateway {
+  rpc OnlinePushMsg(OnlinePushMsgReq) returns (OnlinePushMsgResp);
+  rpc GetUsersOnlineStatus(GetUsersOnlineStatusReq) returns (GetUsersOnlineStatusResp);
+  rpc OnlineBatchPushOneMsg(OnlineBatchPushOneMsgReq) returns (OnlineBatchPushOneMsgResp);
+  rpc SuperGroupOnlineBatchPushOneMsg(OnlineBatchPushOneMsgReq) returns (OnlineBatchPushOneMsgResp);
+  rpc KickUserOffline(KickUserOfflineReq) returns (KickUserOfflineResp);
+  rpc MultiTerminalLoginCheck(MultiTerminalLoginCheckReq) returns (MultiTerminalLoginCheckResp);
+}

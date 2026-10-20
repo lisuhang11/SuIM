@@ -4,3 +4,5 @@
 # Local credentials. Copy services/user/etc/user.yaml.example to user.yaml.
 .env
 services/user/etc/user.yaml
+services/relation/etc/relation.yaml
+services/apigateway/etc/apigateway.yaml

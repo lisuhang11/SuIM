@@ -3,6 +3,7 @@
 //	0         success
 //	1000-1999 common
 //	2000-2999 user
+//	3000-3999 relation
 //
 // The next service takes the following thousand.
 package errorcode

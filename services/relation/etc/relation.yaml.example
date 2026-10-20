@@ -1,0 +1,33 @@
+listenIP: 0.0.0.0
+registerIP: 127.0.0.1
+port: 8081
+
+mysql:
+  address:
+    - 127.0.0.1:3306
+  username: suim
+  password: ""
+  database: suim
+  maxOpenConn: 20
+  maxIdleConn: 10
+
+registry:
+  type: etcd
+  etcd:
+    endpoints:
+      - 127.0.0.1:2379
+    rootDir: /services
+    username: ""
+    password: ""
+    dialTimeout: 5
+    ttl: 10
+
+webhooks:
+  url: ""
+  beforeAddBlack:
+    enable: false
+    timeout: 5
+    failedContinue: false
+  afterRemoveBlack:
+    enable: false
+    timeout: 5

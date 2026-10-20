@@ -150,6 +150,116 @@ func TestSession(t *testing.T) {
 	}
 }
 
+func TestProfile(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	rdb, err := store.NewRedis(config.Redis{
+		Address:   []string{"127.0.0.1:6379"},
+		Password:  env["REDIS_PASSWORD"],
+		RedisMode: "standalone",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn, rdb)
+	if err != nil {
+		t.Skipf("mysql or redis is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	tokenCache, stopCache := logic.NewTokenCache(ctx, rdb, svcconfig.LocalCache{
+		Topic: "suim:user:token:delete:profile", SlotNum: 4, SlotSize: 64, SuccessExpire: 60, FailedExpire: 5,
+	})
+	t.Cleanup(stopCache)
+	srv := logic.New(st, token.NewIssuer(config.JWT{Secret: "test-secret", ExpireSeconds: 2592000}), tokenCache)
+
+	email := fmt.Sprintf("profile-%d@example.com", time.Now().UnixNano())
+	reg, err := srv.Register(ctx, &userpb.RegisterReq{Username: "Ada", Email: email, Password: "secret1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := reg.GetUser().GetUserId()
+	t.Cleanup(func() { cleanupUser(t, mysqlCfg, id) })
+
+	if _, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{}); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidUserID) {
+		t.Fatalf("empty user id: %v", err)
+	}
+	got, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id})
+	if err != nil || got.GetUser().GetNickname() != "Ada" {
+		t.Fatalf("get user: %+v err=%v", got, err)
+	}
+	if _, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: "missing-user"}); !isCode(err, codes.NotFound, errorcode.UserNotFound) {
+		t.Fatalf("missing user: %v", err)
+	}
+	batch, err := srv.GetUsersByIDs(ctx, &userpb.GetUsersByIDsReq{UserIds: []string{id, id, "missing-user"}})
+	if err != nil || len(batch.GetUsers()) != 1 || batch.GetUsers()[id].GetEmail() != email {
+		t.Fatalf("batch: %+v err=%v", batch, err)
+	}
+
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{User: &userpb.UserInfo{
+		UserId: id, Nickname: "Ada Lovelace", AvatarUrl: "https://example.com/a.png", IsActive: true,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id})
+	if err != nil || got.GetUser().GetNickname() != "Ada Lovelace" || got.GetUser().GetAvatarUrl() != "https://example.com/a.png" {
+		t.Fatalf("updated profile: %+v err=%v", got.GetUser(), err)
+	}
+
+	p1, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p2, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.ChangePassword(ctx, &userpb.ChangePasswordReq{UserId: id, OldPassword: "nope12", NewPassword: "secret2"}); !isCode(err, codes.Unauthenticated, errorcode.UserPasswordMismatch) {
+		t.Fatalf("bad old password: %v", err)
+	}
+	if _, err := srv.ChangePassword(ctx, &userpb.ChangePasswordReq{UserId: id, OldPassword: "secret1", NewPassword: "secret2"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: p1.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("platform 1 survived password change: %v", err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: p2.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("platform 2 survived password change: %v", err)
+	}
+	if _, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1}); !isCode(err, codes.Unauthenticated, errorcode.UserBadCredential) {
+		t.Fatalf("old password still works: %v", err)
+	}
+	fresh, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret2", PlatformId: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{User: &userpb.UserInfo{
+		UserId: id, Nickname: "Ada Lovelace", AvatarUrl: "https://example.com/a.png", IsActive: false,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: fresh.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("token survived disable: %v", err)
+	}
+	if _, err := srv.DeleteUser(ctx, &userpb.DeleteUserReq{UserId: id}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id}); !isCode(err, codes.NotFound, errorcode.UserNotFound) {
+		t.Fatalf("deleted user still readable: %v", err)
+	}
+	if _, err := srv.DeleteUser(ctx, &userpb.DeleteUserReq{UserId: id}); !isCode(err, codes.NotFound, errorcode.UserNotFound) {
+		t.Fatalf("second delete: %v", err)
+	}
+}
+
 func isCode(err error, grpc codes.Code, code errorcode.Code) bool {
 	got, ok := errorcode.CodeOf(err)
 	return ok && got == code && status.Code(err) == grpc

@@ -9,6 +9,11 @@ option go_package = "github.com/lisuhang11/SuIM/proto/userpb";
 service UserService {
   rpc Register(RegisterReq) returns (RegisterResp);
   rpc Login(LoginReq) returns (LoginResp);
+  rpc GetUserByID(GetUserByIDReq) returns (GetUserByIDResp);
+  rpc GetUsersByIDs(GetUsersByIDsReq) returns (GetUsersByIDsResp);
+  rpc UpdateUser(UpdateUserReq) returns (UpdateUserResp);
+  rpc DeleteUser(DeleteUserReq) returns (DeleteUserResp);
+  rpc ChangePassword(ChangePasswordReq) returns (ChangePasswordResp);
   rpc ValidateToken(ValidateTokenReq) returns (ValidateTokenResp);
   rpc Logout(LogoutReq) returns (LogoutResp);
 }
@@ -46,6 +51,46 @@ message LoginResp {
   string token = 2;
   int64 expire_time_seconds = 3;
 }
+
+message GetUserByIDReq {
+  string user_id = 1;
+}
+
+message GetUserByIDResp {
+  UserInfo user = 1;
+}
+
+// --------------- GetUsersByIDs ---------------
+message GetUsersByIDsReq {
+  repeated string user_ids = 1;
+}
+
+message GetUsersByIDsResp {
+  map<string, UserInfo> users = 1;
+}
+
+// --------------- UpdateUser ---------------
+message UpdateUserReq {
+  UserInfo user = 1;
+}
+
+message UpdateUserResp {}
+
+// --------------- DeleteUser ---------------
+message DeleteUserReq {
+  string user_id = 1;
+}
+
+message DeleteUserResp {}
+
+// --------------- ChangePassword ---------------
+message ChangePasswordReq {
+  string user_id      = 1;
+  string old_password = 2;
+  string new_password = 3;
+}
+
+message ChangePasswordResp {}
 
 message ValidateTokenReq {
   string token = 1;

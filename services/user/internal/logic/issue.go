@@ -7,6 +7,7 @@ import (
 )
 
 func (s *Server) issue(userID string, platformID int32) (*model.Token, error) {
+	// 1. 生成令牌 ID 并签名。
 	now := s.now().UTC()
 	id, err := s.newID()
 	if err != nil {

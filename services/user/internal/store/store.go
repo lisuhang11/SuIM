@@ -232,9 +232,19 @@ func revokeAllTx(ctx context.Context, tx *sql.Tx, userID string, platformID int3
 }
 
 func listLive(ctx context.Context, tx *sql.Tx, userID string, platformID int32) ([]model.Token, error) {
-	rows, err := tx.QueryContext(ctx, `
+	return listLiveQuery(ctx, tx, `
 		SELECT id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked
 		FROM auth_tokens WHERE user_id = ? AND platform_id = ? AND is_revoked = 0 FOR UPDATE`, userID, platformID)
+}
+
+func listLiveUser(ctx context.Context, tx *sql.Tx, userID string) ([]model.Token, error) {
+	return listLiveQuery(ctx, tx, `
+		SELECT id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked
+		FROM auth_tokens WHERE user_id = ? AND is_revoked = 0 FOR UPDATE`, userID)
+}
+
+func listLiveQuery(ctx context.Context, tx *sql.Tx, query string, args ...any) ([]model.Token, error) {
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

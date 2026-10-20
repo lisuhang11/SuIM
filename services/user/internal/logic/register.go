@@ -15,6 +15,7 @@ import (
 )
 
 func (s *Server) Register(ctx context.Context, req *userpb.RegisterReq) (*userpb.RegisterResp, error) {
+	// 1. 校验邮箱、昵称和密码。
 	email, nickname, err := normalizeAccount(req.GetEmail(), req.GetUsername())
 	if err != nil {
 		return nil, err
@@ -22,6 +23,7 @@ func (s *Server) Register(ctx context.Context, req *userpb.RegisterReq) (*userpb
 	if err := validatePassword(req.GetPassword()); err != nil {
 		return nil, err
 	}
+	// 2. 生成密码哈希和用户 ID。
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.GetPassword()), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("hash password")
@@ -30,6 +32,7 @@ func (s *Server) Register(ctx context.Context, req *userpb.RegisterReq) (*userpb
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("create user id")
 	}
+	// 3. 写入用户。邮箱重复返回已注册。
 	user := &model.User{
 		UserID:       id,
 		Email:        email,

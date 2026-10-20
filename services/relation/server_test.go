@@ -23,6 +23,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	"github.com/lisuhang11/SuIM/services/relation/internal/logic"
+	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
 
@@ -35,6 +36,17 @@ func (u knownUsers) CheckUsers(_ context.Context, ids []string) error {
 		}
 	}
 	return nil
+}
+
+func (u knownUsers) GetUsers(_ context.Context, ids []string) (map[string]model.UserProfile, error) {
+	out := make(map[string]model.UserProfile, len(ids))
+	for _, id := range ids {
+		if _, ok := u[id]; !ok {
+			continue
+		}
+		out[id] = model.UserProfile{UserID: id, Nickname: id}
+	}
+	return out, nil
 }
 
 func TestFriendApply(t *testing.T) {
@@ -270,6 +282,103 @@ func TestBlackAndFriend(t *testing.T) {
 	}
 }
 
+func TestIncremental(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn)
+	if err != nil {
+		t.Skipf("mysql is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	script, err := os.ReadFile(filepath.Join("..", "..", "migrations", "relation.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx, string(script)); err != nil {
+		t.Fatal(err)
+	}
+	a := fmt.Sprintf("ia-%d", time.Now().UnixNano())
+	b := fmt.Sprintf("ib-%d", time.Now().UnixNano())
+	t.Cleanup(func() { cleanupRelation(t, mysqlCfg, a, b) })
+	srv := logic.New(st, knownUsers{a: {}, b: {}}, logic.Hooks{})
+
+	full, err := srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a})
+	if err != nil || !full.GetFull() || full.GetVersion() != 0 || len(full.GetInsert()) != 0 {
+		t.Fatalf("empty friends %+v err=%v", full, err)
+	}
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: "hi"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: a, ToUserId: b, HandleResult: 1}); err != nil {
+		t.Fatal(err)
+	}
+	full, err = srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a})
+	if err != nil || !full.GetFull() || full.GetVersion() == 0 || full.GetVersionId() == "" || len(full.GetInsert()) != 1 {
+		t.Fatalf("full friends %+v err=%v", full, err)
+	}
+	if full.GetInsert()[0].GetFriendUser().GetUserId() != b || full.GetInsert()[0].GetFriendUser().GetNickname() != b {
+		t.Fatalf("friend info %+v", full.GetInsert()[0])
+	}
+	same, err := srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a, VersionId: full.GetVersionId(), Version: full.GetVersion()})
+	if err != nil || same.GetFull() || len(same.GetInsert()) != 0 || len(same.GetUpdate()) != 0 || len(same.GetDelete()) != 0 || same.GetVersion() != full.GetVersion() {
+		t.Fatalf("unchanged friends %+v err=%v", same, err)
+	}
+	remark := "Ada"
+	if _, err := srv.UpdateFriend(ctx, &relationpb.UpdateFriendReq{OwnerUserId: a, FriendUserId: b, Remark: &remark}); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a, VersionId: full.GetVersionId(), Version: full.GetVersion()})
+	if err != nil || changed.GetFull() || len(changed.GetUpdate()) != 1 || changed.GetUpdate()[0].GetRemark() != "Ada" || changed.GetVersion() <= full.GetVersion() {
+		t.Fatalf("remark sync %+v err=%v", changed, err)
+	}
+	pinned := true
+	if _, err := srv.UpdateFriend(ctx, &relationpb.UpdateFriendReq{OwnerUserId: a, FriendUserId: b, IsPinned: &pinned}); err != nil {
+		t.Fatal(err)
+	}
+	pinnedSync, err := srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a, VersionId: changed.GetVersionId(), Version: changed.GetVersion()})
+	if err != nil || pinnedSync.GetFull() || pinnedSync.GetSortVersion() == 0 || len(pinnedSync.GetUpdate()) != 1 || !pinnedSync.GetUpdate()[0].GetIsPinned() {
+		t.Fatalf("pin sync %+v err=%v", pinnedSync, err)
+	}
+	reset, err := srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a, VersionId: "other-version-id", Version: pinnedSync.GetVersion()})
+	if err != nil || !reset.GetFull() || len(reset.GetInsert()) != 1 {
+		t.Fatalf("version id mismatch %+v err=%v", reset, err)
+	}
+	if _, err := srv.DeleteFriend(ctx, &relationpb.DeleteFriendReq{UserId: a, FriendId: b}); err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a, VersionId: pinnedSync.GetVersionId(), Version: pinnedSync.GetVersion()})
+	if err != nil || deleted.GetFull() || len(deleted.GetDelete()) != 1 || deleted.GetDelete()[0] != b {
+		t.Fatalf("delete sync %+v err=%v", deleted, err)
+	}
+
+	blocked, err := srv.GetIncrementalBlacks(ctx, &relationpb.GetIncrementalBlacksReq{UserId: a})
+	if err != nil || !blocked.GetFull() || len(blocked.GetInsert()) != 0 {
+		t.Fatalf("empty blacks %+v err=%v", blocked, err)
+	}
+	if _, err := srv.BlockUser(ctx, &relationpb.BlockUserReq{UserId: a, BlockedUserId: b}); err != nil {
+		t.Fatal(err)
+	}
+	blocked, err = srv.GetIncrementalBlacks(ctx, &relationpb.GetIncrementalBlacksReq{UserId: a})
+	if err != nil || !blocked.GetFull() || len(blocked.GetInsert()) != 1 || blocked.GetInsert()[0].GetBlackUser().GetUserId() != b {
+		t.Fatalf("full blacks %+v err=%v", blocked, err)
+	}
+	if _, err := srv.UnblockUser(ctx, &relationpb.UnblockUserReq{UserId: a, BlockedUserId: b}); err != nil {
+		t.Fatal(err)
+	}
+	unblocked, err := srv.GetIncrementalBlacks(ctx, &relationpb.GetIncrementalBlacksReq{UserId: a, VersionId: blocked.GetVersionId(), Version: blocked.GetVersion()})
+	if err != nil || unblocked.GetFull() || len(unblocked.GetDelete()) != 1 || unblocked.GetDelete()[0] != b {
+		t.Fatalf("unblock sync %+v err=%v", unblocked, err)
+	}
+}
+
 func isCode(err error, grpc codes.Code, code errorcode.Code) bool {
 	got, ok := errorcode.CodeOf(err)
 	return ok && got == code && status.Code(err) == grpc
@@ -294,6 +403,18 @@ func cleanupRelation(t *testing.T, cfg config.MySQL, ids ...string) {
 		}
 		if _, err := db.ExecContext(ctx, `DELETE FROM black WHERE owner_user_id = ? OR block_user_id = ?`, id, id); err != nil {
 			t.Errorf("cleanup black: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `DELETE FROM friend_version_log WHERE owner_user_id = ?`, id); err != nil {
+			t.Errorf("cleanup friend version log: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `DELETE FROM friend_version WHERE owner_user_id = ?`, id); err != nil {
+			t.Errorf("cleanup friend version: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `DELETE FROM black_version_log WHERE owner_user_id = ?`, id); err != nil {
+			t.Errorf("cleanup black version log: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `DELETE FROM black_version WHERE owner_user_id = ?`, id); err != nil {
+			t.Errorf("cleanup black version: %v", err)
 		}
 	}
 }

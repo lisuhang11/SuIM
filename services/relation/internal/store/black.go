@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 )
 
 func (s *Store) CheckBlack(ctx context.Context, user1, user2 string) (bool, bool, error) {
@@ -32,17 +34,46 @@ func (s *Store) isBlack(ctx context.Context, owner, block string) (bool, error) 
 }
 
 func (s *Store) CreateBlack(ctx context.Context, owner, block, operator string, now time.Time) error {
-	_, err := s.db.ExecContext(ctx, `
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO black (owner_user_id, block_user_id, create_time, add_source, operator_user_id)
 		VALUES (?, ?, ?, 0, ?)`,
-		owner, block, now.UTC(), operator)
-	if isDuplicate(err) {
-		return ErrAlreadyBlocked
+		owner, block, now.UTC(), operator); err != nil {
+		if isDuplicate(err) {
+			return ErrAlreadyBlocked
+		}
+		return err
 	}
-	return err
+	if err := incrVersion(ctx, tx, blackVersionHead, blackVersionLog, owner, []string{block}, model.VersionInsert, now); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
-func (s *Store) DeleteBlack(ctx context.Context, owner, block string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM black WHERE owner_user_id = ? AND block_user_id = ?`, owner, block)
-	return err
+func (s *Store) DeleteBlack(ctx context.Context, owner, block string, now time.Time) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	res, err := tx.ExecContext(ctx, `DELETE FROM black WHERE owner_user_id = ? AND block_user_id = ?`, owner, block)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		if err := incrVersion(ctx, tx, blackVersionHead, blackVersionLog, owner, []string{block}, model.VersionDelete, now); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

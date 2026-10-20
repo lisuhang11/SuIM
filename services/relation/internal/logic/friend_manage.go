@@ -39,7 +39,7 @@ func (s *Server) DeleteFriend(ctx context.Context, req *relationpb.DeleteFriendR
 	}
 	// 2. 删除前 webhook。尚未接入。
 	// 3. 只删除这一侧的好友关系。
-	if err := s.store.DeleteFriend(ctx, owner, friend); err != nil {
+	if err := s.store.DeleteFriend(ctx, owner, friend, s.now()); err != nil {
 		if errors.Is(err, store.ErrNotFriend) {
 			return nil, errorcode.ErrRelationNotFriend
 		}
@@ -72,7 +72,7 @@ func (s *Server) UpdateFriend(ctx context.Context, req *relationpb.UpdateFriendR
 		remark = &value
 	}
 	// 2. 更新这一侧的备注或置顶。不是好友则拒绝。
-	if err := s.store.UpdateFriend(ctx, owner, friend, remark, req.IsPinned); err != nil {
+	if err := s.store.UpdateFriend(ctx, owner, friend, remark, req.IsPinned, s.now()); err != nil {
 		if errors.Is(err, store.ErrNotFriend) {
 			return nil, errorcode.ErrRelationNotFriend
 		}

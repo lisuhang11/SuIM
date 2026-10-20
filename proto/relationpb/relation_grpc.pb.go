@@ -19,14 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	RelationService_SendFriendRequest_FullMethodName  = "/relation.RelationService/SendFriendRequest"
-	RelationService_RespondFriendApply_FullMethodName = "/relation.RelationService/RespondFriendApply"
-	RelationService_DeleteFriend_FullMethodName       = "/relation.RelationService/DeleteFriend"
-	RelationService_UpdateFriend_FullMethodName       = "/relation.RelationService/UpdateFriend"
-	RelationService_BlockUser_FullMethodName          = "/relation.RelationService/BlockUser"
-	RelationService_UnblockUser_FullMethodName        = "/relation.RelationService/UnblockUser"
-	RelationService_IsFriend_FullMethodName           = "/relation.RelationService/IsFriend"
-	RelationService_IsBlack_FullMethodName            = "/relation.RelationService/IsBlack"
+	RelationService_SendFriendRequest_FullMethodName     = "/relation.RelationService/SendFriendRequest"
+	RelationService_RespondFriendApply_FullMethodName    = "/relation.RelationService/RespondFriendApply"
+	RelationService_DeleteFriend_FullMethodName          = "/relation.RelationService/DeleteFriend"
+	RelationService_UpdateFriend_FullMethodName          = "/relation.RelationService/UpdateFriend"
+	RelationService_BlockUser_FullMethodName             = "/relation.RelationService/BlockUser"
+	RelationService_UnblockUser_FullMethodName           = "/relation.RelationService/UnblockUser"
+	RelationService_IsFriend_FullMethodName              = "/relation.RelationService/IsFriend"
+	RelationService_IsBlack_FullMethodName               = "/relation.RelationService/IsBlack"
+	RelationService_GetIncrementalFriends_FullMethodName = "/relation.RelationService/GetIncrementalFriends"
+	RelationService_GetIncrementalBlacks_FullMethodName  = "/relation.RelationService/GetIncrementalBlacks"
 )
 
 // RelationServiceClient is the client API for RelationService service.
@@ -45,6 +47,8 @@ type RelationServiceClient interface {
 	UnblockUser(ctx context.Context, in *UnblockUserReq, opts ...grpc.CallOption) (*UnblockUserResp, error)
 	IsFriend(ctx context.Context, in *IsFriendReq, opts ...grpc.CallOption) (*IsFriendResp, error)
 	IsBlack(ctx context.Context, in *IsBlackReq, opts ...grpc.CallOption) (*IsBlackResp, error)
+	GetIncrementalFriends(ctx context.Context, in *GetIncrementalFriendsReq, opts ...grpc.CallOption) (*GetIncrementalFriendsResp, error)
+	GetIncrementalBlacks(ctx context.Context, in *GetIncrementalBlacksReq, opts ...grpc.CallOption) (*GetIncrementalBlacksResp, error)
 }
 
 type relationServiceClient struct {
@@ -135,6 +139,26 @@ func (c *relationServiceClient) IsBlack(ctx context.Context, in *IsBlackReq, opt
 	return out, nil
 }
 
+func (c *relationServiceClient) GetIncrementalFriends(ctx context.Context, in *GetIncrementalFriendsReq, opts ...grpc.CallOption) (*GetIncrementalFriendsResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetIncrementalFriendsResp)
+	err := c.cc.Invoke(ctx, RelationService_GetIncrementalFriends_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *relationServiceClient) GetIncrementalBlacks(ctx context.Context, in *GetIncrementalBlacksReq, opts ...grpc.CallOption) (*GetIncrementalBlacksResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetIncrementalBlacksResp)
+	err := c.cc.Invoke(ctx, RelationService_GetIncrementalBlacks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RelationServiceServer is the server API for RelationService service.
 // All implementations must embed UnimplementedRelationServiceServer
 // for forward compatibility.
@@ -151,6 +175,8 @@ type RelationServiceServer interface {
 	UnblockUser(context.Context, *UnblockUserReq) (*UnblockUserResp, error)
 	IsFriend(context.Context, *IsFriendReq) (*IsFriendResp, error)
 	IsBlack(context.Context, *IsBlackReq) (*IsBlackResp, error)
+	GetIncrementalFriends(context.Context, *GetIncrementalFriendsReq) (*GetIncrementalFriendsResp, error)
+	GetIncrementalBlacks(context.Context, *GetIncrementalBlacksReq) (*GetIncrementalBlacksResp, error)
 	mustEmbedUnimplementedRelationServiceServer()
 }
 
@@ -184,6 +210,12 @@ func (UnimplementedRelationServiceServer) IsFriend(context.Context, *IsFriendReq
 }
 func (UnimplementedRelationServiceServer) IsBlack(context.Context, *IsBlackReq) (*IsBlackResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method IsBlack not implemented")
+}
+func (UnimplementedRelationServiceServer) GetIncrementalFriends(context.Context, *GetIncrementalFriendsReq) (*GetIncrementalFriendsResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIncrementalFriends not implemented")
+}
+func (UnimplementedRelationServiceServer) GetIncrementalBlacks(context.Context, *GetIncrementalBlacksReq) (*GetIncrementalBlacksResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIncrementalBlacks not implemented")
 }
 func (UnimplementedRelationServiceServer) mustEmbedUnimplementedRelationServiceServer() {}
 func (UnimplementedRelationServiceServer) testEmbeddedByValue()                         {}
@@ -350,6 +382,42 @@ func _RelationService_IsBlack_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RelationService_GetIncrementalFriends_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIncrementalFriendsReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RelationServiceServer).GetIncrementalFriends(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RelationService_GetIncrementalFriends_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RelationServiceServer).GetIncrementalFriends(ctx, req.(*GetIncrementalFriendsReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RelationService_GetIncrementalBlacks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIncrementalBlacksReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RelationServiceServer).GetIncrementalBlacks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RelationService_GetIncrementalBlacks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RelationServiceServer).GetIncrementalBlacks(ctx, req.(*GetIncrementalBlacksReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RelationService_ServiceDesc is the grpc.ServiceDesc for RelationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -388,6 +456,14 @@ var RelationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "IsBlack",
 			Handler:    _RelationService_IsBlack_Handler,
+		},
+		{
+			MethodName: "GetIncrementalFriends",
+			Handler:    _RelationService_GetIncrementalFriends_Handler,
+		},
+		{
+			MethodName: "GetIncrementalBlacks",
+			Handler:    _RelationService_GetIncrementalBlacks_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

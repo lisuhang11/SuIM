@@ -98,7 +98,13 @@ func (s *Store) AgreeFriendRequest(ctx context.Context, from, to, handleMsg stri
 	if err := insertFriend(ctx, tx, from, to, now, from); err != nil {
 		return err
 	}
+	if err := incrVersion(ctx, tx, friendVersionHead, friendVersionLog, from, []string{to}, model.VersionInsert, now); err != nil {
+		return err
+	}
 	if err := insertFriend(ctx, tx, to, from, now, from); err != nil {
+		return err
+	}
+	if err := incrVersion(ctx, tx, friendVersionHead, friendVersionLog, to, []string{from}, model.VersionInsert, now); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -148,8 +154,14 @@ func insertFriend(ctx context.Context, tx *sql.Tx, owner, friend string, now tim
 	return err
 }
 
-func (s *Store) DeleteFriend(ctx context.Context, owner, friend string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM friend WHERE owner_user_id = ? AND friend_user_id = ?`, owner, friend)
+func (s *Store) DeleteFriend(ctx context.Context, owner, friend string, now time.Time) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	res, err := tx.ExecContext(ctx, `DELETE FROM friend WHERE owner_user_id = ? AND friend_user_id = ?`, owner, friend)
 	if err != nil {
 		return err
 	}
@@ -160,10 +172,13 @@ func (s *Store) DeleteFriend(ctx context.Context, owner, friend string) error {
 	if n == 0 {
 		return ErrNotFriend
 	}
-	return nil
+	if err := incrVersion(ctx, tx, friendVersionHead, friendVersionLog, owner, []string{friend}, model.VersionDelete, now); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
-func (s *Store) UpdateFriend(ctx context.Context, owner, friend string, remark *string, pinned *bool) error {
+func (s *Store) UpdateFriend(ctx context.Context, owner, friend string, remark *string, pinned *bool, now time.Time) error {
 	ok, err := s.isFriend(ctx, owner, friend)
 	if err != nil {
 		return err
@@ -171,6 +186,11 @@ func (s *Store) UpdateFriend(ctx context.Context, owner, friend string, remark *
 	if !ok {
 		return ErrNotFriend
 	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
 	sets := make([]string, 0, 2)
 	args := make([]any, 0, 4)
 	if remark != nil {
@@ -186,8 +206,17 @@ func (s *Store) UpdateFriend(ctx context.Context, owner, friend string, remark *
 		args = append(args, value)
 	}
 	args = append(args, owner, friend)
-	_, err = s.db.ExecContext(ctx, `UPDATE friend SET `+strings.Join(sets, ", ")+` WHERE owner_user_id = ? AND friend_user_id = ?`, args...)
-	return err
+	if _, err = tx.ExecContext(ctx, `UPDATE friend SET `+strings.Join(sets, ", ")+` WHERE owner_user_id = ? AND friend_user_id = ?`, args...); err != nil {
+		return err
+	}
+	ids := []string{friend}
+	if pinned != nil {
+		ids = append(ids, model.SortElemID)
+	}
+	if err := incrVersion(ctx, tx, friendVersionHead, friendVersionLog, owner, ids, model.VersionUpdate, now); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func isDuplicate(err error) bool {

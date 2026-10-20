@@ -22,6 +22,8 @@
 //	POST /friend/block
 //	POST /friend/unblock
 //	POST /friend/is_black
+//	POST /friend/incremental_friends
+//	POST /friend/incremental_blacks
 //
 // Bodies and data use the protobuf JSON names, for example user_id.
 // Responses are {"code":0,"msg":"","data":{...}}. code 0 is success.
@@ -84,6 +86,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /friend/block", s.auth(s.blockUser))
 	mux.HandleFunc("POST /friend/unblock", s.auth(s.unblockUser))
 	mux.HandleFunc("POST /friend/is_black", s.auth(s.isBlack))
+	mux.HandleFunc("POST /friend/incremental_friends", s.auth(s.incrementalFriends))
+	mux.HandleFunc("POST /friend/incremental_blacks", s.auth(s.incrementalBlacks))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, code: http.StatusOK}

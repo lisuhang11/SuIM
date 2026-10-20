@@ -19,6 +19,9 @@ service RelationService {
 
   rpc IsFriend(IsFriendReq) returns (IsFriendResp);
   rpc IsBlack(IsBlackReq) returns (IsBlackResp);
+
+  rpc GetIncrementalFriends(GetIncrementalFriendsReq) returns (GetIncrementalFriendsResp);
+  rpc GetIncrementalBlacks(GetIncrementalBlacksReq) returns (GetIncrementalBlacksResp);
 }
 
 // --------------- FriendRequestInfo ---------------
@@ -109,4 +112,65 @@ message IsBlackReq {
 message IsBlackResp {
   bool in_user1_blacklist = 1; // user1 has blocked user2
   bool in_user2_blacklist = 2; // user2 has blocked user1
+}
+
+
+// --------------- incremental sync ---------------
+// version 0 or an unknown version_id asks for a full snapshot.
+// Otherwise the response carries logs newer than version.
+// Friend sort changes use sort_version. A pin change bumps it.
+
+message PublicUserInfo {
+  string user_id    = 1;
+  string nickname   = 2;
+  string avatar_url = 3;
+}
+
+message FriendInfo {
+  string         owner_user_id    = 1;
+  string         remark           = 2;
+  int64          create_time      = 3;
+  PublicUserInfo friend_user      = 4;
+  int32          add_source       = 5;
+  string         operator_user_id = 6;
+  bool           is_pinned        = 7;
+}
+
+message BlackInfo {
+  string         owner_user_id    = 1;
+  int64          create_time      = 2;
+  PublicUserInfo black_user       = 3;
+  int32          add_source       = 4;
+  string         operator_user_id = 5;
+}
+
+message GetIncrementalFriendsReq {
+  string user_id    = 1;
+  string version_id = 2;
+  uint64 version    = 3;
+}
+
+message GetIncrementalFriendsResp {
+  uint64              version      = 1;
+  string              version_id   = 2;
+  bool                full         = 3;
+  repeated string     delete       = 4;
+  repeated FriendInfo insert       = 5;
+  repeated FriendInfo update       = 6;
+  uint64              sort_version = 7;
+}
+
+message GetIncrementalBlacksReq {
+  string user_id    = 1;
+  string version_id = 2;
+  uint64 version    = 3;
+}
+
+message GetIncrementalBlacksResp {
+  uint64             version    = 1;
+  string             version_id = 2;
+  bool               full       = 3;
+  repeated string    delete     = 4;
+  repeated BlackInfo insert     = 5;
+  repeated BlackInfo update     = 6;
 }

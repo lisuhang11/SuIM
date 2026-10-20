@@ -30,3 +30,47 @@ CREATE TABLE IF NOT EXISTS `black` (
     `operator_user_id` VARCHAR(64) DEFAULT '' COMMENT '操作者 userID',
     PRIMARY KEY (`owner_user_id`, `block_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='黑名单表(单方视角)';
+
+-- 版本头。同一用户一行，id 在首次写入后不变。deleted 固定为 0。
+-- 变更明细同一 owner + elem_id 只保留最新一条。
+-- state: 1 insert, 2 delete, 3 update
+-- 好友置顶变更额外写一行 elem_id = '____S_O_R_T_I_D____'
+CREATE TABLE IF NOT EXISTS `friend_version` (
+    `id`            CHAR(24)        NOT NULL,
+    `owner_user_id` VARCHAR(64)     NOT NULL,
+    `version`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `deleted`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `last_update`   DATETIME(3)     NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_friend_version_owner` (`owner_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友版本';
+
+CREATE TABLE IF NOT EXISTS `friend_version_log` (
+    `owner_user_id` VARCHAR(64)     NOT NULL,
+    `elem_id`       VARCHAR(64)     NOT NULL,
+    `state`         TINYINT         NOT NULL,
+    `version`       BIGINT UNSIGNED NOT NULL,
+    `last_update`   DATETIME(3)     NOT NULL,
+    PRIMARY KEY (`owner_user_id`, `elem_id`),
+    KEY `idx_friend_version_owner` (`owner_user_id`, `version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友版本明细';
+
+CREATE TABLE IF NOT EXISTS `black_version` (
+    `id`            CHAR(24)        NOT NULL,
+    `owner_user_id` VARCHAR(64)     NOT NULL,
+    `version`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `deleted`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    `last_update`   DATETIME(3)     NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_black_version_owner` (`owner_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='黑名单版本';
+
+CREATE TABLE IF NOT EXISTS `black_version_log` (
+    `owner_user_id` VARCHAR(64)     NOT NULL,
+    `elem_id`       VARCHAR(64)     NOT NULL,
+    `state`         TINYINT         NOT NULL,
+    `version`       BIGINT UNSIGNED NOT NULL,
+    `last_update`   DATETIME(3)     NOT NULL,
+    PRIMARY KEY (`owner_user_id`, `elem_id`),
+    KEY `idx_black_version_owner` (`owner_user_id`, `version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='黑名单版本明细';

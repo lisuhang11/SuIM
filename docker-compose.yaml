@@ -1,0 +1,160 @@
+networks:
+  suim:
+    driver: bridge
+
+services:
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    container_name: suim-mysql
+    volumes:
+      - "${DATA_DIR}/components/mysql:/var/lib/mysql"
+    environment:
+      TZ: ${TZ}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: always
+    networks:
+      - suim
+
+  redis:
+    image: redis:7.0
+    ports:
+      - "6379:6379"
+    container_name: suim-redis
+    volumes:
+      - "${DATA_DIR}/components/redis:/data"
+    environment:
+      TZ: ${TZ}
+    restart: always
+    sysctls:
+      net.core.somaxconn: 1024
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --appendonly
+      - "yes"
+      - --aof-use-rdb-preamble
+      - "yes"
+      - --save
+      - ""
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - suim
+
+  etcd:
+    image: ${ETCD_IMAGE}
+    user: root
+    container_name: suim-etcd
+    entrypoint: []
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      - ETCD_NAME=s1
+      - ETCD_DATA_DIR=/etcd-data
+      # Authentication is managed below; no-auth requires a trusted, isolated network.
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_CLUSTER=s1=http://0.0.0.0:2380
+      - ETCD_INITIAL_CLUSTER_TOKEN=tkn
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_ROOT_USER=${ETCD_ROOT_USER:-}
+      - ETCD_ROOT_PASSWORD=${ETCD_ROOT_PASSWORD:-}
+      - ETCD_USERNAME=${ETCD_USERNAME:-}
+      - ETCD_PASSWORD=${ETCD_PASSWORD:-}
+      - PATH=/opt/bitnami/etcd/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    volumes:
+      - "${DATA_DIR}/components/etcd:/etcd-data"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        export PATH="/opt/bitnami/etcd/bin:$$PATH"
+        fail() { echo "$$*" >&2; exit 1; }
+        auth=no
+        if [ -n "$${ETCD_ROOT_USER:-}$${ETCD_ROOT_PASSWORD:-}$${ETCD_USERNAME:-}$${ETCD_PASSWORD:-}" ]; then
+          [ -n "$${ETCD_ROOT_USER:-}" ] && [ -n "$${ETCD_ROOT_PASSWORD:-}" ] && [ -n "$${ETCD_USERNAME:-}" ] && [ -n "$${ETCD_PASSWORD:-}" ] || fail "Set all four authentication variables or leave all four empty."
+          [ "$$ETCD_ROOT_USER" = root ] && [ "$$ETCD_USERNAME" != root ] || fail "etcd requires ETCD_ROOT_USER=root and a separate application user."
+          auth=yes
+        fi
+        [ -d /etcd-data ] && [ -w /etcd-data ] && [ -x /etcd-data ] || fail "/etcd-data must be writable and searchable."
+        (unset ETCD_ROOT_USER ETCD_ROOT_PASSWORD ETCD_USERNAME ETCD_PASSWORD; ETCD_DATA_DIR=/etcd-data exec etcd) &
+        daemon=$$!
+        cleanup() {
+          trap - EXIT TERM INT
+          kill -"$${signal:-TERM}" "$$daemon" 2>/dev/null || :
+          wait "$$daemon" 2>/dev/null || :
+        }
+        trap cleanup EXIT
+        trap "signal=TERM; exit 143" TERM
+        trap "signal=INT; exit 130" INT
+        export ETCDCTL_API=3 ETCDCTL_ENDPOINTS=http://127.0.0.1:2379
+        export ETCDCTL_DIAL_TIMEOUT=2s ETCDCTL_COMMAND_TIMEOUT=2s
+        unset ETCDCTL_USER ETCDCTL_PASSWORD
+        attempts=0
+        until etcdctl endpoint status >/dev/null 2>&1; do
+          kill -0 "$$daemon" 2>/dev/null || { wait "$$daemon"; exit $$?; }
+          attempts=$$((attempts + 1))
+          [ "$$attempts" -lt 30 ] || fail "etcd startup timed out."
+          sleep 1
+        done
+        if [ "$$auth" = yes ]; then
+          export ETCDCTL_USER="$$ETCD_ROOT_USER" ETCDCTL_PASSWORD="$$ETCD_ROOT_PASSWORD"
+        fi
+        status=$$(etcdctl auth status) || fail "Cannot verify authentication; check configured credentials."
+        case "$$status" in
+        *"Authentication Status: false"*)
+          if [ "$$auth" = yes ]; then
+            users=$$(etcdctl user list)
+            [ -z "$$users" ] || fail "Existing users with disabled authentication require manual review."
+            printf "%s\n%s\n" "$$ETCD_ROOT_PASSWORD" "$$ETCD_ROOT_PASSWORD" | etcdctl user add root >/dev/null
+            printf "%s\n%s\n" "$$ETCD_PASSWORD" "$$ETCD_PASSWORD" | etcdctl user add "$$ETCD_USERNAME" >/dev/null
+            etcdctl role add openim-role
+            etcdctl role grant-permission openim-role --prefix readwrite ""
+            etcdctl user grant-role "$$ETCD_USERNAME" openim-role
+            etcdctl user grant-role root root
+            etcdctl auth enable
+          else
+            echo "etcd authentication is explicitly disabled; restrict access to the published ports."
+          fi
+          ;;
+        *"Authentication Status: true"*)
+          [ "$$auth" = yes ] || fail "Existing authentication requires configured credentials."
+          ;;
+        *) fail "Could not determine authentication status." ;;
+        esac
+        if [ "$$auth" = yes ]; then
+          etcdctl user get root >/dev/null
+          ETCDCTL_USER="$$ETCD_USERNAME" ETCDCTL_PASSWORD="$$ETCD_PASSWORD" etcdctl get /check_openim_component >/dev/null
+        fi
+        echo "etcd startup complete."
+        wait "$$daemon"
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: always
+    networks:
+      - suim

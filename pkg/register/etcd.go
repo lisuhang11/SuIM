@@ -65,7 +65,8 @@ func (r *etcdRegistry) Register(ctx context.Context, inst *ServiceInstance) erro
 		return fmt.Errorf("grant lease: %w", err)
 	}
 
-	key := fmt.Sprintf("/services/%s/%s", url.PathEscape(inst.Name), url.PathEscape(inst.ID))
+	// etcd naming 监听的前缀不带前导斜杠，和 Dial 里的 etcd:///services/... 对齐。
+	key := fmt.Sprintf("services/%s/%s", url.PathEscape(inst.Name), url.PathEscape(inst.ID))
 	valBytes, _ := json.Marshal(map[string]string{"Addr": inst.Addr})
 	if _, err := r.client.Put(ctx, key, string(valBytes), clientv3.WithLease(lease.ID)); err != nil {
 		_, _ = r.client.Revoke(context.Background(), lease.ID)

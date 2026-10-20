@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "github.com/lisuhang11/SuIM/proto/userpb";
+
+// UserService provides account registration and a single JWT session per platform.
+// Success and failure are conveyed by gRPC status. Response messages carry business data only.
+service UserService {
+  rpc Register(RegisterReq) returns (RegisterResp);
+  rpc Login(LoginReq) returns (LoginResp);
+  rpc ValidateToken(ValidateTokenReq) returns (ValidateTokenResp);
+  rpc Logout(LogoutReq) returns (LogoutResp);
+}
+
+// UserInfo is the public profile. RegisterReq.username is stored as nickname.
+message UserInfo {
+  string user_id = 1;
+  string email = 2;
+  string nickname = 3;
+  string avatar_url = 4;
+  int32 app_manger_level = 5;
+  int32 global_recv_msg_opt = 6;
+  bool is_active = 7;
+  int64 create_time = 8;
+}
+
+message RegisterReq {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message RegisterResp {
+  UserInfo user = 1;
+}
+
+message LoginReq {
+  string email = 1;
+  string password = 2;
+  int32 platform_id = 3;
+}
+
+message LoginResp {
+  UserInfo user = 1;
+  string token = 2;
+  int64 expire_time_seconds = 3;
+}
+
+message ValidateTokenReq {
+  string token = 1;
+}
+
+message ValidateTokenResp {
+  bool valid = 1;
+  UserInfo user = 2;
+  int32 platform_id = 3;
+}
+
+message LogoutReq {
+  string token = 1;
+}
+
+message LogoutResp {}

@@ -21,21 +21,21 @@ type Registry interface {
 }
 
 type Config struct {
-	Type string
-	Etcd EtcdConfig
-	K8s  K8sConfig
+	Type string     `yaml:"type"`
+	Etcd EtcdConfig `yaml:"etcd"`
+	K8s  K8sConfig  `yaml:"k8s"`
 }
 
 type EtcdConfig struct {
-	Endpoints   []string
-	RootDir     string
-	Username    string
-	Password    string
-	DialTimeout int
-	TTL         int
+	Endpoints   []string `yaml:"endpoints"`
+	RootDir     string   `yaml:"rootDir"`
+	Username    string   `yaml:"username"`
+	Password    string   `yaml:"password"`
+	DialTimeout int      `yaml:"dialTimeout"`
+	TTL         int      `yaml:"ttl"`
 }
 
 type K8sConfig struct {
-	Namespace string
-	Port      int
+	Namespace string `yaml:"namespace"`
+	Port      int    `yaml:"port"`
 }

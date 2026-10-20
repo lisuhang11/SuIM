@@ -1,0 +1,6 @@
+# Docker volume data. These directories are owned by the containers.
+/data/
+
+# Local credentials. Copy services/user/etc/user.yaml.example to user.yaml.
+.env
+services/user/etc/user.yaml

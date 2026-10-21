@@ -36,41 +36,41 @@ CREATE TABLE IF NOT EXISTS `black` (
 -- state: 1 insert, 2 delete, 3 update
 -- 好友置顶变更额外写一行 elem_id = '____S_O_R_T_I_D____'
 CREATE TABLE IF NOT EXISTS `friend_version` (
-    `id`            CHAR(24)        NOT NULL,
-    `owner_user_id` VARCHAR(64)     NOT NULL,
-    `version`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    `deleted`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    `last_update`   DATETIME(3)     NOT NULL,
+    `id`            CHAR(24)        NOT NULL COMMENT '版本ID，首次写入后不变',
+    `owner_user_id` VARCHAR(64)     NOT NULL COMMENT '关系拥有者',
+    `version`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '当前版本号',
+    `deleted`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '固定为0',
+    `last_update`   DATETIME(3)     NOT NULL COMMENT '最后更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_friend_version_owner` (`owner_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友版本';
 
 CREATE TABLE IF NOT EXISTS `friend_version_log` (
-    `owner_user_id` VARCHAR(64)     NOT NULL,
-    `elem_id`       VARCHAR(64)     NOT NULL,
-    `state`         TINYINT         NOT NULL,
-    `version`       BIGINT UNSIGNED NOT NULL,
-    `last_update`   DATETIME(3)     NOT NULL,
+    `owner_user_id` VARCHAR(64)     NOT NULL COMMENT '关系拥有者',
+    `elem_id`       VARCHAR(64)     NOT NULL COMMENT '好友用户ID，置顶变更为排序哨兵',
+    `state`         TINYINT         NOT NULL COMMENT '1插入 2删除 3更新',
+    `version`       BIGINT UNSIGNED NOT NULL COMMENT '该元素的版本号',
+    `last_update`   DATETIME(3)     NOT NULL COMMENT '最后更新时间',
     PRIMARY KEY (`owner_user_id`, `elem_id`),
     KEY `idx_friend_version_owner` (`owner_user_id`, `version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友版本明细';
 
 CREATE TABLE IF NOT EXISTS `black_version` (
-    `id`            CHAR(24)        NOT NULL,
-    `owner_user_id` VARCHAR(64)     NOT NULL,
-    `version`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    `deleted`       BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    `last_update`   DATETIME(3)     NOT NULL,
+    `id`            CHAR(24)        NOT NULL COMMENT '版本ID，首次写入后不变',
+    `owner_user_id` VARCHAR(64)     NOT NULL COMMENT '拉黑者',
+    `version`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '当前版本号',
+    `deleted`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '固定为0',
+    `last_update`   DATETIME(3)     NOT NULL COMMENT '最后更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_black_version_owner` (`owner_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='黑名单版本';
 
 CREATE TABLE IF NOT EXISTS `black_version_log` (
-    `owner_user_id` VARCHAR(64)     NOT NULL,
-    `elem_id`       VARCHAR(64)     NOT NULL,
-    `state`         TINYINT         NOT NULL,
-    `version`       BIGINT UNSIGNED NOT NULL,
-    `last_update`   DATETIME(3)     NOT NULL,
+    `owner_user_id` VARCHAR(64)     NOT NULL COMMENT '拉黑者',
+    `elem_id`       VARCHAR(64)     NOT NULL COMMENT '被拉黑用户ID',
+    `state`         TINYINT         NOT NULL COMMENT '1插入 2删除 3更新',
+    `version`       BIGINT UNSIGNED NOT NULL COMMENT '该元素的版本号',
+    `last_update`   DATETIME(3)     NOT NULL COMMENT '最后更新时间',
     PRIMARY KEY (`owner_user_id`, `elem_id`),
     KEY `idx_black_version_owner` (`owner_user_id`, `version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='黑名单版本明细';

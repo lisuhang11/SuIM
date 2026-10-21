@@ -5,4 +5,5 @@
 .env
 services/user/etc/user.yaml
 services/relation/etc/relation.yaml
+services/group/etc/group.yaml
 services/apigateway/etc/apigateway.yaml

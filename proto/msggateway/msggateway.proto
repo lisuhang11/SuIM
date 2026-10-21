@@ -1,0 +1,5 @@
+
+
+service MsgGateway {
+  rpc GetUsersOnlineStatus(GetUsersOnlineStatusReq) returns (GetUsersOnlineStatusResp);
+}

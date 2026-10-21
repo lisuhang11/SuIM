@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/proto/grouppb"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	"github.com/lisuhang11/SuIM/proto/userpb"
 )
@@ -74,14 +75,27 @@ func (s *relationStub) IsBlack(_ context.Context, req *relationpb.IsBlackReq) (*
 	return &relationpb.IsBlackResp{InUser1Blacklist: true}, nil
 }
 
+type groupStub struct {
+	grouppb.UnimplementedGroupServiceServer
+	creator string
+}
+
+func (s *groupStub) CreateGroup(_ context.Context, req *grouppb.CreateGroupReq) (*grouppb.CreateGroupResp, error) {
+	s.creator = req.GetCreatorUserId()
+	return &grouppb.CreateGroupResp{GroupId: "g1"}, nil
+}
+
 func TestGateway(t *testing.T) {
 	users := &userStub{}
 	friends := &relationStub{}
+	groups := &groupStub{}
 	userLis := serve(t, func(gs *grpc.Server) { userpb.RegisterUserServiceServer(gs, users) })
 	relLis := serve(t, func(gs *grpc.Server) { relationpb.RegisterRelationServiceServer(gs, friends) })
+	groupLis := serve(t, func(gs *grpc.Server) { grouppb.RegisterGroupServiceServer(gs, groups) })
 	userConn := dial(t, userLis)
 	relConn := dial(t, relLis)
-	httpSrv := httptest.NewServer(New(userpb.NewUserServiceClient(userConn), relationpb.NewRelationServiceClient(relConn)).Handler())
+	groupConn := dial(t, groupLis)
+	httpSrv := httptest.NewServer(New(userpb.NewUserServiceClient(userConn), relationpb.NewRelationServiceClient(relConn), grouppb.NewGroupServiceClient(groupConn)).Handler())
 	t.Cleanup(httpSrv.Close)
 
 	res := post(t, httpSrv.URL+"/user/register", "", `{"username":"Ada","email":"a@b.c","password":"secret1"}`)
@@ -133,6 +147,14 @@ func TestGateway(t *testing.T) {
 	res = post(t, httpSrv.URL+"/user/logout", "good", `{}`)
 	if res.Status != http.StatusOK || users.loggedOut != "good" {
 		t.Fatalf("logout %+v token=%s", res, users.loggedOut)
+	}
+	res = post(t, httpSrv.URL+"/group/create", "good", `{"creator_user_id":"u2","group_name":"g","group_type":2}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("create as other %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/group/create", "good", `{"creator_user_id":"u1","group_name":"g","group_type":2}`)
+	if res.Status != http.StatusOK || groups.creator != "u1" {
+		t.Fatalf("create %+v creator=%s", res, groups.creator)
 	}
 	res = post(t, httpSrv.URL+"/user/login", "", `{`)
 	if res.Status != http.StatusBadRequest || res.Code != int32(errorcode.InvalidJSON) {

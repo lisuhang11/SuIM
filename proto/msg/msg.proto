@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package msg;
+
+option go_package = "github.com/lisuhang11/SuIM/proto/msg;msgpb";
+
+// MsgData is one chat message on the transfer queue.
+message MsgData {
+  string send_id = 1;
+  string recv_id = 2;
+  string group_id = 3;
+  string client_msg_id = 4;
+  string server_msg_id = 5;
+  int32 sender_platform_id = 6;
+  string sender_nickname = 7;
+  string sender_face_url = 8;
+  int32 session_type = 9;
+  int32 msg_from = 10;
+  int32 content_type = 11;
+  bytes content = 12;
+  int64 seq = 14;
+  int64 send_time = 15;
+  int64 create_time = 16;
+  int32 status = 17;
+  bool is_read = 18;
+  map<string, bool> options = 19;
+  repeated string at_user_id_list = 21;
+  string attached_info = 22;
+  string ex = 23;
+}
+
+// TipsComm is the protobuf body of a notification message.
+message TipsComm {
+  bytes detail = 1;
+  string default_tips = 2;
+  string json_detail = 3;
+}
+
+// MsgDataToMySQL is the toMysql payload. LastSeq is the conversation max before this batch.
+message MsgDataToMySQL {
+  string conversation_id = 1;
+  repeated MsgData msg_data = 2;
+  int64 last_seq = 3;
+}
+
+// PushMsgData is the toPush payload.
+message PushMsgData {
+  MsgData msg_data = 1;
+  string conversation_id = 2;
+}

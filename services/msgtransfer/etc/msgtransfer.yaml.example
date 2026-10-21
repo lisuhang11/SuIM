@@ -1,0 +1,35 @@
+mysql:
+  address:
+    - 127.0.0.1:3306
+  username: suim
+  password: ""
+  database: suim
+  maxOpenConn: 20
+  maxIdleConn: 10
+
+redis:
+  address:
+    - 127.0.0.1:6379
+  username: ""
+  password: ""
+  redisMode: standalone
+  db: 0
+  maxRetry: 3
+  poolSize: 10
+
+queue:
+  streamPrefix: mq
+  maxLen: 100000
+  batchSize: 100
+  workers: 8
+  intervalMs: 100
+
+msgCacheTTLSeconds: 86400
+
+webhooks:
+  url: ""
+  afterMsgSaveDB:
+    enable: false
+    timeout: 5
+    attentionIds: []
+    deniedTypes: []

@@ -1,0 +1,351 @@
+syntax = "proto3";
+
+package conversation;
+
+option go_package = "github.com/lisuhang11/SuIM/proto/conversationpb";
+
+
+service ConversationService {
+  rpc GetConversation(GetConversationReq) returns (GetConversationResp);
+  rpc GetConversations(GetConversationsReq) returns (GetConversationsResp);
+  rpc GetAllConversations(GetAllConversationsReq) returns (GetAllConversationsResp);
+  rpc GetSortedConversationList(GetSortedConversationListReq) returns (GetSortedConversationListResp);
+  rpc GetOwnerConversation(GetOwnerConversationReq) returns (GetOwnerConversationResp);
+  rpc GetConversationIDs(GetConversationIDsReq) returns (GetConversationIDsResp);
+  rpc GetConversationsByConversationID(GetConversationsByConversationIDReq) returns (GetConversationsByConversationIDResp);
+
+  rpc GetPinnedConversationIDs(GetPinnedConversationIDsReq) returns (GetPinnedConversationIDsResp);
+  rpc GetNotNotifyConversationIDs(GetNotNotifyConversationIDsReq) returns (GetNotNotifyConversationIDsResp);
+  rpc GetRecvMsgNotNotifyUserIDs(GetRecvMsgNotNotifyUserIDsReq) returns (GetRecvMsgNotNotifyUserIDsResp);
+  rpc GetConversationOfflinePushUserIDs(GetConversationOfflinePushUserIDsReq) returns (GetConversationOfflinePushUserIDsResp);
+  rpc GetConversationNotReceiveMessageUserIDs(GetConversationNotReceiveMessageUserIDsReq) returns (GetConversationNotReceiveMessageUserIDsResp);
+
+  rpc SetConversation(SetConversationReq) returns (SetConversationResp);
+  rpc SetConversations(SetConversationsReq) returns (SetConversationsResp);
+  rpc UpdateConversation(UpdateConversationReq) returns (UpdateConversationResp);
+  rpc UpdateConversationsByUser(UpdateConversationsByUserReq) returns (UpdateConversationsByUserResp);
+  rpc CreateSingleChatConversations(CreateSingleChatConversationsReq) returns (CreateSingleChatConversationsResp);
+  rpc CreateGroupChatConversations(CreateGroupChatConversationsReq) returns (CreateGroupChatConversationsResp);
+  rpc SetConversationMaxSeq(SetConversationMaxSeqReq) returns (SetConversationMaxSeqResp);
+  rpc SetConversationMinSeq(SetConversationMinSeqReq) returns (SetConversationMinSeqResp);
+  rpc DeleteConversations(DeleteConversationsReq) returns (DeleteConversationsResp);
+
+  rpc GetUserConversationIDsHash(GetUserConversationIDsHashReq) returns (GetUserConversationIDsHashResp);
+  rpc GetFullOwnerConversationIDs(GetFullOwnerConversationIDsReq) returns (GetFullOwnerConversationIDsResp);
+  rpc GetIncrementalConversation(GetIncrementalConversationReq) returns (GetIncrementalConversationResp);
+
+  rpc GetConversationsNeedClearMsg(GetConversationsNeedClearMsgReq) returns (GetConversationsNeedClearMsgResp);
+  rpc ClearUserConversationMsg(ClearUserConversationMsgReq) returns (ClearUserConversationMsgResp);
+}
+
+message Conversation {
+  string owner_user_id = 1;
+  string conversation_id = 2;
+  int32 conversation_type = 3; // 1单聊 2群聊
+  string user_id = 4;          // 单聊对端
+  string group_id = 5;
+  int32 recv_msg_opt = 6; // 0接收并提醒 1不接收 2接收不提醒
+  bool is_pinned = 7;
+  string attached_info = 8;
+  bool is_private_chat = 9;
+  int32 group_at_type = 10; // 0无 1@我 2@所有人 3@所有人且@我 4群公告
+  string ex = 11;
+  int32 burn_duration = 12; // 阅后即焚时长，秒
+  int64 min_seq = 13;
+  int64 max_seq = 14;
+  int64 msg_destruct_time = 15;         // 定时销毁时长
+  int64 latest_msg_destruct_time = 16;  // 最近一次销毁时间，0 表示从未销毁
+  bool is_msg_destruct = 17;
+  int64 create_time = 18;
+}
+
+// ConversationReq 是部分更新。未设置的 optional 字段保持原值。
+// conversation_id / conversation_type / user_id / group_id 用来定位或补建会话。
+message ConversationReq {
+  string conversation_id = 1;
+  int32 conversation_type = 2;
+  string user_id = 3;
+  string group_id = 4;
+  optional int32 recv_msg_opt = 5;
+  optional bool is_pinned = 6;
+  optional string attached_info = 7;
+  optional bool is_private_chat = 8;
+  optional string ex = 9;
+  optional int32 burn_duration = 10;
+  optional int64 min_seq = 11;
+  optional int64 max_seq = 12;
+  optional int32 group_at_type = 13;
+  optional int64 msg_destruct_time = 14;
+  optional bool is_msg_destruct = 15;
+  optional int64 latest_msg_destruct_time = 16;
+}
+
+// MsgInfo 只出现在排序列表里，是最后一条消息的预览，不落 conversation 表。
+message MsgInfo {
+  string server_msg_id = 1;
+  string client_msg_id = 2;
+  int32 session_type = 3;
+  string send_id = 4;
+  string recv_id = 5;
+  string sender_name = 6;
+  string face_url = 7;
+  string group_id = 8;
+  string group_name = 9;
+  string group_face_url = 10;
+  int32 group_type = 11;
+  uint32 group_member_count = 12;
+  int64 latest_msg_recv_time = 13;
+  int32 msg_from = 14;
+  int32 content_type = 15;
+  string content = 16;
+  string ex = 17;
+}
+
+message ConversationElem {
+  string conversation_id = 1;
+  int32 recv_msg_opt = 2;
+  int64 unread_count = 3;
+  bool is_pinned = 4;
+  MsgInfo msg_info = 5;
+}
+
+// --------------- GetConversation ---------------
+message GetConversationReq {
+  string owner_user_id = 1;
+  string conversation_id = 2;
+}
+message GetConversationResp {
+  Conversation conversation = 1;
+}
+
+// --------------- GetConversations ---------------
+message GetConversationsReq {
+  string owner_user_id = 1;
+  repeated string conversation_ids = 2;
+}
+message GetConversationsResp {
+  repeated Conversation conversations = 1;
+}
+
+// --------------- GetAllConversations ---------------
+message GetAllConversationsReq {
+  string owner_user_id = 1;
+}
+message GetAllConversationsResp {
+  repeated Conversation conversations = 1;
+}
+
+// --------------- GetSortedConversationList ---------------
+// conversation_ids 为空时返回该用户的全部会话。
+// 排序：置顶在前，其余按最后一条消息时间倒序。
+message GetSortedConversationListReq {
+  string user_id = 1;
+  repeated string conversation_ids = 2;
+  int32 offset = 3;
+  int32 limit = 4;
+}
+message GetSortedConversationListResp {
+  int64 total = 1;
+  int64 unread_total = 2;
+  repeated ConversationElem conversation_elems = 3;
+}
+
+// --------------- GetOwnerConversation ---------------
+message GetOwnerConversationReq {
+  string user_id = 1;
+  int32 offset = 2;
+  int32 limit = 3;
+}
+message GetOwnerConversationResp {
+  int64 total = 1;
+  repeated Conversation conversations = 2;
+}
+
+// --------------- GetConversationIDs ---------------
+message GetConversationIDsReq {
+  string user_id = 1;
+}
+message GetConversationIDsResp {
+  repeated string conversation_ids = 1;
+}
+
+// --------------- GetConversationsByConversationID ---------------
+// 跨用户查询同一个 conversation_id 的各自行。
+message GetConversationsByConversationIDReq {
+  repeated string conversation_ids = 1;
+}
+message GetConversationsByConversationIDResp {
+  repeated Conversation conversations = 1;
+}
+
+// --------------- GetPinnedConversationIDs ---------------
+message GetPinnedConversationIDsReq {
+  string user_id = 1;
+}
+message GetPinnedConversationIDsResp {
+  repeated string conversation_ids = 1;
+}
+
+// --------------- GetNotNotifyConversationIDs ---------------
+// recv_msg_opt != 0 的会话。
+message GetNotNotifyConversationIDsReq {
+  string user_id = 1;
+}
+message GetNotNotifyConversationIDsResp {
+  repeated string conversation_ids = 1;
+}
+
+// --------------- GetRecvMsgNotNotifyUserIDs ---------------
+// 群里 recv_msg_opt = 2（接收但不提醒）的成员。
+message GetRecvMsgNotNotifyUserIDsReq {
+  string group_id = 1;
+}
+message GetRecvMsgNotNotifyUserIDsResp {
+  repeated string user_ids = 1;
+}
+
+// --------------- GetConversationOfflinePushUserIDs ---------------
+// 从 user_ids 里去掉不接收离线推送的人。
+message GetConversationOfflinePushUserIDsReq {
+  string conversation_id = 1;
+  repeated string user_ids = 2;
+}
+message GetConversationOfflinePushUserIDsResp {
+  repeated string user_ids = 1;
+}
+
+// --------------- GetConversationNotReceiveMessageUserIDs ---------------
+// recv_msg_opt = 1（不接收）的拥有者。
+message GetConversationNotReceiveMessageUserIDsReq {
+  string conversation_id = 1;
+}
+message GetConversationNotReceiveMessageUserIDsResp {
+  repeated string user_ids = 1;
+}
+
+// --------------- SetConversation ---------------
+message SetConversationReq {
+  Conversation conversation = 1;
+}
+message SetConversationResp {}
+
+// --------------- SetConversations ---------------
+// 把同一份部分更新应用到多个拥有者。会话不存在时按 conversation 里的类型和对端补建。
+message SetConversationsReq {
+  repeated string user_ids = 1;
+  ConversationReq conversation = 2;
+}
+message SetConversationsResp {}
+
+// --------------- UpdateConversation ---------------
+// conversation_id 以本请求为准，忽略 conversation.conversation_id。
+message UpdateConversationReq {
+  string conversation_id = 1;
+  repeated string user_ids = 2;
+  ConversationReq conversation = 3;
+}
+message UpdateConversationResp {}
+
+// --------------- UpdateConversationsByUser ---------------
+// 更新某个用户名下全部会话的 ex。ex 未设置则不变。
+message UpdateConversationsByUserReq {
+  string user_id = 1;
+  optional string ex = 2;
+}
+message UpdateConversationsByUserResp {}
+
+// --------------- CreateSingleChatConversations ---------------
+// conversation_id 为空时由服务端生成。双方各写一行。
+message CreateSingleChatConversationsReq {
+  string send_id = 1;
+  string recv_id = 2;
+  string conversation_id = 3;
+  int32 conversation_type = 4; // 缺省按单聊
+}
+message CreateSingleChatConversationsResp {}
+
+// --------------- CreateGroupChatConversations ---------------
+message CreateGroupChatConversationsReq {
+  string group_id = 1;
+  repeated string user_ids = 2;
+}
+message CreateGroupChatConversationsResp {}
+
+// --------------- SetConversationMaxSeq ---------------
+message SetConversationMaxSeqReq {
+  string conversation_id = 1;
+  repeated string owner_user_ids = 2;
+  int64 max_seq = 3;
+}
+message SetConversationMaxSeqResp {}
+
+// --------------- SetConversationMinSeq ---------------
+message SetConversationMinSeqReq {
+  string conversation_id = 1;
+  repeated string owner_user_ids = 2;
+  int64 min_seq = 3;
+}
+message SetConversationMinSeqResp {}
+
+// --------------- DeleteConversations ---------------
+// need_delete_time > 0 时，只删 create_time 早于该时刻的会话。
+message DeleteConversationsReq {
+  string owner_user_id = 1;
+  repeated string conversation_ids = 2;
+  int64 need_delete_time = 3;
+}
+message DeleteConversationsResp {}
+
+// --------------- GetUserConversationIDsHash ---------------
+message GetUserConversationIDsHashReq {
+  string owner_user_id = 1;
+}
+message GetUserConversationIDsHashResp {
+  uint64 hash = 1;
+}
+
+// --------------- GetFullOwnerConversationIDs ---------------
+// id_hash 与服务端一致时 equal=true，不再下发 conversation_ids。
+// version_id 在版本文档重建后更换。
+message GetFullOwnerConversationIDsReq {
+  string user_id = 1;
+  uint64 id_hash = 2;
+}
+message GetFullOwnerConversationIDsResp {
+  uint64 version = 1;
+  string version_id = 2;
+  bool equal = 3;
+  repeated string conversation_ids = 4;
+}
+
+// --------------- incremental sync ---------------
+// version 为 0，或 version_id 对不上，返回全量（full=true，数据在 insert）。
+// 否则返回 version 之后的变更日志。
+message GetIncrementalConversationReq {
+  string user_id = 1;
+  string version_id = 2;
+  uint64 version = 3;
+}
+message GetIncrementalConversationResp {
+  uint64 version = 1;
+  string version_id = 2;
+  bool full = 3;
+  repeated string delete = 4;
+  repeated Conversation insert = 5;
+  repeated Conversation update = 6;
+}
+
+// --------------- GetConversationsNeedClearMsg ---------------
+message GetConversationsNeedClearMsgReq {}
+message GetConversationsNeedClearMsgResp {
+  repeated Conversation conversations = 1;
+}
+
+// --------------- ClearUserConversationMsg ---------------
+message ClearUserConversationMsgReq {
+  int64 timestamp = 1;
+  int32 limit = 2;
+}
+message ClearUserConversationMsgResp {
+  int32 count = 1;
+}

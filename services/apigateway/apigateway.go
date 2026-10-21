@@ -17,6 +17,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/proto/grouppb"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	"github.com/lisuhang11/SuIM/proto/userpb"
 	"github.com/lisuhang11/SuIM/services/apigateway/internal/api"
@@ -61,6 +62,11 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial relation service: %w", err)
 	}
 	defer relationConn.Close()
+	groupConn, err := reg.Dial(ctx, "group", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dial group service: %w", err)
+	}
+	defer groupConn.Close()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
@@ -70,6 +76,7 @@ func run(cfgPath string) error {
 		Handler: api.New(
 			userpb.NewUserServiceClient(userConn),
 			relationpb.NewRelationServiceClient(relationConn),
+			grouppb.NewGroupServiceClient(groupConn),
 		).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

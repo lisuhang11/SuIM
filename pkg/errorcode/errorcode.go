@@ -4,6 +4,7 @@
 //	1000-1999 common
 //	2000-2999 user
 //	3000-3999 relation
+//	4000-4999 group
 //
 // The next service takes the following thousand.
 package errorcode

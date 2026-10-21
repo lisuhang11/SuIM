@@ -1,4 +1,4 @@
-// Package api is the HTTP entry in front of the user and relation services.
+// Package api is the HTTP entry in front of the user, relation, and group services.
 //
 // Public:
 //
@@ -24,6 +24,18 @@
 //	POST /friend/is_black
 //	POST /friend/incremental_friends
 //	POST /friend/incremental_blacks
+//	POST /group/create
+//	POST /group/dismiss
+//	POST /group/transfer
+//	POST /group/update
+//	POST /group/get
+//	POST /group/get_groups
+//	POST /group/invite
+//	POST /group/kick
+//	POST /group/quit
+//	POST /group/members
+//	POST /group/member_ids
+//	POST /group/joined
 //
 // Bodies and data use the protobuf JSON names, for example user_id.
 // Responses are {"code":0,"msg":"","data":{...}}. code 0 is success.
@@ -42,6 +54,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/proto/grouppb"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	"github.com/lisuhang11/SuIM/proto/userpb"
 )
@@ -58,10 +71,11 @@ type ctxKey struct{}
 type Server struct {
 	users   userpb.UserServiceClient
 	friends relationpb.RelationServiceClient
+	groups  grouppb.GroupServiceClient
 }
 
-func New(users userpb.UserServiceClient, friends relationpb.RelationServiceClient) *Server {
-	return &Server{users: users, friends: friends}
+func New(users userpb.UserServiceClient, friends relationpb.RelationServiceClient, groups grouppb.GroupServiceClient) *Server {
+	return &Server{users: users, friends: friends, groups: groups}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -88,6 +102,18 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /friend/is_black", s.auth(s.isBlack))
 	mux.HandleFunc("POST /friend/incremental_friends", s.auth(s.incrementalFriends))
 	mux.HandleFunc("POST /friend/incremental_blacks", s.auth(s.incrementalBlacks))
+
+	mux.HandleFunc("POST /group/create", s.auth(s.createGroup))
+	mux.HandleFunc("POST /group/dismiss", s.auth(s.dismissGroup))
+	mux.HandleFunc("POST /group/transfer", s.auth(s.transferGroupOwner))
+	mux.HandleFunc("POST /group/update", s.auth(s.updateGroupInfo))
+	mux.HandleFunc("POST /group/get_groups", s.auth(s.getGroupsInfo))
+	mux.HandleFunc("POST /group/invite", s.auth(s.inviteUserToGroup))
+	mux.HandleFunc("POST /group/kick", s.auth(s.kickGroupMember))
+	mux.HandleFunc("POST /group/quit", s.auth(s.quitGroup))
+	mux.HandleFunc("POST /group/members", s.auth(s.getGroupMembers))
+	mux.HandleFunc("POST /group/member_ids", s.auth(s.getGroupMemberUserIDs))
+	mux.HandleFunc("POST /group/joined", s.auth(s.getJoinedGroups))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, code: http.StatusOK}

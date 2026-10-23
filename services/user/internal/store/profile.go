@@ -18,8 +18,7 @@ func (s *Store) GetUsersByIDs(ctx context.Context, ids []string) ([]*model.User,
 		args[i] = id
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT user_id, email, password_hash, nickname, avatar_url,
-			app_manger_level, global_recv_msg_opt, is_active, create_time
+		SELECT `+userColumns+`
 		FROM user WHERE user_id IN (`+placeholders+`)`, args...)
 	if err != nil {
 		return nil, err
@@ -27,16 +26,11 @@ func (s *Store) GetUsersByIDs(ctx context.Context, ids []string) ([]*model.User,
 	defer rows.Close()
 	var out []*model.User
 	for rows.Next() {
-		var u model.User
-		var active int
-		if err := rows.Scan(
-			&u.UserID, &u.Email, &u.PasswordHash, &u.Nickname, &u.AvatarURL,
-			&u.AppMangerLevel, &u.GlobalRecvMsgOpt, &active, &u.CreateTime,
-		); err != nil {
+		u, err := scanUser(rows)
+		if err != nil {
 			return nil, err
 		}
-		u.IsActive = active == 1
-		out = append(out, &u)
+		out = append(out, u)
 	}
 	return out, rows.Err()
 }

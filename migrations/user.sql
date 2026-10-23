@@ -7,10 +7,23 @@ CREATE TABLE IF NOT EXISTS `user` (
     `app_manger_level`    INT           NOT NULL DEFAULT 0      COMMENT '管理员级别',
     `global_recv_msg_opt` INT           NOT NULL DEFAULT 0      COMMENT '全局消息接收选项',
     `is_active`           TINYINT(1)    NOT NULL DEFAULT 1      COMMENT '是否激活',
+    `area_code`           VARCHAR(16)   NOT NULL DEFAULT ''     COMMENT '手机区号',
+    `phone_number`        VARCHAR(32)   NULL                    COMMENT '手机号',
+    `account`             VARCHAR(64)   NULL                    COMMENT '账号',
+    `gender`              INT           NOT NULL DEFAULT 0      COMMENT '性别：0未知 1男 2女',
+    `birth_time`          DATETIME(3)   NULL                    COMMENT '生日',
+    `level`               INT           NOT NULL DEFAULT 0      COMMENT '等级',
+    `allow_vibration`     INT           NOT NULL DEFAULT 1      COMMENT '是否允许震动：1允许 2不允许',
+    `allow_beep`          INT           NOT NULL DEFAULT 1      COMMENT '是否允许提示音：1允许 2不允许',
+    `allow_add_friend`    INT           NOT NULL DEFAULT 1      COMMENT '是否允许加好友：1允许 2不允许',
+    `register_type`       INT           NOT NULL DEFAULT 0      COMMENT '注册方式',
+    `ex`                  VARCHAR(1024) NOT NULL DEFAULT ''     COMMENT '扩展字段',
     `create_time`         DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     `updated_at`          DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
     PRIMARY KEY (`user_id`),
-    UNIQUE INDEX `idx_email` (`email`)
+    UNIQUE INDEX `idx_email` (`email`),
+    UNIQUE INDEX `uk_account` (`account`),
+    UNIQUE INDEX `uk_phone` (`area_code`, `phone_number`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户基础信息表';
 
 CREATE TABLE IF NOT EXISTS `auth_tokens` (

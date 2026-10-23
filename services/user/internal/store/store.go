@@ -70,7 +70,36 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
+	for _, stmt := range []string{
+		"ALTER TABLE `user` ADD COLUMN area_code VARCHAR(16) NOT NULL DEFAULT '' COMMENT '手机区号'",
+		"ALTER TABLE `user` ADD COLUMN phone_number VARCHAR(32) NULL COMMENT '手机号'",
+		"ALTER TABLE `user` ADD COLUMN account VARCHAR(64) NULL COMMENT '账号'",
+		"ALTER TABLE `user` ADD COLUMN gender INT NOT NULL DEFAULT 0 COMMENT '性别：0未知 1男 2女'",
+		"ALTER TABLE `user` ADD COLUMN birth_time DATETIME(3) NULL COMMENT '生日'",
+		"ALTER TABLE `user` ADD COLUMN level INT NOT NULL DEFAULT 0 COMMENT '等级'",
+		"ALTER TABLE `user` ADD COLUMN allow_vibration INT NOT NULL DEFAULT 1 COMMENT '是否允许震动：1允许 2不允许'",
+		"ALTER TABLE `user` ADD COLUMN allow_beep INT NOT NULL DEFAULT 1 COMMENT '是否允许提示音：1允许 2不允许'",
+		"ALTER TABLE `user` ADD COLUMN allow_add_friend INT NOT NULL DEFAULT 1 COMMENT '是否允许加好友：1允许 2不允许'",
+		"ALTER TABLE `user` ADD COLUMN register_type INT NOT NULL DEFAULT 0 COMMENT '注册方式'",
+		"ALTER TABLE `user` ADD COLUMN ex VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '扩展字段'",
+		"ALTER TABLE `user` ADD UNIQUE INDEX uk_account (account)",
+		"ALTER TABLE `user` ADD UNIQUE INDEX uk_phone (area_code, phone_number)",
+	} {
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !isDuplicateColumn(err) && !isDuplicateKey(err) {
+			return fmt.Errorf("migrate: %w", err)
+		}
+	}
 	return nil
+}
+
+func isDuplicateColumn(err error) bool {
+	var me *mysqldriver.MySQLError
+	return errors.As(err, &me) && me.Number == 1060
+}
+
+func isDuplicateKey(err error) bool {
+	var me *mysqldriver.MySQLError
+	return errors.As(err, &me) && me.Number == 1061
 }
 
 func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
@@ -97,32 +126,50 @@ func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 	return nil
 }
 
+const userColumns = `user_id, email, password_hash, nickname, avatar_url,
+	app_manger_level, global_recv_msg_opt, is_active, create_time,
+	area_code, phone_number, account, gender, birth_time, level,
+	allow_vibration, allow_beep, allow_add_friend, register_type, ex`
+
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
-	return s.getUser(ctx, `SELECT user_id, email, password_hash, nickname, avatar_url,
-		app_manger_level, global_recv_msg_opt, is_active, create_time
-		FROM user WHERE email = ?`, email)
+	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE email = ?`, email)
 }
 
 func (s *Store) GetUserByID(ctx context.Context, userID string) (*model.User, error) {
-	return s.getUser(ctx, `SELECT user_id, email, password_hash, nickname, avatar_url,
-		app_manger_level, global_recv_msg_opt, is_active, create_time
-		FROM user WHERE user_id = ?`, userID)
+	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE user_id = ?`, userID)
 }
 
 func (s *Store) getUser(ctx context.Context, query, arg string) (*model.User, error) {
-	var u model.User
-	var active int
-	err := s.db.QueryRowContext(ctx, query, arg).Scan(
-		&u.UserID, &u.Email, &u.PasswordHash, &u.Nickname, &u.AvatarURL,
-		&u.AppMangerLevel, &u.GlobalRecvMsgOpt, &active, &u.CreateTime,
-	)
+	u, err := scanUser(s.db.QueryRowContext(ctx, query, arg))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
+	return u, nil
+}
+
+func scanUser(sc scanner) (*model.User, error) {
+	var u model.User
+	var active int
+	var phone, account sql.NullString
+	var birth sql.NullTime
+	err := sc.Scan(
+		&u.UserID, &u.Email, &u.PasswordHash, &u.Nickname, &u.AvatarURL,
+		&u.AppMangerLevel, &u.GlobalRecvMsgOpt, &active, &u.CreateTime,
+		&u.AreaCode, &phone, &account, &u.Gender, &birth, &u.Level,
+		&u.AllowVibration, &u.AllowBeep, &u.AllowAddFriend, &u.RegisterType, &u.Ex,
+	)
+	if err != nil {
+		return nil, err
+	}
 	u.IsActive = active == 1
+	u.PhoneNumber = phone.String
+	u.Account = account.String
+	if birth.Valid {
+		u.BirthTime = birth.Time
+	}
 	return &u, nil
 }
 

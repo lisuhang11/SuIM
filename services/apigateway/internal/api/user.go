@@ -48,6 +48,20 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, resp)
 }
 
+func (s *Server) searchUsers(w http.ResponseWriter, r *http.Request) {
+	var req userpb.SearchUsersReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	resp, err := s.users.SearchUsers(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
 func (s *Server) getUsers(w http.ResponseWriter, r *http.Request) {
 	var req userpb.GetUsersByIDsReq
 	if err := decode(w, r, &req); err != nil {
@@ -68,9 +82,11 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if !s.requireSelf(w, r, req.GetUser().GetUserId()) {
+	userID, ok := s.actor(w, r, req.GetUserId())
+	if !ok {
 		return
 	}
+	req.UserId = userID
 	resp, err := s.users.UpdateUser(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)

@@ -202,15 +202,41 @@ func TestProfile(t *testing.T) {
 	if err != nil || len(batch.GetUsers()) != 1 || batch.GetUsers()[id].GetEmail() != email {
 		t.Fatalf("batch: %+v err=%v", batch, err)
 	}
+	if _, err := srv.SearchUsers(ctx, &userpb.SearchUsersReq{Keyword: " "}); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidProfile) {
+		t.Fatalf("empty search: %v", err)
+	}
+	found, err := srv.SearchUsers(ctx, &userpb.SearchUsersReq{Keyword: email})
+	if err != nil || len(found.GetUsers()) != 0 {
+		t.Fatalf("search email: %+v err=%v", found, err)
+	}
+	found, err = srv.SearchUsers(ctx, &userpb.SearchUsersReq{Keyword: id})
+	if err != nil || len(found.GetUsers()) != 1 || found.GetUsers()[0].GetEmail() != email {
+		t.Fatalf("search id: %+v err=%v", found, err)
+	}
+	none, err := srv.SearchUsers(ctx, &userpb.SearchUsersReq{Keyword: "nobody-" + id})
+	if err != nil || len(none.GetUsers()) != 0 {
+		t.Fatalf("search miss: %+v err=%v", none, err)
+	}
 
-	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{User: &userpb.UserInfo{
-		UserId: id, Nickname: "Ada Lovelace", AvatarUrl: "https://example.com/a.png", IsActive: true,
-	}}); err != nil {
+	nick := "Ada Lovelace"
+	avatar := "https://example.com/a.png"
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{
+		UserId: id, Nickname: &nick, AvatarUrl: &avatar,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	gender := int32(1)
+	birth := time.Date(1990, 5, 6, 0, 0, 0, 0, time.UTC).UnixMilli()
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id, Gender: &gender, BirthTime: &birth}); err != nil {
 		t.Fatal(err)
 	}
 	got, err = srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id})
-	if err != nil || got.GetUser().GetNickname() != "Ada Lovelace" || got.GetUser().GetAvatarUrl() != "https://example.com/a.png" {
+	if err != nil || got.GetUser().GetNickname() != "Ada Lovelace" || got.GetUser().GetAvatarUrl() != "https://example.com/a.png" ||
+		got.GetUser().GetGender() != 1 || got.GetUser().GetBirthTime() != birth || !got.GetUser().GetIsActive() {
 		t.Fatalf("updated profile: %+v err=%v", got.GetUser(), err)
+	}
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id}); !isCode(err, codes.InvalidArgument, errorcode.UserNothingToUpdate) {
+		t.Fatalf("empty update: %v", err)
 	}
 
 	p1, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1})
@@ -241,9 +267,8 @@ func TestProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{User: &userpb.UserInfo{
-		UserId: id, Nickname: "Ada Lovelace", AvatarUrl: "https://example.com/a.png", IsActive: false,
-	}}); err != nil {
+	inactive := false
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id, IsActive: &inactive}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: fresh.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {

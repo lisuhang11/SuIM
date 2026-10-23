@@ -40,6 +40,40 @@ func (s *Server) respondFriendApply(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, resp)
 }
 
+func (s *Server) recvFriendRequests(w http.ResponseWriter, r *http.Request) {
+	var req relationpb.GetRecvFriendRequestsReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetUserId()) {
+		return
+	}
+	resp, err := s.friends.GetRecvFriendRequests(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) sentFriendRequests(w http.ResponseWriter, r *http.Request) {
+	var req relationpb.GetSentFriendRequestsReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetUserId()) {
+		return
+	}
+	resp, err := s.friends.GetSentFriendRequests(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
 func (s *Server) deleteFriend(w http.ResponseWriter, r *http.Request) {
 	var req relationpb.DeleteFriendReq
 	if err := decode(w, r, &req); err != nil {
@@ -210,19 +244,3 @@ func (s *Server) blackList(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, resp)
 }
 
-func (s *Server) incrementalBlacks(w http.ResponseWriter, r *http.Request) {
-	var req relationpb.GetIncrementalBlacksReq
-	if err := decode(w, r, &req); err != nil {
-		writeErr(w, err)
-		return
-	}
-	if !s.requireSelf(w, r, req.GetUserId()) {
-		return
-	}
-	resp, err := s.friends.GetIncrementalBlacks(r.Context(), &req)
-	if err != nil {
-		writeErr(w, err)
-		return
-	}
-	writeOK(w, resp)
-}

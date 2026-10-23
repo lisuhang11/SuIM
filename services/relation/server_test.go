@@ -94,6 +94,22 @@ func TestFriendApply(t *testing.T) {
 	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: from, ToUserId: to, Message: "hi"}); err != nil {
 		t.Fatal(err)
 	}
+	recv, err := srv.GetRecvFriendRequests(ctx, &relationpb.GetRecvFriendRequestsReq{UserId: to})
+	if err != nil || recv.GetTotal() != 1 || len(recv.GetRequests()) != 1 {
+		t.Fatalf("recv list: %+v err=%v", recv, err)
+	}
+	gotReq := recv.GetRequests()[0]
+	if gotReq.GetFromUserId() != from || gotReq.GetToUserId() != to || gotReq.GetMessage() != "hi" || gotReq.GetHandleResult() != 0 || gotReq.GetFromNickname() != from || gotReq.GetCreateTime() == 0 {
+		t.Fatalf("recv item: %+v", gotReq)
+	}
+	sent, err := srv.GetSentFriendRequests(ctx, &relationpb.GetSentFriendRequestsReq{UserId: from, HandleResults: []int32{0}})
+	if err != nil || sent.GetTotal() != 1 || sent.GetRequests()[0].GetToNickname() != to {
+		t.Fatalf("sent list: %+v err=%v", sent, err)
+	}
+	none, err := srv.GetRecvFriendRequests(ctx, &relationpb.GetRecvFriendRequestsReq{UserId: from, HandleResults: []int32{-1}})
+	if err != nil || none.GetTotal() != 0 || len(none.GetRequests()) != 0 {
+		t.Fatalf("filtered recv: %+v err=%v", none, err)
+	}
 	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: from, ToUserId: to, Message: "again"}); !isCode(err, codes.AlreadyExists, errorcode.RelationRequestRepeated) {
 		t.Fatalf("duplicate pending code=%v err=%v", status.Code(err), err)
 	}
@@ -322,11 +338,8 @@ func TestIncremental(t *testing.T) {
 		t.Fatal(err)
 	}
 	full, err = srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a})
-	if err != nil || !full.GetFull() || full.GetVersion() == 0 || full.GetVersionId() == "" || len(full.GetInsert()) != 1 {
+	if err != nil || !full.GetFull() || full.GetVersion() == 0 || full.GetVersionId() == "" || len(full.GetInsert()) != 0 || full.GetSortVersion() != 0 {
 		t.Fatalf("full friends %+v err=%v", full, err)
-	}
-	if full.GetInsert()[0].GetFriendUser().GetUserId() != b || full.GetInsert()[0].GetFriendUser().GetNickname() != b {
-		t.Fatalf("friend info %+v", full.GetInsert()[0])
 	}
 	same, err := srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a, VersionId: full.GetVersionId(), Version: full.GetVersion()})
 	if err != nil || same.GetFull() || len(same.GetInsert()) != 0 || len(same.GetUpdate()) != 0 || len(same.GetDelete()) != 0 || same.GetVersion() != full.GetVersion() {
@@ -337,7 +350,7 @@ func TestIncremental(t *testing.T) {
 		t.Fatal(err)
 	}
 	changed, err := srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a, VersionId: full.GetVersionId(), Version: full.GetVersion()})
-	if err != nil || changed.GetFull() || len(changed.GetUpdate()) != 1 || changed.GetUpdate()[0].GetRemark() != "Ada" || changed.GetVersion() <= full.GetVersion() {
+	if err != nil || changed.GetFull() || changed.GetSortVersion() != 0 || len(changed.GetUpdate()) != 1 || changed.GetUpdate()[0].GetRemark() != "Ada" || changed.GetVersion() <= full.GetVersion() {
 		t.Fatalf("remark sync %+v err=%v", changed, err)
 	}
 	pinned := true
@@ -349,7 +362,7 @@ func TestIncremental(t *testing.T) {
 		t.Fatalf("pin sync %+v err=%v", pinnedSync, err)
 	}
 	reset, err := srv.GetIncrementalFriends(ctx, &relationpb.GetIncrementalFriendsReq{UserId: a, VersionId: "other-version-id", Version: pinnedSync.GetVersion()})
-	if err != nil || !reset.GetFull() || len(reset.GetInsert()) != 1 {
+	if err != nil || !reset.GetFull() || len(reset.GetInsert()) != 0 {
 		t.Fatalf("version id mismatch %+v err=%v", reset, err)
 	}
 	if _, err := srv.DeleteFriend(ctx, &relationpb.DeleteFriendReq{UserId: a, FriendId: b}); err != nil {
@@ -360,23 +373,23 @@ func TestIncremental(t *testing.T) {
 		t.Fatalf("delete sync %+v err=%v", deleted, err)
 	}
 
-	blocked, err := srv.GetIncrementalBlacks(ctx, &relationpb.GetIncrementalBlacksReq{UserId: a})
-	if err != nil || !blocked.GetFull() || len(blocked.GetInsert()) != 0 {
-		t.Fatalf("empty blacks %+v err=%v", blocked, err)
-	}
 	if _, err := srv.BlockUser(ctx, &relationpb.BlockUserReq{UserId: a, BlockedUserId: b}); err != nil {
 		t.Fatal(err)
 	}
-	blocked, err = srv.GetIncrementalBlacks(ctx, &relationpb.GetIncrementalBlacksReq{UserId: a})
-	if err != nil || !blocked.GetFull() || len(blocked.GetInsert()) != 1 || blocked.GetInsert()[0].GetBlackUser().GetUserId() != b {
-		t.Fatalf("full blacks %+v err=%v", blocked, err)
+	listed, err := srv.GetBlackList(ctx, &relationpb.GetBlackListReq{UserId: a})
+	if err != nil || listed.GetTotal() != 1 || len(listed.GetBlacks()) != 1 || listed.GetBlacks()[0].GetBlackUser().GetUserId() != b {
+		t.Fatalf("black list %+v err=%v", listed, err)
+	}
+	in, err := srv.IsBlack(ctx, &relationpb.IsBlackReq{User1: a, User2: b})
+	if err != nil || !in.GetInUser1Blacklist() || in.GetInUser2Blacklist() {
+		t.Fatalf("is black %+v err=%v", in, err)
 	}
 	if _, err := srv.UnblockUser(ctx, &relationpb.UnblockUserReq{UserId: a, BlockedUserId: b}); err != nil {
 		t.Fatal(err)
 	}
-	unblocked, err := srv.GetIncrementalBlacks(ctx, &relationpb.GetIncrementalBlacksReq{UserId: a, VersionId: blocked.GetVersionId(), Version: blocked.GetVersion()})
-	if err != nil || unblocked.GetFull() || len(unblocked.GetDelete()) != 1 || unblocked.GetDelete()[0] != b {
-		t.Fatalf("unblock sync %+v err=%v", unblocked, err)
+	listed, err = srv.GetBlackList(ctx, &relationpb.GetBlackListReq{UserId: a})
+	if err != nil || listed.GetTotal() != 0 || len(listed.GetBlacks()) != 0 {
+		t.Fatalf("empty black list %+v err=%v", listed, err)
 	}
 }
 
@@ -490,12 +503,6 @@ func cleanupRelation(t *testing.T, cfg config.MySQL, ids ...string) {
 		}
 		if _, err := db.ExecContext(ctx, `DELETE FROM friend_version WHERE owner_user_id = ?`, id); err != nil {
 			t.Errorf("cleanup friend version: %v", err)
-		}
-		if _, err := db.ExecContext(ctx, `DELETE FROM black_version_log WHERE owner_user_id = ?`, id); err != nil {
-			t.Errorf("cleanup black version log: %v", err)
-		}
-		if _, err := db.ExecContext(ctx, `DELETE FROM black_version WHERE owner_user_id = ?`, id); err != nil {
-			t.Errorf("cleanup black version: %v", err)
 		}
 	}
 }

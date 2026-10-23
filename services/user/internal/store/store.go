@@ -15,8 +15,9 @@ import (
 )
 
 var (
-	ErrNotFound   = errors.New("not found")
-	ErrEmailTaken = errors.New("email already registered")
+	ErrNotFound     = errors.New("not found")
+	ErrEmailTaken   = errors.New("email already registered")
+	ErrAccountTaken = errors.New("phone or account already registered")
 )
 
 type Store struct {

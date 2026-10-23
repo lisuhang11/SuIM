@@ -16,6 +16,9 @@ const (
 	UserInvalidUserID    Code = 2010
 	UserPasswordMismatch Code = 2011
 	UserInvalidAvatar    Code = 2012
+	UserNothingToUpdate  Code = 2013
+	UserInvalidProfile   Code = 2014
+	UserAccountTaken     Code = 2015
 )
 
 var (
@@ -31,4 +34,7 @@ var (
 	ErrUserInvalidUserID    = Define(UserInvalidUserID, codes.InvalidArgument, "user_id is invalid")
 	ErrUserPasswordMismatch = Define(UserPasswordMismatch, codes.Unauthenticated, "old password is incorrect")
 	ErrUserInvalidAvatar    = Define(UserInvalidAvatar, codes.InvalidArgument, "avatar_url is too long")
+	ErrUserNothingToUpdate  = Define(UserNothingToUpdate, codes.InvalidArgument, "nothing to update")
+	ErrUserInvalidProfile   = Define(UserInvalidProfile, codes.InvalidArgument, "profile field is invalid")
+	ErrUserAccountTaken     = Define(UserAccountTaken, codes.AlreadyExists, "phone or account already registered")
 )

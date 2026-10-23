@@ -55,22 +55,6 @@ CREATE TABLE IF NOT EXISTS `friend_version_log` (
     KEY `idx_friend_version_owner` (`owner_user_id`, `version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友版本明细';
 
-CREATE TABLE IF NOT EXISTS `black_version` (
-    `id`            CHAR(24)        NOT NULL COMMENT '版本ID，首次写入后不变',
-    `owner_user_id` VARCHAR(64)     NOT NULL COMMENT '拉黑者',
-    `version`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '当前版本号',
-    `deleted`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '固定为0',
-    `last_update`   DATETIME(3)     NOT NULL COMMENT '最后更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_black_version_owner` (`owner_user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='黑名单版本';
-
-CREATE TABLE IF NOT EXISTS `black_version_log` (
-    `owner_user_id` VARCHAR(64)     NOT NULL COMMENT '拉黑者',
-    `elem_id`       VARCHAR(64)     NOT NULL COMMENT '被拉黑用户ID',
-    `state`         TINYINT         NOT NULL COMMENT '1插入 2删除 3更新',
-    `version`       BIGINT UNSIGNED NOT NULL COMMENT '该元素的版本号',
-    `last_update`   DATETIME(3)     NOT NULL COMMENT '最后更新时间',
-    PRIMARY KEY (`owner_user_id`, `elem_id`),
-    KEY `idx_black_version_owner` (`owner_user_id`, `version`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='黑名单版本明细';
+-- Blacks are a full list, same as OpenIM. Drop the unused version tables.
+DROP TABLE IF EXISTS `black_version_log`;
+DROP TABLE IF EXISTS `black_version`;

@@ -38,6 +38,10 @@ func (s *Server) invalidate(ctx context.Context, hashes []string) {
 }
 
 func toPB(u *model.User) *userpb.UserInfo {
+	var birth int64
+	if !u.BirthTime.IsZero() {
+		birth = u.BirthTime.UnixMilli()
+	}
 	return &userpb.UserInfo{
 		UserId:           u.UserID,
 		Email:            u.Email,
@@ -47,5 +51,16 @@ func toPB(u *model.User) *userpb.UserInfo {
 		GlobalRecvMsgOpt: u.GlobalRecvMsgOpt,
 		IsActive:         u.IsActive,
 		CreateTime:       u.CreateTime.UnixMilli(),
+		AreaCode:         u.AreaCode,
+		PhoneNumber:      u.PhoneNumber,
+		Account:          u.Account,
+		Gender:           u.Gender,
+		BirthTime:        birth,
+		Level:            u.Level,
+		AllowVibration:   u.AllowVibration,
+		AllowBeep:        u.AllowBeep,
+		AllowAddFriend:   u.AllowAddFriend,
+		RegisterType:     u.RegisterType,
+		Ex:               u.Ex,
 	}
 }

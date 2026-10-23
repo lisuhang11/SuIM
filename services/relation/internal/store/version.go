@@ -15,8 +15,6 @@ import (
 const (
 	friendVersionHead = "friend_version"
 	friendVersionLog  = "friend_version_log"
-	blackVersionHead  = "black_version"
-	blackVersionLog   = "black_version_log"
 )
 
 func (s *Store) FriendVersion(ctx context.Context, owner string) (model.VersionHead, error) {
@@ -34,14 +32,6 @@ func (s *Store) FriendSortVersion(ctx context.Context, owner string) (uint64, er
 		return 0, nil
 	}
 	return version, err
-}
-
-func (s *Store) BlackVersion(ctx context.Context, owner string) (model.VersionHead, error) {
-	return s.maxVersion(ctx, blackVersionHead, owner)
-}
-
-func (s *Store) BlackChanges(ctx context.Context, owner string, version uint64, limit int) ([]model.VersionLog, error) {
-	return s.changes(ctx, blackVersionLog, owner, version, limit)
 }
 
 func (s *Store) PageFriends(ctx context.Context, owner string, offset, limit int) (int, []model.Friend, error) {
@@ -122,47 +112,6 @@ func (s *Store) FriendsByIDs(ctx context.Context, owner string, ids []string) ([
 		byID[row.FriendUserID] = row
 	}
 	out := make([]model.Friend, 0, len(ids))
-	for _, id := range ids {
-		if row, ok := byID[id]; ok {
-			out = append(out, row)
-		}
-	}
-	return out, nil
-}
-
-func (s *Store) ListBlacks(ctx context.Context, owner string) ([]model.Black, error) {
-	rows, err := s.db.QueryContext(ctx, blackSelect+` WHERE owner_user_id = ?`, owner)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanBlacks(rows)
-}
-
-func (s *Store) BlacksByIDs(ctx context.Context, owner string, ids []string) ([]model.Black, error) {
-	if len(ids) == 0 {
-		return nil, nil
-	}
-	placeholders := strings.TrimRight(strings.Repeat("?,", len(ids)), ",")
-	args := make([]any, 0, len(ids)+1)
-	args = append(args, owner)
-	for _, id := range ids {
-		args = append(args, id)
-	}
-	rows, err := s.db.QueryContext(ctx, blackSelect+` WHERE owner_user_id = ? AND block_user_id IN (`+placeholders+`)`, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	found, err := scanBlacks(rows)
-	if err != nil {
-		return nil, err
-	}
-	byID := make(map[string]model.Black, len(found))
-	for _, row := range found {
-		byID[row.BlockUserID] = row
-	}
-	out := make([]model.Black, 0, len(ids))
 	for _, id := range ids {
 		if row, ok := byID[id]; ok {
 			out = append(out, row)

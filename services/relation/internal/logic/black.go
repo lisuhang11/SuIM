@@ -67,7 +67,7 @@ func (s *Server) UnblockUser(ctx context.Context, req *relationpb.UnblockUserReq
 		return nil, err
 	}
 	// 2. 删除黑名单记录。记录不存在也视为成功。
-	if err := s.store.DeleteBlack(ctx, owner, block, s.now()); err != nil {
+	if err := s.store.DeleteBlack(ctx, owner, block); err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("remove black")
 	}
 	// 3. 通知黑名单已删除。尚未接入。

@@ -10,12 +10,15 @@
 //
 //	POST /user/get
 //	POST /user/get_users
+//	POST /user/search
 //	POST /user/update
 //	POST /user/delete
 //	POST /user/change_password
 //	POST /user/logout
 //	POST /friend/send_request
 //	POST /friend/respond
+//	POST /friend/recv_requests
+//	POST /friend/sent_requests
 //	POST /friend/delete
 //	POST /friend/update
 //	POST /friend/is_friend
@@ -23,7 +26,6 @@
 //	POST /friend/unblock
 //	POST /friend/is_black
 //	POST /friend/incremental_friends
-//	POST /friend/incremental_blacks
 //	POST /friend/list
 //	POST /friend/friend_ids
 //	POST /friend/blacks
@@ -107,6 +109,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("POST /user/get", s.auth(s.getUser))
 	mux.HandleFunc("POST /user/get_users", s.auth(s.getUsers))
+	mux.HandleFunc("POST /user/search", s.auth(s.searchUsers))
 	mux.HandleFunc("POST /user/update", s.auth(s.updateUser))
 	mux.HandleFunc("POST /user/delete", s.auth(s.deleteUser))
 	mux.HandleFunc("POST /user/change_password", s.auth(s.changePassword))
@@ -114,6 +117,8 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("POST /friend/send_request", s.auth(s.sendFriendRequest))
 	mux.HandleFunc("POST /friend/respond", s.auth(s.respondFriendApply))
+	mux.HandleFunc("POST /friend/recv_requests", s.auth(s.recvFriendRequests))
+	mux.HandleFunc("POST /friend/sent_requests", s.auth(s.sentFriendRequests))
 	mux.HandleFunc("POST /friend/delete", s.auth(s.deleteFriend))
 	mux.HandleFunc("POST /friend/update", s.auth(s.updateFriend))
 	mux.HandleFunc("POST /friend/is_friend", s.auth(s.isFriend))
@@ -121,7 +126,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /friend/unblock", s.auth(s.unblockUser))
 	mux.HandleFunc("POST /friend/is_black", s.auth(s.isBlack))
 	mux.HandleFunc("POST /friend/incremental_friends", s.auth(s.incrementalFriends))
-	mux.HandleFunc("POST /friend/incremental_blacks", s.auth(s.incrementalBlacks))
 	mux.HandleFunc("POST /friend/list", s.auth(s.friendList))
 	mux.HandleFunc("POST /friend/friend_ids", s.auth(s.fullFriendUserIDs))
 	mux.HandleFunc("POST /friend/blacks", s.auth(s.blackList))

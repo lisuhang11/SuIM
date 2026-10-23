@@ -37,6 +37,17 @@ type Black struct {
 	OperatorUserID string
 }
 
+type FriendRequest struct {
+	FromUserID    string
+	ToUserID      string
+	HandleResult  int32
+	ReqMsg        string
+	CreateTime    time.Time
+	HandlerUserID string
+	HandleMsg     string
+	HandleTime    time.Time
+}
+
 type UserProfile struct {
 	UserID    string
 	Nickname  string

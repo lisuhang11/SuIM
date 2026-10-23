@@ -39,6 +39,13 @@ func (s *userStub) ValidateToken(_ context.Context, req *userpb.ValidateTokenReq
 	return &userpb.ValidateTokenResp{Valid: true, User: &userpb.UserInfo{UserId: "u1"}, PlatformId: 1}, nil
 }
 
+func (s *userStub) SearchUsers(_ context.Context, req *userpb.SearchUsersReq) (*userpb.SearchUsersResp, error) {
+	if req.GetKeyword() == "missing" {
+		return &userpb.SearchUsersResp{Users: []*userpb.UserInfo{}}, nil
+	}
+	return &userpb.SearchUsersResp{Users: []*userpb.UserInfo{{UserId: req.GetKeyword(), Nickname: "Ada"}}}, nil
+}
+
 func (s *userStub) GetUserByID(_ context.Context, req *userpb.GetUserByIDReq) (*userpb.GetUserByIDResp, error) {
 	if req.GetUserId() == "missing" {
 		return nil, errorcode.ErrUserNotFound
@@ -58,6 +65,14 @@ func (s *userStub) UpdateUser(context.Context, *userpb.UpdateUserReq) (*userpb.U
 type relationStub struct {
 	relationpb.UnimplementedRelationServiceServer
 	sentFrom string
+}
+
+func (s *relationStub) GetRecvFriendRequests(_ context.Context, req *relationpb.GetRecvFriendRequestsReq) (*relationpb.GetRecvFriendRequestsResp, error) {
+	return &relationpb.GetRecvFriendRequestsResp{Requests: []*relationpb.FriendRequestInfo{{FromUserId: "u2", ToUserId: req.GetUserId(), Message: "hi"}}, Total: 1}, nil
+}
+
+func (s *relationStub) GetSentFriendRequests(_ context.Context, req *relationpb.GetSentFriendRequestsReq) (*relationpb.GetSentFriendRequestsResp, error) {
+	return &relationpb.GetSentFriendRequestsResp{Requests: []*relationpb.FriendRequestInfo{{FromUserId: req.GetUserId(), ToUserId: "u2"}}, Total: 1}, nil
 }
 
 func (s *relationStub) SendFriendRequest(_ context.Context, req *relationpb.SendFriendRequestReq) (*relationpb.SendFriendRequestResp, error) {
@@ -144,8 +159,16 @@ func TestGateway(t *testing.T) {
 	if res.Status != http.StatusOK || res.Code != 0 || !bytes.Contains(res.Data, []byte(`"user_id":"u1"`)) {
 		t.Fatalf("get user %+v", res)
 	}
+	res = post(t, httpSrv.URL+"/user/search", "good", `{"keyword":"missing"}`)
+	if res.Status != http.StatusOK || res.Code != 0 || bytes.Contains(res.Data, []byte(`"user_id"`)) {
+		t.Fatalf("search empty %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/user/search", "good", `{"keyword":"ada@example.com"}`)
+	if res.Status != http.StatusOK || !bytes.Contains(res.Data, []byte(`"user_id":"ada@example.com"`)) {
+		t.Fatalf("search %+v", res)
+	}
 
-	res = post(t, httpSrv.URL+"/user/update", "good", `{"user":{"user_id":"u2","nickname":"x"}}`)
+	res = post(t, httpSrv.URL+"/user/update", "good", `{"user_id":"u2","nickname":"x"}`)
 	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
 		t.Fatalf("update other %+v", res)
 	}
@@ -156,6 +179,18 @@ func TestGateway(t *testing.T) {
 	res = post(t, httpSrv.URL+"/friend/send_request", "good", `{"from_user_id":"u1","to_user_id":"u2","message":"hi"}`)
 	if res.Status != http.StatusOK || friends.sentFrom != "u1" {
 		t.Fatalf("send %+v from=%s", res, friends.sentFrom)
+	}
+	res = post(t, httpSrv.URL+"/friend/recv_requests", "good", `{"user_id":"u2"}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("recv other %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/friend/recv_requests", "good", `{"user_id":"u1"}`)
+	if res.Status != http.StatusOK || !bytes.Contains(res.Data, []byte(`"message":"hi"`)) {
+		t.Fatalf("recv %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/friend/sent_requests", "good", `{"user_id":"u1"}`)
+	if res.Status != http.StatusOK || !bytes.Contains(res.Data, []byte(`"to_user_id":"u2"`)) {
+		t.Fatalf("sent %+v", res)
 	}
 	res = post(t, httpSrv.URL+"/friend/is_friend", "good", `{"user1":"u2","user2":"u3"}`)
 	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {

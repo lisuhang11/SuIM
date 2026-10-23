@@ -130,6 +130,59 @@ func (s *Store) RefuseFriendRequest(ctx context.Context, from, to, handleMsg str
 	return tx.Commit()
 }
 
+func (s *Store) PageRecvFriendRequests(ctx context.Context, userID string, results []int32, offset, limit int) (int, []model.FriendRequest, error) {
+	return s.pageFriendRequests(ctx, "to_user_id", userID, results, offset, limit)
+}
+
+func (s *Store) PageSentFriendRequests(ctx context.Context, userID string, results []int32, offset, limit int) (int, []model.FriendRequest, error) {
+	return s.pageFriendRequests(ctx, "from_user_id", userID, results, offset, limit)
+}
+
+func (s *Store) pageFriendRequests(ctx context.Context, column, userID string, results []int32, offset, limit int) (int, []model.FriendRequest, error) {
+	if column != "to_user_id" && column != "from_user_id" {
+		return 0, nil, errors.New("invalid friend request column")
+	}
+	where := column + " = ?"
+	args := []any{userID}
+	if len(results) > 0 {
+		where += " AND handle_result IN (" + strings.TrimRight(strings.Repeat("?,", len(results)), ",") + ")"
+		for _, result := range results {
+			args = append(args, result)
+		}
+	}
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM friend_request WHERE `+where, args...).Scan(&total); err != nil {
+		return 0, nil, err
+	}
+	queryArgs := append(append([]any{}, args...), limit, offset)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time
+		FROM friend_request
+		WHERE `+where+`
+		ORDER BY create_time DESC, from_user_id ASC, to_user_id ASC
+		LIMIT ? OFFSET ?`, queryArgs...)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+	var out []model.FriendRequest
+	for rows.Next() {
+		var row model.FriendRequest
+		var created, handled sql.NullTime
+		if err := rows.Scan(&row.FromUserID, &row.ToUserID, &row.HandleResult, &row.ReqMsg, &created, &row.HandlerUserID, &row.HandleMsg, &handled); err != nil {
+			return 0, nil, err
+		}
+		if created.Valid {
+			row.CreateTime = created.Time
+		}
+		if handled.Valid {
+			row.HandleTime = handled.Time
+		}
+		out = append(out, row)
+	}
+	return total, out, rows.Err()
+}
+
 func lockPending(ctx context.Context, tx *sql.Tx, from, to string) error {
 	var result int32
 	err := tx.QueryRowContext(ctx, `SELECT handle_result FROM friend_request WHERE from_user_id = ? AND to_user_id = ? FOR UPDATE`, from, to).Scan(&result)

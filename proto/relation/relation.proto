@@ -9,6 +9,8 @@ service RelationService {
   // Friend request operations
   rpc SendFriendRequest(SendFriendRequestReq) returns (SendFriendRequestResp);
   rpc RespondFriendApply(RespondFriendApplyReq) returns (RespondFriendApplyResp);
+  rpc GetRecvFriendRequests(GetRecvFriendRequestsReq) returns (GetRecvFriendRequestsResp);
+  rpc GetSentFriendRequests(GetSentFriendRequestsReq) returns (GetSentFriendRequestsResp);
 
   rpc DeleteFriend(DeleteFriendReq) returns (DeleteFriendResp);
   rpc UpdateFriend(UpdateFriendReq) returns (UpdateFriendResp);
@@ -21,24 +23,56 @@ service RelationService {
   rpc IsBlack(IsBlackReq) returns (IsBlackResp);
 
   rpc GetIncrementalFriends(GetIncrementalFriendsReq) returns (GetIncrementalFriendsResp);
-  rpc GetIncrementalBlacks(GetIncrementalBlacksReq) returns (GetIncrementalBlacksResp);
 
-  // Paged friend and black profiles. Full ID lists are separate so a client can skip the IDs when id_hash matches.
+  // Paged friend and black profiles. Full friend ID lists are separate so a client can skip the IDs when id_hash matches.
+  // Blacks have no version log. The client pages the full black list.
   rpc GetFriendList(GetFriendListReq) returns (GetFriendListResp);
   rpc GetFullFriendUserIDs(GetFullFriendUserIDsReq) returns (GetFullFriendUserIDsResp);
   rpc GetBlackList(GetBlackListReq) returns (GetBlackListResp);
 }
 
 // --------------- FriendRequestInfo ---------------
-// status: 0 = pending, 1 = accepted, -1 = rejected
+// handle_result: 0 = pending, 1 = accepted, -1 = rejected.
+// create_time and handle_time are Unix milliseconds. handle_time is 0 when unset.
 message FriendRequestInfo {
-  string from_user_id = 1;
-  string to_user_id   = 2;
-  string message      = 3;
-  string handle_msg   = 4;
-  int32  status       = 5;
-  int64  created_at   = 6;
-  int64  updated_at   = 7;
+  string from_user_id     = 1;
+  string to_user_id       = 2;
+  string message          = 3;
+  string handle_msg       = 4;
+  int32  handle_result    = 5;
+  int64  create_time      = 6;
+  int64  handle_time      = 7;
+  string from_nickname    = 8;
+  string from_avatar_url  = 9;
+  string to_nickname      = 10;
+  string to_avatar_url    = 11;
+  string handler_user_id  = 12;
+}
+
+// offset is zero-based. limit 0 means 20, and limit cannot exceed 200.
+// Empty handle_results returns every status.
+message GetRecvFriendRequestsReq {
+  string         user_id        = 1;
+  int32          offset         = 2;
+  int32          limit          = 3;
+  repeated int32 handle_results = 4;
+}
+
+message GetRecvFriendRequestsResp {
+  repeated FriendRequestInfo requests = 1;
+  int32                      total    = 2;
+}
+
+message GetSentFriendRequestsReq {
+  string         user_id        = 1;
+  int32          offset         = 2;
+  int32          limit          = 3;
+  repeated int32 handle_results = 4;
+}
+
+message GetSentFriendRequestsResp {
+  repeated FriendRequestInfo requests = 1;
+  int32                      total    = 2;
 }
 
 // --------------- SendFriendRequest ---------------
@@ -122,8 +156,9 @@ message IsBlackResp {
 
 // --------------- incremental sync ---------------
 // version 0 or an unknown version_id asks for a full snapshot.
+// full=true carries no friend profiles. The client pages friend details and reads the full ID list.
 // Otherwise the response carries logs newer than version.
-// Friend sort changes use sort_version. A pin change bumps it.
+// sort_version is set only when this batch includes a pin change. The client then reads the full ID list again.
 
 message PublicUserInfo {
   string user_id    = 1;
@@ -163,21 +198,6 @@ message GetIncrementalFriendsResp {
   repeated FriendInfo insert       = 5;
   repeated FriendInfo update       = 6;
   uint64              sort_version = 7;
-}
-
-message GetIncrementalBlacksReq {
-  string user_id    = 1;
-  string version_id = 2;
-  uint64 version    = 3;
-}
-
-message GetIncrementalBlacksResp {
-  uint64             version    = 1;
-  string             version_id = 2;
-  bool               full       = 3;
-  repeated string    delete     = 4;
-  repeated BlackInfo insert     = 5;
-  repeated BlackInfo update     = 6;
 }
 
 // --------------- paged profiles and full ID lists ---------------

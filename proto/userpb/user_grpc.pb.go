@@ -23,6 +23,7 @@ const (
 	UserService_Login_FullMethodName          = "/user.UserService/Login"
 	UserService_GetUserByID_FullMethodName    = "/user.UserService/GetUserByID"
 	UserService_GetUsersByIDs_FullMethodName  = "/user.UserService/GetUsersByIDs"
+	UserService_SearchUsers_FullMethodName    = "/user.UserService/SearchUsers"
 	UserService_UpdateUser_FullMethodName     = "/user.UserService/UpdateUser"
 	UserService_DeleteUser_FullMethodName     = "/user.UserService/DeleteUser"
 	UserService_ChangePassword_FullMethodName = "/user.UserService/ChangePassword"
@@ -41,6 +42,7 @@ type UserServiceClient interface {
 	Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginResp, error)
 	GetUserByID(ctx context.Context, in *GetUserByIDReq, opts ...grpc.CallOption) (*GetUserByIDResp, error)
 	GetUsersByIDs(ctx context.Context, in *GetUsersByIDsReq, opts ...grpc.CallOption) (*GetUsersByIDsResp, error)
+	SearchUsers(ctx context.Context, in *SearchUsersReq, opts ...grpc.CallOption) (*SearchUsersResp, error)
 	UpdateUser(ctx context.Context, in *UpdateUserReq, opts ...grpc.CallOption) (*UpdateUserResp, error)
 	DeleteUser(ctx context.Context, in *DeleteUserReq, opts ...grpc.CallOption) (*DeleteUserResp, error)
 	ChangePassword(ctx context.Context, in *ChangePasswordReq, opts ...grpc.CallOption) (*ChangePasswordResp, error)
@@ -90,6 +92,16 @@ func (c *userServiceClient) GetUsersByIDs(ctx context.Context, in *GetUsersByIDs
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetUsersByIDsResp)
 	err := c.cc.Invoke(ctx, UserService_GetUsersByIDs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) SearchUsers(ctx context.Context, in *SearchUsersReq, opts ...grpc.CallOption) (*SearchUsersResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchUsersResp)
+	err := c.cc.Invoke(ctx, UserService_SearchUsers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +169,7 @@ type UserServiceServer interface {
 	Login(context.Context, *LoginReq) (*LoginResp, error)
 	GetUserByID(context.Context, *GetUserByIDReq) (*GetUserByIDResp, error)
 	GetUsersByIDs(context.Context, *GetUsersByIDsReq) (*GetUsersByIDsResp, error)
+	SearchUsers(context.Context, *SearchUsersReq) (*SearchUsersResp, error)
 	UpdateUser(context.Context, *UpdateUserReq) (*UpdateUserResp, error)
 	DeleteUser(context.Context, *DeleteUserReq) (*DeleteUserResp, error)
 	ChangePassword(context.Context, *ChangePasswordReq) (*ChangePasswordResp, error)
@@ -183,6 +196,9 @@ func (UnimplementedUserServiceServer) GetUserByID(context.Context, *GetUserByIDR
 }
 func (UnimplementedUserServiceServer) GetUsersByIDs(context.Context, *GetUsersByIDsReq) (*GetUsersByIDsResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUsersByIDs not implemented")
+}
+func (UnimplementedUserServiceServer) SearchUsers(context.Context, *SearchUsersReq) (*SearchUsersResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchUsers not implemented")
 }
 func (UnimplementedUserServiceServer) UpdateUser(context.Context, *UpdateUserReq) (*UpdateUserResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateUser not implemented")
@@ -288,6 +304,24 @@ func _UserService_GetUsersByIDs_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServiceServer).GetUsersByIDs(ctx, req.(*GetUsersByIDsReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_SearchUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchUsersReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).SearchUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_SearchUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).SearchUsers(ctx, req.(*SearchUsersReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -404,6 +438,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUsersByIDs",
 			Handler:    _UserService_GetUsersByIDs_Handler,
+		},
+		{
+			MethodName: "SearchUsers",
+			Handler:    _UserService_SearchUsers_Handler,
 		},
 		{
 			MethodName: "UpdateUser",

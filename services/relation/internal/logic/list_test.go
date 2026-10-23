@@ -23,4 +23,14 @@ func TestFriendListRejectsBadPage(t *testing.T) {
 	if !ok || got != errorcode.RelationInvalidPage {
 		t.Fatalf("black page err=%v", err)
 	}
+	_, err = srv.GetRecvFriendRequests(context.Background(), &relationpb.GetRecvFriendRequestsReq{UserId: "u", Limit: 201})
+	got, ok = errorcode.CodeOf(err)
+	if !ok || got != errorcode.RelationInvalidPage {
+		t.Fatalf("recv page err=%v", err)
+	}
+	_, err = srv.GetSentFriendRequests(context.Background(), &relationpb.GetSentFriendRequestsReq{UserId: "u", HandleResults: []int32{3}})
+	got, ok = errorcode.CodeOf(err)
+	if !ok || got != errorcode.RelationInvalidHandle {
+		t.Fatalf("sent handle err=%v", err)
+	}
 }

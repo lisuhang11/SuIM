@@ -11,6 +11,7 @@ service UserService {
   rpc Login(LoginReq) returns (LoginResp);
   rpc GetUserByID(GetUserByIDReq) returns (GetUserByIDResp);
   rpc GetUsersByIDs(GetUsersByIDsReq) returns (GetUsersByIDsResp);
+  rpc SearchUsers(SearchUsersReq) returns (SearchUsersResp);
   rpc UpdateUser(UpdateUserReq) returns (UpdateUserResp);
   rpc DeleteUser(DeleteUserReq) returns (DeleteUserResp);
   rpc ChangePassword(ChangePasswordReq) returns (ChangePasswordResp);
@@ -19,6 +20,7 @@ service UserService {
 }
 
 // UserInfo is the public profile. RegisterReq.username is stored as nickname.
+// birth_time is Unix milliseconds. gender is 0 unknown, 1 male, 2 female.
 message UserInfo {
   string user_id = 1;
   string email = 2;
@@ -28,6 +30,17 @@ message UserInfo {
   int32 global_recv_msg_opt = 6;
   bool is_active = 7;
   int64 create_time = 8;
+  string area_code = 9;
+  string phone_number = 10;
+  string account = 11;
+  int32 gender = 12;
+  int64 birth_time = 13;
+  int32 level = 14;
+  int32 allow_vibration = 15;
+  int32 allow_beep = 16;
+  int32 allow_add_friend = 17;
+  int32 register_type = 18;
+  string ex = 19;
 }
 
 message RegisterReq {
@@ -69,9 +82,35 @@ message GetUsersByIDsResp {
   map<string, UserInfo> users = 1;
 }
 
-// --------------- UpdateUser ---------------
+// SearchUsers matches an exact user_id. Email, account, and phone are not searched.
+message SearchUsersReq {
+  string keyword = 1;
+}
+
+message SearchUsersResp {
+  repeated UserInfo users = 1;
+}
+
+// UpdateUserReq 是部分更新。未设置的 optional 字段保持原值。
+// birth_time 为 Unix 毫秒，0 表示清空生日。
 message UpdateUserReq {
-  UserInfo user = 1;
+  string user_id = 1;
+  optional string nickname = 2;
+  optional string avatar_url = 3;
+  optional int32 app_manger_level = 4;
+  optional int32 global_recv_msg_opt = 5;
+  optional bool is_active = 6;
+  optional string area_code = 7;
+  optional string phone_number = 8;
+  optional string account = 9;
+  optional int32 gender = 10;
+  optional int64 birth_time = 11;
+  optional int32 level = 12;
+  optional int32 allow_vibration = 13;
+  optional int32 allow_beep = 14;
+  optional int32 allow_add_friend = 15;
+  optional int32 register_type = 16;
+  optional string ex = 17;
 }
 
 message UpdateUserResp {}

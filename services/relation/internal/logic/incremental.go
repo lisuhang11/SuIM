@@ -24,89 +24,29 @@ func (s *Server) GetIncrementalFriends(ctx context.Context, req *relationpb.GetI
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("query friend version")
 	}
-	sortVersion, err := s.store.FriendSortVersion(ctx, userID)
+	// 3. 版本对不上，或差额达到限额，返回 full 且不带好友资料。
+	if needFull(head, req.GetVersionId(), req.GetVersion()) {
+		return &relationpb.GetIncrementalFriendsResp{Version: head.Version, VersionId: head.ID, Full: true}, nil
+	}
+	if head.Version <= req.GetVersion() {
+		return &relationpb.GetIncrementalFriendsResp{Version: head.Version, VersionId: head.ID}, nil
+	}
+	logs, err := s.store.FriendChanges(ctx, userID, req.GetVersion(), IncrementalLimit)
 	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("query friend sort version")
+		return nil, errorcode.ErrInternal.WithMsg("query friend changes")
 	}
-	if !needFull(head, req.GetVersionId(), req.GetVersion()) && head.Version <= req.GetVersion() {
-		return &relationpb.GetIncrementalFriendsResp{Version: head.Version, VersionId: head.ID, SortVersion: sortVersion}, nil
+	if len(logs) >= IncrementalLimit {
+		return &relationpb.GetIncrementalFriendsResp{Version: head.Version, VersionId: head.ID, Full: true}, nil
 	}
-	// 3. 版本差在限额内时返回增删改，否则整量返回当前好友。
-	if !needFull(head, req.GetVersionId(), req.GetVersion()) {
-		logs, err := s.store.FriendChanges(ctx, userID, req.GetVersion(), IncrementalLimit)
-		if err != nil {
-			return nil, errorcode.ErrInternal.WithMsg("query friend changes")
-		}
-		if len(logs) < IncrementalLimit {
-			resp, err := s.friendIncremental(ctx, userID, head, sortVersion, logs)
-			if err != nil {
-				return nil, err
-			}
-			return resp, nil
-		}
-	}
-	rows, err := s.store.ListFriends(ctx, userID)
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("list friends")
-	}
-	insert, err := s.friendInfos(ctx, rows)
-	if err != nil {
-		return nil, err
-	}
-	return &relationpb.GetIncrementalFriendsResp{
-		Version:     head.Version,
-		VersionId:   head.ID,
-		Full:        true,
-		Insert:      insert,
-		SortVersion: sortVersion,
-	}, nil
-}
-
-func (s *Server) GetIncrementalBlacks(ctx context.Context, req *relationpb.GetIncrementalBlacksReq) (*relationpb.GetIncrementalBlacksResp, error) {
-	// 1. 校验用户。调用方必须是本人，操作者身份尚未从上下文接入。
-	userID, err := normalizeUserID(req.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	// 2. 读取当前版本。版本号没变就原样返回。
-	head, err := s.store.BlackVersion(ctx, userID)
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("query black version")
-	}
-	if !needFull(head, req.GetVersionId(), req.GetVersion()) && head.Version <= req.GetVersion() {
-		return &relationpb.GetIncrementalBlacksResp{Version: head.Version, VersionId: head.ID}, nil
-	}
-	// 3. 版本差在限额内时返回增删改，否则整量返回当前黑名单。
-	if !needFull(head, req.GetVersionId(), req.GetVersion()) {
-		logs, err := s.store.BlackChanges(ctx, userID, req.GetVersion(), IncrementalLimit)
-		if err != nil {
-			return nil, errorcode.ErrInternal.WithMsg("query black changes")
-		}
-		if len(logs) < IncrementalLimit {
-			return s.blackIncremental(ctx, userID, head, logs)
-		}
-	}
-	rows, err := s.store.ListBlacks(ctx, userID)
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("list blacks")
-	}
-	insert, err := s.blackInfos(ctx, rows)
-	if err != nil {
-		return nil, err
-	}
-	return &relationpb.GetIncrementalBlacksResp{
-		Version:   head.Version,
-		VersionId: head.ID,
-		Full:      true,
-		Insert:    insert,
-	}, nil
+	// 4. 限额内返回增删改的好友资料。这一批里有置顶时才带 sort_version。
+	return s.friendIncremental(ctx, userID, head, logs)
 }
 
 func needFull(head model.VersionHead, versionID string, version uint64) bool {
 	return version == 0 || versionID == "" || head.ID == "" || head.ID != versionID
 }
 
-func (s *Server) friendIncremental(ctx context.Context, userID string, head model.VersionHead, sortVersion uint64, logs []model.VersionLog) (*relationpb.GetIncrementalFriendsResp, error) {
+func (s *Server) friendIncremental(ctx context.Context, userID string, head model.VersionHead, logs []model.VersionLog) (*relationpb.GetIncrementalFriendsResp, error) {
 	insertIDs, updateIDs, deleteIDs := splitLogs(logs)
 	insertRows, err := s.store.FriendsByIDs(ctx, userID, insertIDs)
 	if err != nil {
@@ -130,35 +70,18 @@ func (s *Server) friendIncremental(ctx context.Context, userID string, head mode
 		Delete:      deleteIDs,
 		Insert:      insert,
 		Update:      update,
-		SortVersion: sortVersion,
+		SortVersion: sortVersionFrom(logs),
 	}, nil
 }
 
-func (s *Server) blackIncremental(ctx context.Context, userID string, head model.VersionHead, logs []model.VersionLog) (*relationpb.GetIncrementalBlacksResp, error) {
-	insertIDs, updateIDs, deleteIDs := splitLogs(logs)
-	insertRows, err := s.store.BlacksByIDs(ctx, userID, insertIDs)
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("query black inserts")
+func sortVersionFrom(logs []model.VersionLog) uint64 {
+	var version uint64
+	for _, log := range logs {
+		if log.ElemID == model.SortElemID && log.Version > version {
+			version = log.Version
+		}
 	}
-	updateRows, err := s.store.BlacksByIDs(ctx, userID, updateIDs)
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("query black updates")
-	}
-	insert, err := s.blackInfos(ctx, insertRows)
-	if err != nil {
-		return nil, err
-	}
-	update, err := s.blackInfos(ctx, updateRows)
-	if err != nil {
-		return nil, err
-	}
-	return &relationpb.GetIncrementalBlacksResp{
-		Version:   head.Version,
-		VersionId: head.ID,
-		Delete:    deleteIDs,
-		Insert:    insert,
-		Update:    update,
-	}, nil
+	return version
 }
 
 func splitLogs(logs []model.VersionLog) (insertIDs, updateIDs, deleteIDs []string) {

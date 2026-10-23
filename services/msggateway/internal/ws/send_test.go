@@ -2,7 +2,11 @@ package ws
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -115,6 +119,63 @@ func TestPullByRangeUses1002(t *testing.T) {
 	}
 }
 
+func TestHTTPSendText(t *testing.T) {
+	prod := &fakeProducer{}
+	srv := New(Options{
+		Tokens:    fakeTokens{},
+		Relations: &fakeRelations{friend1: true, friend2: true},
+		Publish:   prod,
+	})
+	body := `{"recv_id":"b","content":" hi ","client_msg_id":"c1","session_type":1,"content_type":101}`
+	req := httptest.NewRequest(http.MethodPost, "/msg/send", strings.NewReader(body))
+	req.Header.Set("token", "t")
+	rr := httptest.NewRecorder()
+	srv.HandleSend(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
+	var out struct {
+		Code int `json:"code"`
+		Data struct {
+			ServerMsgID string `json:"server_msg_id"`
+			ClientMsgID string `json:"client_msg_id"`
+			SendTime    int64  `json:"send_time"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Code != 0 || out.Data.ClientMsgID != "c1" || out.Data.ServerMsgID == "" || out.Data.SendTime == 0 {
+		t.Fatalf("resp %+v", out)
+	}
+	if prod.n != 1 || prod.key != "si_a_b" {
+		t.Fatalf("publish n=%d key=%s", prod.n, prod.key)
+	}
+	stored := &msgpb.MsgData{}
+	if err := proto.Unmarshal(prod.body, stored); err != nil {
+		t.Fatal(err)
+	}
+	if string(stored.Content) != `{"content":"hi"}` || stored.SendId != "a" || stored.ContentType != 101 {
+		t.Fatalf("stored %+v content %s", stored, stored.Content)
+	}
+}
+
+func TestHTTPSendRejectsStranger(t *testing.T) {
+	srv := New(Options{
+		Tokens:    fakeTokens{},
+		Relations: &fakeRelations{},
+		Publish:   &fakeProducer{},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/msg/send", strings.NewReader(
+		`{"recv_id":"b","content":"hi","session_type":1,"content_type":101}`))
+	req.Header.Set("token", "t")
+	rr := httptest.NewRecorder()
+	srv.HandleSend(rr, req)
+	if rr.Code != http.StatusPreconditionFailed {
+		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestRangeIsEnd(t *testing.T) {
 	if rangeIsEnd(orderAsc, 1, 2, 3) {
 		t.Fatal("ascending pull is not finished")
@@ -144,14 +205,22 @@ func (f *fakeRelations) IsBlack(context.Context, string, string) (bool, bool, er
 }
 
 type fakeProducer struct {
-	n   int
-	key string
+	n    int
+	key  string
+	body []byte
 }
 
-func (f *fakeProducer) Send(_ context.Context, key string, _ []byte) error {
+func (f *fakeProducer) Send(_ context.Context, key string, body []byte) error {
 	f.n++
 	f.key = key
+	f.body = append([]byte(nil), body...)
 	return nil
+}
+
+type fakeTokens struct{}
+
+func (fakeTokens) Validate(context.Context, string) (string, int32, error) {
+	return "a", 5, nil
 }
 
 type fakeHistory struct {

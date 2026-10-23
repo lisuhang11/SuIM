@@ -53,27 +53,42 @@ func (s *Server) sendMsg(c *Client, req *Req) error {
 	}
 	msg.SendId = c.userID
 	msg.SenderPlatformId = int32(c.platformID)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	code, text, resp := s.accept(ctx, msg)
+	if code != 0 {
+		return c.reply(req, code, text, nil)
+	}
+	body, err := proto.Marshal(resp)
+	if err != nil {
+		return c.reply(req, errInternal, "marshal response", nil)
+	}
+	return c.reply(req, 0, "", body)
+}
+
+// accept checks one single or group message and publishes it to toRedis.
+func (s *Server) accept(ctx context.Context, msg *msgpb.MsgData) (int, string, *msgpb.SendMsgResp) {
 	switch msg.SessionType {
 	case 1, 4:
 		if msg.RecvId == "" {
-			return c.reply(req, errArgs, "recv id is required", nil)
+			return errArgs, "recv id is required", nil
 		}
 	case 2, 3:
 		if msg.GroupId == "" {
-			return c.reply(req, errArgs, "group id is required", nil)
+			return errArgs, "group id is required", nil
 		}
 	default:
-		return c.reply(req, errArgs, "session type is required", nil)
+		return errArgs, "session type is required", nil
 	}
 	if len(msg.Content) == 0 {
-		return c.reply(req, errArgs, "content is required", nil)
+		return errArgs, "content is required", nil
 	}
 	if code, text := s.authorizeSend(msg); code != 0 {
-		return c.reply(req, code, text, nil)
+		return code, text, nil
 	}
 	key := msgconv.QueueKey(msg)
 	if key == "" {
-		return c.reply(req, errArgs, "conversation id is empty", nil)
+		return errArgs, "conversation id is empty", nil
 	}
 	if msg.ClientMsgId == "" {
 		msg.ClientMsgId = newConnID()
@@ -93,25 +108,19 @@ func (s *Server) sendMsg(c *Client, req *Req) error {
 	}
 	body, err := proto.Marshal(msg)
 	if err != nil {
-		return c.reply(req, errInternal, "marshal message", nil)
+		return errInternal, "marshal message", nil
 	}
 	if s.publish == nil {
-		return c.reply(req, errInternal, "queue is not configured", nil)
+		return errInternal, "queue is not configured", nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	if err := s.publish.Send(ctx, key, body); err != nil {
-		return c.reply(req, errInternal, "queue send failed", nil)
+		return errInternal, "queue send failed", nil
 	}
-	resp, err := proto.Marshal(&msgpb.SendMsgResp{
+	return 0, "", &msgpb.SendMsgResp{
 		ServerMsgId: msg.ServerMsgId,
 		ClientMsgId: msg.ClientMsgId,
 		SendTime:    msg.SendTime,
-	})
-	if err != nil {
-		return c.reply(req, errInternal, "marshal response", nil)
 	}
-	return c.reply(req, 0, "", resp)
 }
 
 // authorizeSend checks a single chat before it enters the queue.

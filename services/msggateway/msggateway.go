@@ -113,7 +113,10 @@ func run(cfgPath, migratePath string) error {
 	if err != nil {
 		return fmt.Errorf("listen websocket: %w", err)
 	}
-	wsSrv := &http.Server{Handler: server, ReadHeaderTimeout: 5 * time.Second}
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /msg/send", server.HandleSend)
+	mux.Handle("/", server)
+	wsSrv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	rpcLis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.RPCPort))
 	if err != nil {
 		_ = wsLis.Close()

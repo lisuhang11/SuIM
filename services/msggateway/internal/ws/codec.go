@@ -13,11 +13,13 @@ const (
 	sdkJS = "js"
 
 	reqGetNewestSeq      = 1001
-	reqPullMsgBySeqList  = 1002
+	reqPullMsgByRange    = 1002
 	reqSendMsg           = 1003
 	reqSendSignalMsg     = 1004
-	reqPullMsg           = 1005
+	reqPullMsgBySeqList  = 1005
 	reqGetConvMaxReadSeq = 1006
+	orderAsc             = 0
+	orderDesc            = 1
 	reqPullConvLastMsg   = 1007
 	reqPushMsg           = 2001
 	reqKickOnlineMsg     = 2002

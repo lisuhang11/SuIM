@@ -1,4 +1,4 @@
-CREATE TABLE `msg` (
+CREATE TABLE IF NOT EXISTS `msg` (
   `conversation_id`       VARCHAR(128) NOT NULL,
   `seq`                   BIGINT       NOT NULL,
   `send_id`               VARCHAR(64)  NOT NULL DEFAULT '',
@@ -36,21 +36,21 @@ CREATE TABLE `msg` (
   KEY `idx_send_time` (`conversation_id`, `send_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `msg_user_delete` (
+CREATE TABLE IF NOT EXISTS `msg_user_delete` (
   `conversation_id` VARCHAR(128) NOT NULL,
   `seq`             BIGINT       NOT NULL,
   `user_id`         VARCHAR(64)  NOT NULL,
   PRIMARY KEY (`conversation_id`, `seq`, `user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `seq` (
+CREATE TABLE IF NOT EXISTS `seq_conversation` (
   `conversation_id` VARCHAR(128) NOT NULL,
   `max_seq`         BIGINT       NOT NULL DEFAULT 0,
   `min_seq`         BIGINT       NOT NULL DEFAULT 0,
   PRIMARY KEY (`conversation_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `seq_user` (
+CREATE TABLE IF NOT EXISTS `seq_user` (
   `user_id`         VARCHAR(64)  NOT NULL,
   `conversation_id` VARCHAR(128) NOT NULL,
   `min_seq`         BIGINT       NOT NULL DEFAULT 0,

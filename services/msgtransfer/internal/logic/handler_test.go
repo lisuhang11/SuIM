@@ -39,6 +39,8 @@ func TestTransferPersistsToMySQL(t *testing.T) {
 	pushed := &recordProd{}
 	transfer := NewTransfer(cache, db, bus.Producer(mq.TopicToMySQL), pushed)
 	redisH := NewRedisHandler(transfer, 1, 1, 10*time.Millisecond)
+	chats := &memChats{}
+	redisH.UseSingleChats(chats)
 	redisH.Start(ctx)
 	defer redisH.Close()
 
@@ -87,6 +89,9 @@ func TestTransferPersistsToMySQL(t *testing.T) {
 	if got := cache.seqOf("si_a_b"); got != 1 {
 		t.Fatalf("seq after retry %d", got)
 	}
+	if got := chats.count(); got != 2 {
+		t.Fatalf("conversation ensures %d", got)
+	}
 }
 
 func TestNotStoredMessageOnlyPushes(t *testing.T) {
@@ -97,6 +102,8 @@ func TestNotStoredMessageOnlyPushes(t *testing.T) {
 	pushed := &recordProd{}
 	transfer := NewTransfer(newMemCache(), db, &recordProd{}, pushed)
 	redisH := NewRedisHandler(transfer, 1, 1, 10*time.Millisecond)
+	chats := &memChats{}
+	redisH.UseSingleChats(chats)
 	redisH.Start(ctx)
 	defer redisH.Close()
 
@@ -119,6 +126,9 @@ func TestNotStoredMessageOnlyPushes(t *testing.T) {
 	waitCount(t, pushed, 1)
 	if got := db.count("si_a_b"); got != 0 {
 		t.Fatalf("stored %d", got)
+	}
+	if got := chats.count(); got != 0 {
+		t.Fatalf("conversation ensures %d", got)
 	}
 }
 
@@ -312,6 +322,24 @@ func (m *memDB) readSeq(conversationID, userID string) int64 {
 
 func rowKey(conversationID string, seq int64) string {
 	return conversationID + ":" + strconv.FormatInt(seq, 10)
+}
+
+type memChats struct {
+	mu sync.Mutex
+	n  int
+}
+
+func (m *memChats) Ensure(context.Context, string, string, string) error {
+	m.mu.Lock()
+	m.n++
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *memChats) count() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.n
 }
 
 type recordProd struct {

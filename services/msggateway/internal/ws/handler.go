@@ -6,9 +6,12 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/msgconv"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
+
+const sessionSingle = 1
 
 func (s *Server) dispatch(c *Client, req *Req) error {
 	if req.SendID != "" && req.SendID != c.userID {
@@ -17,12 +20,12 @@ func (s *Server) dispatch(c *Client, req *Req) error {
 	switch req.ReqIdentifier {
 	case reqGetNewestSeq:
 		return s.maxSeq(c, req)
-	case reqPullMsgBySeqList:
-		return s.pullBySeqList(c, req)
+	case reqPullMsgByRange:
+		return s.pullByRange(c, req)
 	case reqSendMsg:
 		return s.sendMsg(c, req)
-	case reqPullMsg:
-		return s.pullByRange(c, req)
+	case reqPullMsgBySeqList:
+		return s.pullBySeqList(c, req)
 	case reqGetConvMaxReadSeq:
 		return s.readAndMaxSeq(c, req)
 	case reqPullConvLastMsg:
@@ -65,6 +68,9 @@ func (s *Server) sendMsg(c *Client, req *Req) error {
 	if len(msg.Content) == 0 {
 		return c.reply(req, errArgs, "content is required", nil)
 	}
+	if code, text := s.authorizeSend(msg); code != 0 {
+		return c.reply(req, code, text, nil)
+	}
 	key := msgconv.QueueKey(msg)
 	if key == "" {
 		return c.reply(req, errArgs, "conversation id is empty", nil)
@@ -106,6 +112,37 @@ func (s *Server) sendMsg(c *Client, req *Req) error {
 		return c.reply(req, errInternal, "marshal response", nil)
 	}
 	return c.reply(req, 0, "", resp)
+}
+
+// authorizeSend checks a single chat before it enters the queue.
+// Both users must be friends, and neither may have blocked the other.
+func (s *Server) authorizeSend(msg *msgpb.MsgData) (int, string) {
+	if msg.SessionType != sessionSingle {
+		return 0, ""
+	}
+	if msg.SendId == msg.RecvId {
+		return errArgs, "cannot message yourself"
+	}
+	if s.relations == nil {
+		return errInternal, "relation service is not configured"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	blockedBySender, blockedByReceiver, err := s.relations.IsBlack(ctx, msg.SendId, msg.RecvId)
+	if err != nil {
+		return errInternal, "check black"
+	}
+	if blockedBySender || blockedByReceiver {
+		return int(errorcode.MsgBlocked), errorcode.ErrMsgBlocked.Error()
+	}
+	senderHasFriend, receiverHasFriend, err := s.relations.IsFriend(ctx, msg.SendId, msg.RecvId)
+	if err != nil {
+		return errInternal, "check friend"
+	}
+	if !senderHasFriend || !receiverHasFriend {
+		return int(errorcode.MsgNotFriend), errorcode.ErrMsgNotFriend.Error()
+	}
+	return 0, ""
 }
 
 func (s *Server) maxSeq(c *Client, req *Req) error {
@@ -175,11 +212,29 @@ func (s *Server) pullByRange(c *Client, req *Req) error {
 		if item == nil || item.ConversationId == "" || s.history == nil {
 			continue
 		}
-		msgs, err := s.history.Range(ctx, item.ConversationId, item.Begin, item.End, item.Num)
+		begin, end, limit := item.Begin, item.End, item.Num
+		if limit <= 0 || limit > 200 {
+			limit = 200
+		}
+		if begin <= 0 {
+			begin = 1
+		}
+		if end <= 0 {
+			end = begin + limit - 1
+		}
+		msgs, err := s.history.Range(ctx, item.ConversationId, begin, end, limit)
 		if err != nil {
 			return c.reply(req, errInternal, "query messages", nil)
 		}
-		putPull(out, item.ConversationId, &msgpb.PullMsgs{Msgs: msgs, IsEnd: true, EndSeq: item.End})
+		maxSeq, err := s.history.MaxSeqs(ctx, []string{item.ConversationId})
+		if err != nil {
+			return c.reply(req, errInternal, "query max seq", nil)
+		}
+		putPull(out, item.ConversationId, &msgpb.PullMsgs{
+			Msgs:   msgs,
+			IsEnd:  rangeIsEnd(in.Order, begin, end, maxSeq[item.ConversationId]),
+			EndSeq: end,
+		})
 	}
 	body, err := proto.Marshal(out)
 	if err != nil {
@@ -309,6 +364,16 @@ func (s *Server) userConversations(ctx context.Context, userID string) []string 
 		}
 	}
 	return ids
+}
+
+func rangeIsEnd(order int32, begin, end, maxSeq int64) bool {
+	if order == orderDesc {
+		return begin <= 1
+	}
+	if maxSeq <= 0 {
+		return true
+	}
+	return maxSeq <= end
 }
 
 func putPull(out *msgpb.PushMessages, conversationID string, pull *msgpb.PullMsgs) {

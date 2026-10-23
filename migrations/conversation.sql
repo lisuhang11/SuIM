@@ -1,4 +1,4 @@
-CREATE TABLE `conversation` (
+CREATE TABLE IF NOT EXISTS `conversation` (
   `owner_user_id`            VARCHAR(64)  NOT NULL COMMENT '会话拥有者',
   `conversation_id`          VARCHAR(255) NOT NULL COMMENT '会话ID',
   `conversation_type`        INT          NOT NULL DEFAULT 0 COMMENT '会话类型',
@@ -22,7 +22,7 @@ CREATE TABLE `conversation` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话';
 
 -- 每个用户一行。version_id 返回给客户端，文档重建后必须换新值。
-CREATE TABLE `conversation_version` (
+CREATE TABLE IF NOT EXISTS `conversation_version` (
   `version_id`  CHAR(24)        NOT NULL COMMENT '版本ID，文档重建后更换',
   `d_id`        VARCHAR(64)     NOT NULL COMMENT '会话拥有者',
   `version`     BIGINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '当前版本号',
@@ -33,7 +33,7 @@ CREATE TABLE `conversation_version` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话版本';
 
 -- 每个会话只保留最新一条变更。
-CREATE TABLE `conversation_version_log` (
+CREATE TABLE IF NOT EXISTS `conversation_version_log` (
   `d_id`        VARCHAR(64)     NOT NULL COMMENT '会话拥有者',
   `e_id`        VARCHAR(255)    NOT NULL COMMENT '会话ID',
   `state`       INT             NOT NULL COMMENT '1插入 2删除 3更新',

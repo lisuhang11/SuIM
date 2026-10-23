@@ -2,7 +2,7 @@ mysql:
   address:
     - 127.0.0.1:3306
   username: suim
-  password: ""
+  password: suIM123
   database: suim
   maxOpenConn: 20
   maxIdleConn: 10
@@ -11,7 +11,7 @@ redis:
   address:
     - 127.0.0.1:6379
   username: ""
-  password: ""
+  password: suIM123
   redisMode: standalone
   db: 0
   maxRetry: 3

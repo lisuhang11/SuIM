@@ -1,0 +1,40 @@
+listenIP: 0.0.0.0
+registerIP: 127.0.0.1
+rpcPort: 8085
+wsPort: 10001
+maxConn: 100000
+handshakeTimeoutSec: 10
+
+mysql:
+  address:
+    - 127.0.0.1:3306
+  username: suim
+  password: suIM123
+  database: suim
+  maxOpenConn: 20
+  maxIdleConn: 10
+
+redis:
+  address:
+    - 127.0.0.1:6379
+  username: ""
+  password: suIM123
+  redisMode: standalone
+  db: 0
+  maxRetry: 3
+  poolSize: 10
+
+queue:
+  streamPrefix: mq
+  maxLen: 100000
+
+registry:
+  type: etcd
+  etcd:
+    endpoints:
+      - 127.0.0.1:2379
+    rootDir: /services
+    username: ""
+    password: ""
+    dialTimeout: 5
+    ttl: 10

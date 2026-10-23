@@ -36,6 +36,12 @@ type GroupDirectory interface {
 	Joined(ctx context.Context, userID string) ([]JoinedGroup, error)
 }
 
+// Relations checks friendship and blocks before a single chat is accepted.
+type Relations interface {
+	IsFriend(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
+	IsBlack(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
+}
+
 // HistoryReader loads sequenced messages from MySQL.
 type HistoryReader interface {
 	ConversationIDs(ctx context.Context, userID string) ([]string, error)
@@ -52,6 +58,7 @@ type Server struct {
 	hub       *Hub
 	tokens    TokenChecker
 	groups    GroupDirectory
+	relations Relations
 	history   HistoryReader
 	publish   mq.Producer
 	maxConn   int64
@@ -59,12 +66,13 @@ type Server struct {
 }
 
 type Options struct {
-	Tokens              TokenChecker
-	Groups              GroupDirectory
-	History             HistoryReader
-	Publish             mq.Producer
-	MaxConn             int64
-	HandshakeTimeout    time.Duration
+	Tokens           TokenChecker
+	Groups           GroupDirectory
+	Relations        Relations
+	History          HistoryReader
+	Publish          mq.Producer
+	MaxConn          int64
+	HandshakeTimeout time.Duration
 }
 
 func New(opts Options) *Server {
@@ -75,12 +83,13 @@ func New(opts Options) *Server {
 		opts.HandshakeTimeout = 10 * time.Second
 	}
 	return &Server{
-		hub:     NewHub(),
-		tokens:  opts.Tokens,
-		groups:  opts.Groups,
-		history: opts.History,
-		publish: opts.Publish,
-		maxConn: opts.MaxConn,
+		hub:       NewHub(),
+		tokens:    opts.Tokens,
+		groups:    opts.Groups,
+		relations: opts.Relations,
+		history:   opts.History,
+		publish:   opts.Publish,
+		maxConn:   opts.MaxConn,
 		upgrader: websocket.Upgrader{
 			HandshakeTimeout: opts.HandshakeTimeout,
 			CheckOrigin:      func(*http.Request) bool { return true },
@@ -211,14 +220,14 @@ func pushBody(msg *msgpb.MsgData, conversationID string) *msgpb.PushMessages {
 }
 
 type dialInfo struct {
-	Token        string `json:"token"`
-	UserID       string `json:"userID"`
-	SendID       string `json:"sendID"`
-	PlatformID   int    `json:"platformID"`
-	OperationID  string `json:"operationID"`
-	Compression  string `json:"compression"`
-	SDKType      string `json:"sdkType"`
-	Background   bool   `json:"background"`
+	Token       string `json:"token"`
+	UserID      string `json:"userID"`
+	SendID      string `json:"sendID"`
+	PlatformID  int    `json:"platformID"`
+	OperationID string `json:"operationID"`
+	Compression string `json:"compression"`
+	SDKType     string `json:"sdkType"`
+	Background  bool   `json:"background"`
 }
 
 func parseDial(r *http.Request) (dialInfo, int, string) {

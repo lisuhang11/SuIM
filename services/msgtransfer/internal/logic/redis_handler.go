@@ -25,14 +25,27 @@ type readSeq struct {
 	userSeq        map[string]int64
 }
 
+// SingleChats creates the two rows of a single-chat conversation.
+type SingleChats interface {
+	Ensure(ctx context.Context, conversationID, sendID, recvID string) error
+}
+
 // RedisHandler consumes toRedis, assigns sequences, and publishes toMysql plus toPush.
 type RedisHandler struct {
 	transfer *Transfer
+	chats    SingleChats
 	batch    *batcher
 	readCh   chan readSeq
 	readCtx  context.Context
 	stopRead context.CancelFunc
 	wg       sync.WaitGroup
+}
+
+// UseSingleChats stores conversation rows after a single-chat message is sequenced.
+func (h *RedisHandler) UseSingleChats(chats SingleChats) {
+	if h != nil {
+		h.chats = chats
+	}
 }
 
 func NewRedisHandler(transfer *Transfer, batchSize, workers int, interval time.Duration) *RedisHandler {
@@ -242,6 +255,9 @@ func (h *RedisHandler) persist(ctx context.Context, key string, list []*incoming
 		if err != nil {
 			return err
 		}
+		if err := h.ensureSingle(ctx, id, msgs); err != nil {
+			return err
+		}
 		if isNew {
 			slog.Info("new conversation", "conversationID", id, "sessionType", msgs[0].SessionType)
 		}
@@ -260,6 +276,17 @@ func (h *RedisHandler) persist(ctx context.Context, key string, list []*incoming
 		}
 	}
 	return nil
+}
+
+func (h *RedisHandler) ensureSingle(ctx context.Context, conversationID string, msgs []*msgpb.MsgData) error {
+	if h.chats == nil || len(msgs) == 0 || msgs[0] == nil {
+		return nil
+	}
+	msg := msgs[0]
+	if msg.SessionType != model.SessionSingle || msg.SendId == "" || msg.RecvId == "" || msg.SendId == msg.RecvId {
+		return nil
+	}
+	return h.chats.Ensure(ctx, conversationID, msg.SendId, msg.RecvId)
 }
 
 func (h *RedisHandler) push(ctx context.Context, key string, list []*incoming, idOf func(*msgpb.MsgData) string) error {

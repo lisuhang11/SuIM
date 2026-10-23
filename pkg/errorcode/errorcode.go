@@ -6,8 +6,7 @@
 //	3000-3999 relation
 //	4000-4999 group
 //	5000-5999 third
-//
-// The next service takes the following thousand.
+//	6000-6999 message
 package errorcode
 
 import (

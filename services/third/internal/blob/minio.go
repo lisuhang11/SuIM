@@ -30,9 +30,10 @@ type Config struct {
 
 // Minio is a multipart client. Sign URLs use SignEndpoint when it differs from Endpoint.
 type Minio struct {
-	core   *minio.Core
-	sign   *minio.Core
-	bucket string
+	core       *minio.Core
+	sign       *minio.Core
+	bucket     string
+	publicBase string
 }
 
 func Open(ctx context.Context, cfg Config) (*Minio, error) {
@@ -60,7 +61,12 @@ func Open(ctx context.Context, cfg Config) (*Minio, error) {
 			return nil, fmt.Errorf("make bucket: %w", err)
 		}
 	}
-	return &Minio{core: core, sign: sign, bucket: cfg.Bucket}, nil
+	return &Minio{
+		core:       core,
+		sign:       sign,
+		bucket:     cfg.Bucket,
+		publicBase: strings.TrimRight(signEndpoint, "/"),
+	}, nil
 }
 
 func newCore(rawURL, accessKey, secretKey string) (*minio.Core, error) {
@@ -151,6 +157,56 @@ func (m *Minio) Abort(ctx context.Context, key, uploadID string) error {
 		return nil
 	}
 	return err
+}
+
+// Form builds a POST policy the client sends straight to MinIO.
+func (m *Minio) Form(ctx context.Context, key string, size int64, contentType string, expires time.Time) (*model.FormCredential, error) {
+	policy := minio.NewPostPolicy()
+	if err := policy.SetBucket(m.bucket); err != nil {
+		return nil, err
+	}
+	if err := policy.SetKey(key); err != nil {
+		return nil, err
+	}
+	if err := policy.SetExpires(expires); err != nil {
+		return nil, err
+	}
+	if size > 0 {
+		if err := policy.SetContentLengthRange(0, size); err != nil {
+			return nil, err
+		}
+	}
+	if err := policy.SetSuccessStatusAction("200"); err != nil {
+		return nil, err
+	}
+	if contentType != "" {
+		if err := policy.SetContentType(contentType); err != nil {
+			return nil, err
+		}
+	}
+	_, form, err := m.sign.PresignedPostPolicy(ctx, policy)
+	if err != nil {
+		return nil, err
+	}
+	return &model.FormCredential{
+		URL:          m.publicBase + "/" + m.bucket,
+		File:         "file",
+		FormData:     form,
+		Expires:      expires,
+		SuccessCodes: []int{http.StatusOK},
+	}, nil
+}
+
+// Head returns the size and ETag of a finished object.
+func (m *Minio) Head(ctx context.Context, key string) (int64, string, error) {
+	info, err := m.core.StatObject(ctx, m.bucket, key, minio.StatObjectOptions{})
+	if err != nil {
+		if isMissing(err) {
+			return 0, "", model.ErrNotFound
+		}
+		return 0, "", err
+	}
+	return info.Size, info.ETag, nil
 }
 
 // Stat returns the size of a finished object.

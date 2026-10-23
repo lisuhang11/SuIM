@@ -40,8 +40,11 @@
 //	POST /object/initiate_multipart_upload
 //	POST /object/auth_sign
 //	POST /object/complete_multipart_upload
+//	POST /object/initiate_form_data
+//	POST /object/complete_form_data
 //
 // Part bytes are PUT to the presigned MinIO URL returned by third.
+// A form upload POSTs the file to the MinIO URL in initiate_form_data.
 // This gateway does not receive the file body.
 //
 // Bodies and data use the protobuf JSON names, for example user_id.
@@ -128,6 +131,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /object/initiate_multipart_upload", s.auth(s.initiateMultipartUpload))
 	mux.HandleFunc("POST /object/auth_sign", s.auth(s.authSign))
 	mux.HandleFunc("POST /object/complete_multipart_upload", s.auth(s.completeMultipartUpload))
+	mux.HandleFunc("POST /object/initiate_form_data", s.auth(s.initiateFormData))
+	mux.HandleFunc("POST /object/complete_form_data", s.auth(s.completeFormData))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, code: http.StatusOK}

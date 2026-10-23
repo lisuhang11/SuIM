@@ -49,12 +49,16 @@ type Parts interface {
 	Finish(ctx context.Context, key, uploadID string, parts []model.StoredPart) error
 	Abort(ctx context.Context, key, uploadID string) error
 	Stat(ctx context.Context, key string) (int64, error)
+	Head(ctx context.Context, key string) (size int64, etag string, err error)
+	Form(ctx context.Context, key string, size int64, contentType string, expires time.Time) (*model.FormCredential, error)
 }
 
 // Options configures the slice plan and how long a session stays open.
 type Options struct {
 	Limits Limits
 	Expire time.Duration
+	// Secret signs form-upload ids.
+	Secret string
 	Now    func() time.Time
 }
 
@@ -65,6 +69,7 @@ type Server struct {
 	objects  ObjectStore
 	parts    Parts
 	limits   Limits
+	secret   []byte
 	expire   time.Duration
 	now      func() time.Time
 }
@@ -87,6 +92,7 @@ func New(sessions SessionStore, objects ObjectStore, parts Parts, opts Options) 
 		objects:  objects,
 		parts:    parts,
 		limits:   limits,
+		secret:   []byte(opts.Secret),
 		expire:   expire,
 		now:      now,
 	}

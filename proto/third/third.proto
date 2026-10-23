@@ -16,12 +16,19 @@ option go_package = "github.com/lisuhang11/SuIM/proto/third;thirdpb";
 //  5. CompleteMultipartUpload checks the part hashes, merges the file,
 //     and returns url (url_prefix + name).
 //
+// A single file can also use a browser form:
+//  1. InitiateFormData returns a short-lived POST policy. No database row yet.
+//  2. The client POSTs the file straight to MinIO with url and form_data.
+//  3. CompleteFormData stats the object, then writes the database row.
+//
 // Download is not part of this service. Callers store url and resolve it later.
 service ThirdService {
   rpc PartLimit(PartLimitReq) returns (PartLimitResp);
   rpc InitiateMultipartUpload(InitiateMultipartUploadReq) returns (InitiateMultipartUploadResp);
   rpc AuthSign(AuthSignReq) returns (AuthSignResp);
   rpc CompleteMultipartUpload(CompleteMultipartUploadReq) returns (CompleteMultipartUploadResp);
+  rpc InitiateFormData(InitiateFormDataReq) returns (InitiateFormDataResp);
+  rpc CompleteFormData(CompleteFormDataReq) returns (CompleteFormDataResp);
 }
 
 // KeyValues is one signed-request header or query key.
@@ -107,5 +114,36 @@ message CompleteMultipartUploadReq {
 }
 
 message CompleteMultipartUploadResp {
+  string url = 1 [json_name = "url"];
+}
+
+message InitiateFormDataReq {
+  // user_id is the token user. The gateway overwrites it.
+  string user_id = 1 [json_name = "user_id"];
+  string name = 2 [json_name = "name"];
+  int64 size = 3 [json_name = "size"];
+  string content_type = 4 [json_name = "content_type"];
+  string cause = 5 [json_name = "cause"];
+}
+
+message InitiateFormDataResp {
+  // id encodes the file name, declared size, content type, cause, and storage key.
+  string id = 1 [json_name = "id"];
+  string url = 2 [json_name = "url"];
+  // file is the multipart form field that carries the bytes.
+  string file = 3 [json_name = "file"];
+  map<string, string> form_data = 4 [json_name = "form_data"];
+  // expires is Unix milliseconds.
+  int64 expires = 5 [json_name = "expires"];
+  repeated int32 success_codes = 6 [json_name = "success_codes"];
+}
+
+message CompleteFormDataReq {
+  string user_id = 1 [json_name = "user_id"];
+  string id = 2 [json_name = "id"];
+  string url_prefix = 3 [json_name = "url_prefix"];
+}
+
+message CompleteFormDataResp {
   string url = 1 [json_name = "url"];
 }

@@ -76,3 +76,41 @@ func (s *Server) completeMultipartUpload(w http.ResponseWriter, r *http.Request)
 	}
 	writeOK(w, resp)
 }
+
+func (s *Server) initiateFormData(w http.ResponseWriter, r *http.Request) {
+	var req thirdpb.InitiateFormDataReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	userID, ok := s.actor(w, r, req.GetUserId())
+	if !ok {
+		return
+	}
+	req.UserId = userID
+	resp, err := s.third.InitiateFormData(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) completeFormData(w http.ResponseWriter, r *http.Request) {
+	var req thirdpb.CompleteFormDataReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	userID, ok := s.actor(w, r, req.GetUserId())
+	if !ok {
+		return
+	}
+	req.UserId = userID
+	resp, err := s.third.CompleteFormData(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}

@@ -88,12 +88,18 @@ func (s *groupStub) CreateGroup(_ context.Context, req *grouppb.CreateGroupReq) 
 
 type thirdStub struct {
 	thirdpb.UnimplementedThirdServiceServer
-	userID string
+	userID     string
+	formUserID string
 }
 
 func (s *thirdStub) InitiateMultipartUpload(_ context.Context, req *thirdpb.InitiateMultipartUploadReq) (*thirdpb.InitiateMultipartUploadResp, error) {
 	s.userID = req.GetUserId()
 	return &thirdpb.InitiateMultipartUploadResp{Url: "https://cdn/" + req.GetName()}, nil
+}
+
+func (s *thirdStub) InitiateFormData(_ context.Context, req *thirdpb.InitiateFormDataReq) (*thirdpb.InitiateFormDataResp, error) {
+	s.formUserID = req.GetUserId()
+	return &thirdpb.InitiateFormDataResp{Id: "ticket", Url: "http://127.0.0.1:9000/suim", File: "file"}, nil
 }
 
 func TestGateway(t *testing.T) {
@@ -186,6 +192,18 @@ func TestGateway(t *testing.T) {
 	res = post(t, httpSrv.URL+"/object/initiate_multipart_upload", "good", `{"name":"u1/a.bin","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1}`)
 	if res.Status != http.StatusOK || uploads.userID != "u1" || !bytes.Contains(res.Data, []byte(`"url":"https://cdn/u1/a.bin"`)) {
 		t.Fatalf("upload %+v user=%s", res, uploads.userID)
+	}
+	res = post(t, httpSrv.URL+"/object/initiate_form_data", "", `{"name":"u1/a.bin","size":1}`)
+	if res.Status != http.StatusUnauthorized || res.Code != int32(errorcode.TokenRequired) {
+		t.Fatalf("form missing token %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/object/initiate_form_data", "good", `{"user_id":"u2","name":"u1/a.bin","size":1}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("form as other %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/object/initiate_form_data", "good", `{"name":"u1/a.bin","size":1}`)
+	if res.Status != http.StatusOK || uploads.formUserID != "u1" || !bytes.Contains(res.Data, []byte(`"file":"file"`)) {
+		t.Fatalf("form %+v user=%s", res, uploads.formUserID)
 	}
 	res = post(t, httpSrv.URL+"/user/login", "", `{`)
 	if res.Status != http.StatusBadRequest || res.Code != int32(errorcode.InvalidJSON) {

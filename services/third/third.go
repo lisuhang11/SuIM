@@ -77,6 +77,7 @@ func run(cfgPath, migratePath string) error {
 	svc := logic.New(st, st, objects, logic.Options{
 		Limits: logic.DefaultLimits,
 		Expire: time.Duration(cfg.SignExpireSeconds) * time.Second,
+		Secret: cfg.MinIO.SecretKey,
 	})
 
 	reg, err := register.New(&cfg.Registry)

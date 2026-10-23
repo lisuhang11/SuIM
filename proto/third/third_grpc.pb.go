@@ -23,6 +23,8 @@ const (
 	ThirdService_InitiateMultipartUpload_FullMethodName = "/third.ThirdService/InitiateMultipartUpload"
 	ThirdService_AuthSign_FullMethodName                = "/third.ThirdService/AuthSign"
 	ThirdService_CompleteMultipartUpload_FullMethodName = "/third.ThirdService/CompleteMultipartUpload"
+	ThirdService_InitiateFormData_FullMethodName        = "/third.ThirdService/InitiateFormData"
+	ThirdService_CompleteFormData_FullMethodName        = "/third.ThirdService/CompleteFormData"
 )
 
 // ThirdServiceClient is the client API for ThirdService service.
@@ -35,11 +37,16 @@ const (
 //     hashes each part. hash is MD5(partMD5s joined by ",").
 //  2. InitiateMultipartUpload opens a session and returns signed PUT URLs.
 //     When hash is already stored, url is set and upload is empty.
-//  3. The client PUTs part bytes to those URLs. They are served by the
-//     third service HTTP port, not by the API gateway.
+//  3. The client PUTs part bytes to those URLs. The URLs are presigned
+//     MinIO addresses, not this service and not the API gateway.
 //  4. AuthSign returns more part URLs for the same upload_id.
 //  5. CompleteMultipartUpload checks the part hashes, merges the file,
 //     and returns url (url_prefix + name).
+//
+// A single file can also use a browser form:
+//  1. InitiateFormData returns a short-lived POST policy. No database row yet.
+//  2. The client POSTs the file straight to MinIO with url and form_data.
+//  3. CompleteFormData stats the object, then writes the database row.
 //
 // Download is not part of this service. Callers store url and resolve it later.
 type ThirdServiceClient interface {
@@ -47,6 +54,8 @@ type ThirdServiceClient interface {
 	InitiateMultipartUpload(ctx context.Context, in *InitiateMultipartUploadReq, opts ...grpc.CallOption) (*InitiateMultipartUploadResp, error)
 	AuthSign(ctx context.Context, in *AuthSignReq, opts ...grpc.CallOption) (*AuthSignResp, error)
 	CompleteMultipartUpload(ctx context.Context, in *CompleteMultipartUploadReq, opts ...grpc.CallOption) (*CompleteMultipartUploadResp, error)
+	InitiateFormData(ctx context.Context, in *InitiateFormDataReq, opts ...grpc.CallOption) (*InitiateFormDataResp, error)
+	CompleteFormData(ctx context.Context, in *CompleteFormDataReq, opts ...grpc.CallOption) (*CompleteFormDataResp, error)
 }
 
 type thirdServiceClient struct {
@@ -97,6 +106,26 @@ func (c *thirdServiceClient) CompleteMultipartUpload(ctx context.Context, in *Co
 	return out, nil
 }
 
+func (c *thirdServiceClient) InitiateFormData(ctx context.Context, in *InitiateFormDataReq, opts ...grpc.CallOption) (*InitiateFormDataResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitiateFormDataResp)
+	err := c.cc.Invoke(ctx, ThirdService_InitiateFormData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *thirdServiceClient) CompleteFormData(ctx context.Context, in *CompleteFormDataReq, opts ...grpc.CallOption) (*CompleteFormDataResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteFormDataResp)
+	err := c.cc.Invoke(ctx, ThirdService_CompleteFormData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ThirdServiceServer is the server API for ThirdService service.
 // All implementations must embed UnimplementedThirdServiceServer
 // for forward compatibility.
@@ -107,11 +136,16 @@ func (c *thirdServiceClient) CompleteMultipartUpload(ctx context.Context, in *Co
 //     hashes each part. hash is MD5(partMD5s joined by ",").
 //  2. InitiateMultipartUpload opens a session and returns signed PUT URLs.
 //     When hash is already stored, url is set and upload is empty.
-//  3. The client PUTs part bytes to those URLs. They are served by the
-//     third service HTTP port, not by the API gateway.
+//  3. The client PUTs part bytes to those URLs. The URLs are presigned
+//     MinIO addresses, not this service and not the API gateway.
 //  4. AuthSign returns more part URLs for the same upload_id.
 //  5. CompleteMultipartUpload checks the part hashes, merges the file,
 //     and returns url (url_prefix + name).
+//
+// A single file can also use a browser form:
+//  1. InitiateFormData returns a short-lived POST policy. No database row yet.
+//  2. The client POSTs the file straight to MinIO with url and form_data.
+//  3. CompleteFormData stats the object, then writes the database row.
 //
 // Download is not part of this service. Callers store url and resolve it later.
 type ThirdServiceServer interface {
@@ -119,6 +153,8 @@ type ThirdServiceServer interface {
 	InitiateMultipartUpload(context.Context, *InitiateMultipartUploadReq) (*InitiateMultipartUploadResp, error)
 	AuthSign(context.Context, *AuthSignReq) (*AuthSignResp, error)
 	CompleteMultipartUpload(context.Context, *CompleteMultipartUploadReq) (*CompleteMultipartUploadResp, error)
+	InitiateFormData(context.Context, *InitiateFormDataReq) (*InitiateFormDataResp, error)
+	CompleteFormData(context.Context, *CompleteFormDataReq) (*CompleteFormDataResp, error)
 	mustEmbedUnimplementedThirdServiceServer()
 }
 
@@ -140,6 +176,12 @@ func (UnimplementedThirdServiceServer) AuthSign(context.Context, *AuthSignReq) (
 }
 func (UnimplementedThirdServiceServer) CompleteMultipartUpload(context.Context, *CompleteMultipartUploadReq) (*CompleteMultipartUploadResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method CompleteMultipartUpload not implemented")
+}
+func (UnimplementedThirdServiceServer) InitiateFormData(context.Context, *InitiateFormDataReq) (*InitiateFormDataResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method InitiateFormData not implemented")
+}
+func (UnimplementedThirdServiceServer) CompleteFormData(context.Context, *CompleteFormDataReq) (*CompleteFormDataResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompleteFormData not implemented")
 }
 func (UnimplementedThirdServiceServer) mustEmbedUnimplementedThirdServiceServer() {}
 func (UnimplementedThirdServiceServer) testEmbeddedByValue()                      {}
@@ -234,6 +276,42 @@ func _ThirdService_CompleteMultipartUpload_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ThirdService_InitiateFormData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiateFormDataReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ThirdServiceServer).InitiateFormData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ThirdService_InitiateFormData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ThirdServiceServer).InitiateFormData(ctx, req.(*InitiateFormDataReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ThirdService_CompleteFormData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteFormDataReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ThirdServiceServer).CompleteFormData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ThirdService_CompleteFormData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ThirdServiceServer).CompleteFormData(ctx, req.(*CompleteFormDataReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ThirdService_ServiceDesc is the grpc.ServiceDesc for ThirdService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -256,6 +334,14 @@ var ThirdService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CompleteMultipartUpload",
 			Handler:    _ThirdService_CompleteMultipartUpload_Handler,
+		},
+		{
+			MethodName: "InitiateFormData",
+			Handler:    _ThirdService_InitiateFormData_Handler,
+		},
+		{
+			MethodName: "CompleteFormData",
+			Handler:    _ThirdService_CompleteFormData_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

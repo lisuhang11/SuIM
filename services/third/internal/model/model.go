@@ -14,6 +14,15 @@ var (
 	ErrUploadNotFound = errors.New("upload not found")
 )
 
+// FormCredential is a browser POST policy for one object.
+type FormCredential struct {
+	URL          string
+	File         string
+	FormData     map[string]string
+	Expires      time.Time
+	SuccessCodes []int
+}
+
 // StoredPart is one part already accepted by object storage.
 type StoredPart struct {
 	Number int

@@ -252,6 +252,7 @@ type memParts struct {
 	mu      sync.Mutex
 	uploads map[string]*memUpload
 	objects map[string][]byte
+	heads   map[string]memHead
 }
 
 func (m *memParts) Create(_ context.Context, _ string, _ string) (string, error) {
@@ -340,4 +341,29 @@ func (m *memParts) Stat(_ context.Context, key string) (int64, error) {
 		return 0, model.ErrNotFound
 	}
 	return int64(len(body)), nil
+}
+
+func (m *memParts) Head(_ context.Context, key string) (int64, string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	head, ok := m.heads[key]
+	if !ok {
+		return 0, "", model.ErrNotFound
+	}
+	return head.size, head.etag, nil
+}
+
+func (m *memParts) Form(_ context.Context, key string, _ int64, contentType string, expires time.Time) (*model.FormCredential, error) {
+	return &model.FormCredential{
+		URL:          "http://127.0.0.1:9000/suim",
+		File:         "file",
+		FormData:     map[string]string{"key": key, "Content-Type": contentType},
+		Expires:      expires,
+		SuccessCodes: []int{200},
+	}, nil
+}
+
+type memHead struct {
+	size int64
+	etag string
 }

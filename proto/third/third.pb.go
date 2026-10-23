@@ -805,6 +805,274 @@ func (x *CompleteMultipartUploadResp) GetUrl() string {
 	return ""
 }
 
+type InitiateFormDataReq struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// user_id is the token user. The gateway overwrites it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,proto3" json:"user_id,omitempty"`
+	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Size          int64  `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	ContentType   string `protobuf:"bytes,4,opt,name=content_type,proto3" json:"content_type,omitempty"`
+	Cause         string `protobuf:"bytes,5,opt,name=cause,proto3" json:"cause,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InitiateFormDataReq) Reset() {
+	*x = InitiateFormDataReq{}
+	mi := &file_third_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitiateFormDataReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitiateFormDataReq) ProtoMessage() {}
+
+func (x *InitiateFormDataReq) ProtoReflect() protoreflect.Message {
+	mi := &file_third_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitiateFormDataReq.ProtoReflect.Descriptor instead.
+func (*InitiateFormDataReq) Descriptor() ([]byte, []int) {
+	return file_third_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *InitiateFormDataReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *InitiateFormDataReq) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *InitiateFormDataReq) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *InitiateFormDataReq) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *InitiateFormDataReq) GetCause() string {
+	if x != nil {
+		return x.Cause
+	}
+	return ""
+}
+
+type InitiateFormDataResp struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// id encodes the file name, declared size, content type, cause, and storage key.
+	Id  string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Url string `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	// file is the multipart form field that carries the bytes.
+	File     string            `protobuf:"bytes,3,opt,name=file,proto3" json:"file,omitempty"`
+	FormData map[string]string `protobuf:"bytes,4,rep,name=form_data,proto3" json:"form_data,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// expires is Unix milliseconds.
+	Expires       int64   `protobuf:"varint,5,opt,name=expires,proto3" json:"expires,omitempty"`
+	SuccessCodes  []int32 `protobuf:"varint,6,rep,packed,name=success_codes,proto3" json:"success_codes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InitiateFormDataResp) Reset() {
+	*x = InitiateFormDataResp{}
+	mi := &file_third_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitiateFormDataResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitiateFormDataResp) ProtoMessage() {}
+
+func (x *InitiateFormDataResp) ProtoReflect() protoreflect.Message {
+	mi := &file_third_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitiateFormDataResp.ProtoReflect.Descriptor instead.
+func (*InitiateFormDataResp) Descriptor() ([]byte, []int) {
+	return file_third_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *InitiateFormDataResp) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *InitiateFormDataResp) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *InitiateFormDataResp) GetFile() string {
+	if x != nil {
+		return x.File
+	}
+	return ""
+}
+
+func (x *InitiateFormDataResp) GetFormData() map[string]string {
+	if x != nil {
+		return x.FormData
+	}
+	return nil
+}
+
+func (x *InitiateFormDataResp) GetExpires() int64 {
+	if x != nil {
+		return x.Expires
+	}
+	return 0
+}
+
+func (x *InitiateFormDataResp) GetSuccessCodes() []int32 {
+	if x != nil {
+		return x.SuccessCodes
+	}
+	return nil
+}
+
+type CompleteFormDataReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,proto3" json:"user_id,omitempty"`
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	UrlPrefix     string                 `protobuf:"bytes,3,opt,name=url_prefix,proto3" json:"url_prefix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CompleteFormDataReq) Reset() {
+	*x = CompleteFormDataReq{}
+	mi := &file_third_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompleteFormDataReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompleteFormDataReq) ProtoMessage() {}
+
+func (x *CompleteFormDataReq) ProtoReflect() protoreflect.Message {
+	mi := &file_third_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompleteFormDataReq.ProtoReflect.Descriptor instead.
+func (*CompleteFormDataReq) Descriptor() ([]byte, []int) {
+	return file_third_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CompleteFormDataReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *CompleteFormDataReq) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CompleteFormDataReq) GetUrlPrefix() string {
+	if x != nil {
+		return x.UrlPrefix
+	}
+	return ""
+}
+
+type CompleteFormDataResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CompleteFormDataResp) Reset() {
+	*x = CompleteFormDataResp{}
+	mi := &file_third_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompleteFormDataResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompleteFormDataResp) ProtoMessage() {}
+
+func (x *CompleteFormDataResp) ProtoReflect() protoreflect.Message {
+	mi := &file_third_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompleteFormDataResp.ProtoReflect.Descriptor instead.
+func (*CompleteFormDataResp) Descriptor() ([]byte, []int) {
+	return file_third_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *CompleteFormDataResp) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
 var File_third_proto protoreflect.FileDescriptor
 
 const file_third_proto_rawDesc = "" +
@@ -869,12 +1137,38 @@ const file_third_proto_rawDesc = "" +
 	"url_prefix\x18\a \x01(\tR\n" +
 	"url_prefix\"/\n" +
 	"\x1bCompleteMultipartUploadResp\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url2\xbf\x02\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\"\x91\x01\n" +
+	"\x13InitiateFormDataReq\x12\x18\n" +
+	"\auser_id\x18\x01 \x01(\tR\auser_id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
+	"\x04size\x18\x03 \x01(\x03R\x04size\x12\"\n" +
+	"\fcontent_type\x18\x04 \x01(\tR\fcontent_type\x12\x14\n" +
+	"\x05cause\x18\x05 \x01(\tR\x05cause\"\x92\x02\n" +
+	"\x14InitiateFormDataResp\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12\x12\n" +
+	"\x04file\x18\x03 \x01(\tR\x04file\x12G\n" +
+	"\tform_data\x18\x04 \x03(\v2).third.InitiateFormDataResp.FormDataEntryR\tform_data\x12\x18\n" +
+	"\aexpires\x18\x05 \x01(\x03R\aexpires\x12$\n" +
+	"\rsuccess_codes\x18\x06 \x03(\x05R\rsuccess_codes\x1a;\n" +
+	"\rFormDataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"_\n" +
+	"\x13CompleteFormDataReq\x12\x18\n" +
+	"\auser_id\x18\x01 \x01(\tR\auser_id\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\x12\x1e\n" +
+	"\n" +
+	"url_prefix\x18\x03 \x01(\tR\n" +
+	"url_prefix\"(\n" +
+	"\x14CompleteFormDataResp\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url2\xd9\x03\n" +
 	"\fThirdService\x126\n" +
 	"\tPartLimit\x12\x13.third.PartLimitReq\x1a\x14.third.PartLimitResp\x12`\n" +
 	"\x17InitiateMultipartUpload\x12!.third.InitiateMultipartUploadReq\x1a\".third.InitiateMultipartUploadResp\x123\n" +
 	"\bAuthSign\x12\x12.third.AuthSignReq\x1a\x13.third.AuthSignResp\x12`\n" +
-	"\x17CompleteMultipartUpload\x12!.third.CompleteMultipartUploadReq\x1a\".third.CompleteMultipartUploadRespB0Z.github.com/lisuhang11/SuIM/proto/third;thirdpbb\x06proto3"
+	"\x17CompleteMultipartUpload\x12!.third.CompleteMultipartUploadReq\x1a\".third.CompleteMultipartUploadResp\x12K\n" +
+	"\x10InitiateFormData\x12\x1a.third.InitiateFormDataReq\x1a\x1b.third.InitiateFormDataResp\x12K\n" +
+	"\x10CompleteFormData\x12\x1a.third.CompleteFormDataReq\x1a\x1b.third.CompleteFormDataRespB0Z.github.com/lisuhang11/SuIM/proto/third;thirdpbb\x06proto3"
 
 var (
 	file_third_proto_rawDescOnce sync.Once
@@ -888,7 +1182,7 @@ func file_third_proto_rawDescGZIP() []byte {
 	return file_third_proto_rawDescData
 }
 
-var file_third_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_third_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_third_proto_goTypes = []any{
 	(*KeyValues)(nil),                   // 0: third.KeyValues
 	(*SignPart)(nil),                    // 1: third.SignPart
@@ -902,6 +1196,11 @@ var file_third_proto_goTypes = []any{
 	(*AuthSignResp)(nil),                // 9: third.AuthSignResp
 	(*CompleteMultipartUploadReq)(nil),  // 10: third.CompleteMultipartUploadReq
 	(*CompleteMultipartUploadResp)(nil), // 11: third.CompleteMultipartUploadResp
+	(*InitiateFormDataReq)(nil),         // 12: third.InitiateFormDataReq
+	(*InitiateFormDataResp)(nil),        // 13: third.InitiateFormDataResp
+	(*CompleteFormDataReq)(nil),         // 14: third.CompleteFormDataReq
+	(*CompleteFormDataResp)(nil),        // 15: third.CompleteFormDataResp
+	nil,                                 // 16: third.InitiateFormDataResp.FormDataEntry
 }
 var file_third_proto_depIdxs = []int32{
 	0,  // 0: third.SignPart.query:type_name -> third.KeyValues
@@ -914,19 +1213,24 @@ var file_third_proto_depIdxs = []int32{
 	0,  // 7: third.AuthSignResp.query:type_name -> third.KeyValues
 	0,  // 8: third.AuthSignResp.header:type_name -> third.KeyValues
 	1,  // 9: third.AuthSignResp.parts:type_name -> third.SignPart
-	3,  // 10: third.ThirdService.PartLimit:input_type -> third.PartLimitReq
-	5,  // 11: third.ThirdService.InitiateMultipartUpload:input_type -> third.InitiateMultipartUploadReq
-	8,  // 12: third.ThirdService.AuthSign:input_type -> third.AuthSignReq
-	10, // 13: third.ThirdService.CompleteMultipartUpload:input_type -> third.CompleteMultipartUploadReq
-	4,  // 14: third.ThirdService.PartLimit:output_type -> third.PartLimitResp
-	7,  // 15: third.ThirdService.InitiateMultipartUpload:output_type -> third.InitiateMultipartUploadResp
-	9,  // 16: third.ThirdService.AuthSign:output_type -> third.AuthSignResp
-	11, // 17: third.ThirdService.CompleteMultipartUpload:output_type -> third.CompleteMultipartUploadResp
-	14, // [14:18] is the sub-list for method output_type
-	10, // [10:14] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	16, // 10: third.InitiateFormDataResp.form_data:type_name -> third.InitiateFormDataResp.FormDataEntry
+	3,  // 11: third.ThirdService.PartLimit:input_type -> third.PartLimitReq
+	5,  // 12: third.ThirdService.InitiateMultipartUpload:input_type -> third.InitiateMultipartUploadReq
+	8,  // 13: third.ThirdService.AuthSign:input_type -> third.AuthSignReq
+	10, // 14: third.ThirdService.CompleteMultipartUpload:input_type -> third.CompleteMultipartUploadReq
+	12, // 15: third.ThirdService.InitiateFormData:input_type -> third.InitiateFormDataReq
+	14, // 16: third.ThirdService.CompleteFormData:input_type -> third.CompleteFormDataReq
+	4,  // 17: third.ThirdService.PartLimit:output_type -> third.PartLimitResp
+	7,  // 18: third.ThirdService.InitiateMultipartUpload:output_type -> third.InitiateMultipartUploadResp
+	9,  // 19: third.ThirdService.AuthSign:output_type -> third.AuthSignResp
+	11, // 20: third.ThirdService.CompleteMultipartUpload:output_type -> third.CompleteMultipartUploadResp
+	13, // 21: third.ThirdService.InitiateFormData:output_type -> third.InitiateFormDataResp
+	15, // 22: third.ThirdService.CompleteFormData:output_type -> third.CompleteFormDataResp
+	17, // [17:23] is the sub-list for method output_type
+	11, // [11:17] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_third_proto_init() }
@@ -940,7 +1244,7 @@ func file_third_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_third_proto_rawDesc), len(file_third_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -61,5 +61,8 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
+	if _, err := s.db.ExecContext(ctx, "ALTER TABLE `object` MODIFY `storage_key` VARCHAR(255) NOT NULL COMMENT 'MinIO对象键'"); err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
 	return nil
 }

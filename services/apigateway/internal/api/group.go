@@ -178,6 +178,88 @@ func (s *Server) getGroupMemberUserIDs(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, resp)
 }
 
+func (s *Server) incrementalJoinedGroups(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.GetIncrementalJoinGroupsReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetUserId()) {
+		return
+	}
+	resp, err := s.groups.GetIncrementalJoinGroups(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) fullJoinGroupIDs(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.GetFullJoinGroupIDsReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetUserId()) {
+		return
+	}
+	resp, err := s.groups.GetFullJoinGroupIDs(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) incrementalGroupMembers(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.GetIncrementalGroupMembersReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetUserId()) {
+		return
+	}
+	resp, err := s.groups.GetIncrementalGroupMembers(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) batchIncrementalGroupMembers(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.BatchGetIncrementalGroupMembersReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetUserId()) {
+		return
+	}
+	resp, err := s.groups.BatchGetIncrementalGroupMembers(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) fullGroupMemberUserIDs(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.GetFullGroupMemberUserIDsReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	resp, err := s.groups.GetFullGroupMemberUserIDs(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
 func (s *Server) getJoinedGroups(w http.ResponseWriter, r *http.Request) {
 	var req grouppb.GetJoinedGroupsReq
 	if err := decode(w, r, &req); err != nil {

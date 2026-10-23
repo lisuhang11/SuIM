@@ -20,6 +20,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/pkg/idhash"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	"github.com/lisuhang11/SuIM/services/relation/internal/logic"
@@ -376,6 +377,86 @@ func TestIncremental(t *testing.T) {
 	unblocked, err := srv.GetIncrementalBlacks(ctx, &relationpb.GetIncrementalBlacksReq{UserId: a, VersionId: blocked.GetVersionId(), Version: blocked.GetVersion()})
 	if err != nil || unblocked.GetFull() || len(unblocked.GetDelete()) != 1 || unblocked.GetDelete()[0] != b {
 		t.Fatalf("unblock sync %+v err=%v", unblocked, err)
+	}
+}
+
+func TestFriendPageAndIDs(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn)
+	if err != nil {
+		t.Skipf("mysql is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	script, err := os.ReadFile(filepath.Join("..", "..", "migrations", "relation.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx, string(script)); err != nil {
+		t.Fatal(err)
+	}
+	a := fmt.Sprintf("pa-%d", time.Now().UnixNano())
+	b := fmt.Sprintf("pb-%d", time.Now().UnixNano())
+	c := fmt.Sprintf("pc-%d", time.Now().UnixNano())
+	t.Cleanup(func() { cleanupRelation(t, mysqlCfg, a, b, c) })
+	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}}, logic.Hooks{})
+
+	empty, err := srv.GetFullFriendUserIDs(ctx, &relationpb.GetFullFriendUserIDsReq{UserId: a})
+	if err != nil || !empty.GetEqual() || empty.GetVersion() != 0 || len(empty.GetUserIds()) != 0 {
+		t.Fatalf("empty ids %+v err=%v", empty, err)
+	}
+	if _, err := srv.GetFriendList(ctx, &relationpb.GetFriendListReq{UserId: a, Limit: 201}); !isCode(err, codes.InvalidArgument, errorcode.RelationInvalidPage) {
+		t.Fatalf("bad page code=%v err=%v", status.Code(err), err)
+	}
+	for _, friend := range []string{b, c} {
+		if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: friend, Message: "hi"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: a, ToUserId: friend, HandleResult: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pinned := true
+	if _, err := srv.UpdateFriend(ctx, &relationpb.UpdateFriendReq{OwnerUserId: a, FriendUserId: c, IsPinned: &pinned}); err != nil {
+		t.Fatal(err)
+	}
+	page, err := srv.GetFriendList(ctx, &relationpb.GetFriendListReq{UserId: a, Limit: 1})
+	if err != nil || page.GetTotal() != 2 || len(page.GetFriends()) != 1 || page.GetFriends()[0].GetFriendUser().GetUserId() != c {
+		t.Fatalf("pinned page %+v err=%v", page, err)
+	}
+	next, err := srv.GetFriendList(ctx, &relationpb.GetFriendListReq{UserId: a, Offset: 1, Limit: 1})
+	if err != nil || len(next.GetFriends()) != 1 || next.GetFriends()[0].GetFriendUser().GetUserId() != b {
+		t.Fatalf("second page %+v err=%v", next, err)
+	}
+	ids, err := srv.GetFullFriendUserIDs(ctx, &relationpb.GetFullFriendUserIDsReq{UserId: a})
+	if err != nil || ids.GetEqual() || len(ids.GetUserIds()) != 2 || ids.GetUserIds()[0] != c || ids.GetUserIds()[1] != b || ids.GetVersion() == 0 {
+		t.Fatalf("friend ids %+v err=%v", ids, err)
+	}
+	same, err := srv.GetFullFriendUserIDs(ctx, &relationpb.GetFullFriendUserIDsReq{UserId: a, IdHash: idhash.Hash(ids.GetUserIds())})
+	if err != nil || !same.GetEqual() || len(same.GetUserIds()) != 0 || same.GetVersionId() != ids.GetVersionId() {
+		t.Fatalf("equal ids %+v err=%v", same, err)
+	}
+	if _, err := srv.BlockUser(ctx, &relationpb.BlockUserReq{UserId: a, BlockedUserId: b}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.BlockUser(ctx, &relationpb.BlockUserReq{UserId: a, BlockedUserId: c}); err != nil {
+		t.Fatal(err)
+	}
+	blacks, err := srv.GetBlackList(ctx, &relationpb.GetBlackListReq{UserId: a, Limit: 1})
+	if err != nil || blacks.GetTotal() != 2 || len(blacks.GetBlacks()) != 1 || blacks.GetBlacks()[0].GetBlackUser().GetUserId() != b {
+		t.Fatalf("blacks %+v err=%v", blacks, err)
+	}
+	blacks, err = srv.GetBlackList(ctx, &relationpb.GetBlackListReq{UserId: a, Offset: 1, Limit: 1})
+	if err != nil || len(blacks.GetBlacks()) != 1 || blacks.GetBlacks()[0].GetBlackUser().GetUserId() != c {
+		t.Fatalf("second blacks %+v err=%v", blacks, err)
 	}
 }
 

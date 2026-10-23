@@ -22,6 +22,11 @@ service RelationService {
 
   rpc GetIncrementalFriends(GetIncrementalFriendsReq) returns (GetIncrementalFriendsResp);
   rpc GetIncrementalBlacks(GetIncrementalBlacksReq) returns (GetIncrementalBlacksResp);
+
+  // Paged friend and black profiles. Full ID lists are separate so a client can skip the IDs when id_hash matches.
+  rpc GetFriendList(GetFriendListReq) returns (GetFriendListResp);
+  rpc GetFullFriendUserIDs(GetFullFriendUserIDsReq) returns (GetFullFriendUserIDsResp);
+  rpc GetBlackList(GetBlackListReq) returns (GetBlackListResp);
 }
 
 // --------------- FriendRequestInfo ---------------
@@ -173,4 +178,42 @@ message GetIncrementalBlacksResp {
   repeated string    delete     = 4;
   repeated BlackInfo insert     = 5;
   repeated BlackInfo update     = 6;
+}
+
+// --------------- paged profiles and full ID lists ---------------
+// offset is zero-based. limit 0 means 20, and limit cannot exceed 200.
+// id_hash is the hash of the client's ordered ID list. equal means that list is unchanged and user_ids is empty.
+
+message GetFriendListReq {
+  string user_id = 1;
+  int32  offset  = 2;
+  int32  limit   = 3;
+}
+
+message GetFriendListResp {
+  repeated FriendInfo friends = 1;
+  int32               total   = 2;
+}
+
+message GetFullFriendUserIDsReq {
+  string user_id = 1;
+  uint64 id_hash = 2;
+}
+
+message GetFullFriendUserIDsResp {
+  uint64          version    = 1;
+  string          version_id = 2;
+  bool            equal      = 3;
+  repeated string user_ids   = 4;
+}
+
+message GetBlackListReq {
+  string user_id = 1;
+  int32  offset  = 2;
+  int32  limit   = 3;
+}
+
+message GetBlackListResp {
+  repeated BlackInfo blacks = 1;
+  int32              total  = 2;
 }

@@ -17,6 +17,7 @@ const (
 	RelationNotFriend         Code = 3011
 	RelationInvalidRemark     Code = 3012
 	RelationNothingToUpdate   Code = 3013
+	RelationInvalidPage       Code = 3014
 )
 
 var (
@@ -33,4 +34,5 @@ var (
 	ErrRelationNotFriend         = Define(RelationNotFriend, codes.NotFound, "not friends")
 	ErrRelationInvalidRemark     = Define(RelationInvalidRemark, codes.InvalidArgument, "remark is too long")
 	ErrRelationNothingToUpdate   = Define(RelationNothingToUpdate, codes.InvalidArgument, "remark or is_pinned is required")
+	ErrRelationInvalidPage       = Define(RelationInvalidPage, codes.InvalidArgument, "pagination is invalid")
 )

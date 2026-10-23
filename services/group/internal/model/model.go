@@ -80,6 +80,17 @@ type UserProfile struct {
 	AvatarURL string
 }
 
+type VersionHead struct {
+	ID      string
+	Version uint64
+}
+
+type VersionLog struct {
+	ElemID  string
+	State   int32
+	Version uint64
+}
+
 type GroupPatch struct {
 	Name               *string
 	Notification       *string

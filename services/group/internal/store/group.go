@@ -448,6 +448,23 @@ func (s *Store) JoinedGroupIDs(ctx context.Context, userID string, offset, limit
 	return total, ids, rows.Err()
 }
 
+func (s *Store) AllJoinedGroupIDs(ctx context.Context, userID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT group_id FROM group_member WHERE user_id = ? ORDER BY join_time DESC, group_id ASC", userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 const groupSelect = `SELECT group_id, group_name, notification, introduction, face_url, create_time, status,
 	creator_user_id, group_type, need_verification, look_member_info, apply_member_friend,
 	notification_update_time, notification_user_id, ex FROM ` + "`group`"

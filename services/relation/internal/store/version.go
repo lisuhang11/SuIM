@@ -44,6 +44,51 @@ func (s *Store) BlackChanges(ctx context.Context, owner string, version uint64, 
 	return s.changes(ctx, blackVersionLog, owner, version, limit)
 }
 
+func (s *Store) PageFriends(ctx context.Context, owner string, offset, limit int) (int, []model.Friend, error) {
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM friend WHERE owner_user_id = ?`, owner).Scan(&total); err != nil {
+		return 0, nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, friendSelect+` WHERE owner_user_id = ? ORDER BY is_pinned DESC, create_time ASC, friend_user_id ASC LIMIT ? OFFSET ?`, owner, limit, offset)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+	rowsOut, err := scanFriends(rows)
+	return total, rowsOut, err
+}
+
+func (s *Store) FriendUserIDs(ctx context.Context, owner string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT friend_user_id FROM friend WHERE owner_user_id = ? ORDER BY is_pinned DESC, create_time ASC, friend_user_id ASC`, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (s *Store) PageBlacks(ctx context.Context, owner string, offset, limit int) (int, []model.Black, error) {
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM black WHERE owner_user_id = ?`, owner).Scan(&total); err != nil {
+		return 0, nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, blackSelect+` WHERE owner_user_id = ? ORDER BY create_time ASC, block_user_id ASC LIMIT ? OFFSET ?`, owner, limit, offset)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+	rowsOut, err := scanBlacks(rows)
+	return total, rowsOut, err
+}
+
 func (s *Store) ListFriends(ctx context.Context, owner string) ([]model.Friend, error) {
 	rows, err := s.db.QueryContext(ctx, friendSelect+` WHERE owner_user_id = ?`, owner)
 	if err != nil {

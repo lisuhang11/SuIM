@@ -16,6 +16,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/pkg/idhash"
 	"github.com/lisuhang11/SuIM/proto/grouppb"
 	"github.com/lisuhang11/SuIM/services/group/internal/logic"
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
@@ -246,6 +247,116 @@ func TestGroup(t *testing.T) {
 	}
 	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: gid, OpUserId: c, UserIds: []string{b}}); !isCode(err, codes.FailedPrecondition, errorcode.GroupDismissed) {
 		t.Fatalf("invite dismissed code=%v err=%v", status.Code(err), err)
+	}
+}
+
+func TestGroupSync(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn)
+	if err != nil {
+		t.Skipf("mysql is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	script, err := os.ReadFile(filepath.Join("..", "..", "migrations", "group.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx, string(script)); err != nil {
+		t.Fatal(err)
+	}
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	a := "sa-" + suffix
+	b := "sb-" + suffix
+	c := "sc-" + suffix
+	d := "sd-" + suffix
+	t.Cleanup(func() { cleanupGroup(t, mysqlCfg, a, b, c, d) })
+	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}, d: {}})
+
+	created, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{
+		CreatorUserId: a,
+		GroupName:     "room",
+		GroupType:     model.GroupTypeNormal,
+		MemberIds:     []string{b},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gid := created.GetGroupId()
+
+	joined, err := srv.GetIncrementalJoinGroups(ctx, &grouppb.GetIncrementalJoinGroupsReq{UserId: a})
+	if err != nil || !joined.GetFull() || joined.GetVersion() == 0 || joined.GetVersionId() == "" || len(joined.GetInsert()) != 0 {
+		t.Fatalf("full join %+v err=%v", joined, err)
+	}
+	same, err := srv.GetIncrementalJoinGroups(ctx, &grouppb.GetIncrementalJoinGroupsReq{UserId: a, VersionId: joined.GetVersionId(), Version: joined.GetVersion()})
+	if err != nil || same.GetFull() || len(same.GetInsert()) != 0 || len(same.GetDelete()) != 0 {
+		t.Fatalf("unchanged join %+v err=%v", same, err)
+	}
+	reset, err := srv.GetIncrementalJoinGroups(ctx, &grouppb.GetIncrementalJoinGroupsReq{UserId: a, VersionId: "other", Version: joined.GetVersion()})
+	if err != nil || !reset.GetFull() || len(reset.GetInsert()) != 0 {
+		t.Fatalf("version mismatch %+v err=%v", reset, err)
+	}
+	page, err := srv.GetJoinedGroups(ctx, &grouppb.GetJoinedGroupsReq{UserId: a, Limit: 10})
+	if err != nil || page.GetTotal() != 1 || page.GetGroups()[0].GetGroupId() != gid {
+		t.Fatalf("joined page %+v err=%v", page, err)
+	}
+	groupIDs, err := srv.GetFullJoinGroupIDs(ctx, &grouppb.GetFullJoinGroupIDsReq{UserId: a})
+	if err != nil || groupIDs.GetEqual() || len(groupIDs.GetGroupIds()) != 1 || groupIDs.GetGroupIds()[0] != gid {
+		t.Fatalf("join ids %+v err=%v", groupIDs, err)
+	}
+	equalGroups, err := srv.GetFullJoinGroupIDs(ctx, &grouppb.GetFullJoinGroupIDsReq{UserId: a, IdHash: idhash.Hash(groupIDs.GetGroupIds())})
+	if err != nil || !equalGroups.GetEqual() || len(equalGroups.GetGroupIds()) != 0 {
+		t.Fatalf("equal join ids %+v err=%v", equalGroups, err)
+	}
+
+	members, err := srv.GetIncrementalGroupMembers(ctx, &grouppb.GetIncrementalGroupMembersReq{GroupId: gid, UserId: a})
+	if err != nil || !members.GetFull() || len(members.GetInsert()) != 0 || members.GetGroup().GetGroupId() != gid || members.GetGroup().GetMemberCount() != 2 {
+		t.Fatalf("full members %+v err=%v", members, err)
+	}
+	memberIDs, err := srv.GetFullGroupMemberUserIDs(ctx, &grouppb.GetFullGroupMemberUserIDsReq{GroupId: gid})
+	if err != nil || memberIDs.GetEqual() || len(memberIDs.GetUserIds()) != 2 || memberIDs.GetUserIds()[0] != a {
+		t.Fatalf("member ids %+v err=%v", memberIDs, err)
+	}
+	equalMembers, err := srv.GetFullGroupMemberUserIDs(ctx, &grouppb.GetFullGroupMemberUserIDsReq{GroupId: gid, IdHash: idhash.Hash(memberIDs.GetUserIds())})
+	if err != nil || !equalMembers.GetEqual() || len(equalMembers.GetUserIds()) != 0 {
+		t.Fatalf("equal member ids %+v err=%v", equalMembers, err)
+	}
+	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: gid, OpUserId: a, UserIds: []string{c}}); err != nil {
+		t.Fatal(err)
+	}
+	delta, err := srv.GetIncrementalGroupMembers(ctx, &grouppb.GetIncrementalGroupMembersReq{GroupId: gid, UserId: a, VersionId: members.GetVersionId(), Version: members.GetVersion()})
+	if err != nil || delta.GetFull() || len(delta.GetInsert()) != 1 || delta.GetInsert()[0].GetUserId() != c || delta.GetGroup().GetMemberCount() != 3 {
+		t.Fatalf("member insert %+v err=%v", delta, err)
+	}
+	if _, err := srv.GetIncrementalGroupMembers(ctx, &grouppb.GetIncrementalGroupMembersReq{GroupId: gid, UserId: d}); !isCode(err, codes.NotFound, errorcode.GroupNotMember) {
+		t.Fatalf("outsider code=%v err=%v", status.Code(err), err)
+	}
+
+	dismissed, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{CreatorUserId: a, GroupName: "gone", GroupType: model.GroupTypeNormal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.DismissGroup(ctx, &grouppb.DismissGroupReq{GroupId: dismissed.GetGroupId(), OpUserId: a}); err != nil {
+		t.Fatal(err)
+	}
+	batch, err := srv.BatchGetIncrementalGroupMembers(ctx, &grouppb.BatchGetIncrementalGroupMembersReq{
+		UserId: a,
+		Groups: []*grouppb.GetIncrementalGroupMembersReq{
+			{GroupId: gid},
+			{GroupId: dismissed.GetGroupId()},
+			{GroupId: gid},
+		},
+	})
+	if err != nil || len(batch.GetGroups()) != 1 || batch.GetGroups()[gid] == nil || !batch.GetGroups()[gid].GetFull() {
+		t.Fatalf("batch %+v err=%v", batch, err)
 	}
 }
 

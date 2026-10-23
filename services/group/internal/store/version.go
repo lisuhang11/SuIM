@@ -5,7 +5,10 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"time"
+
+	"github.com/lisuhang11/SuIM/services/group/internal/model"
 )
 
 const (
@@ -14,6 +17,51 @@ const (
 	joinVersionHead   = "group_join_version"
 	joinVersionLog    = "group_join_version_log"
 )
+
+func (s *Store) JoinVersion(ctx context.Context, userID string) (model.VersionHead, error) {
+	return s.versionHead(ctx, joinVersionHead, userID)
+}
+
+func (s *Store) JoinChanges(ctx context.Context, userID string, version uint64, limit int) ([]model.VersionLog, error) {
+	return s.versionChanges(ctx, joinVersionLog, userID, version, limit)
+}
+
+func (s *Store) MemberVersion(ctx context.Context, groupID string) (model.VersionHead, error) {
+	return s.versionHead(ctx, memberVersionHead, groupID)
+}
+
+func (s *Store) MemberChanges(ctx context.Context, groupID string, version uint64, limit int) ([]model.VersionLog, error) {
+	return s.versionChanges(ctx, memberVersionLog, groupID, version, limit)
+}
+
+func (s *Store) versionHead(ctx context.Context, table, did string) (model.VersionHead, error) {
+	var head model.VersionHead
+	err := s.db.QueryRowContext(ctx, `SELECT version_id, version FROM `+table+` WHERE d_id = ?`, did).Scan(&head.ID, &head.Version)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.VersionHead{}, nil
+	}
+	return head, err
+}
+
+func (s *Store) versionChanges(ctx context.Context, table, did string, version uint64, limit int) ([]model.VersionLog, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT e_id, state, version FROM `+table+` WHERE d_id = ? AND version > ? ORDER BY version LIMIT ?`, did, version, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.VersionLog
+	for rows.Next() {
+		var row model.VersionLog
+		if err := rows.Scan(&row.ElemID, &row.State, &row.Version); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
 
 func incrMembers(ctx context.Context, tx *sql.Tx, groupID string, userIDs []string, state int32, now time.Time) error {
 	return incrVersion(ctx, tx, memberVersionHead, memberVersionLog, groupID, userIDs, state, now)

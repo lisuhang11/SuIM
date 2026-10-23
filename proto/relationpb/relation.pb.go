@@ -1422,6 +1422,350 @@ func (x *GetIncrementalBlacksResp) GetUpdate() []*BlackInfo {
 	return nil
 }
 
+type GetFriendListReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFriendListReq) Reset() {
+	*x = GetFriendListReq{}
+	mi := &file_relation_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFriendListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFriendListReq) ProtoMessage() {}
+
+func (x *GetFriendListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_relation_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFriendListReq.ProtoReflect.Descriptor instead.
+func (*GetFriendListReq) Descriptor() ([]byte, []int) {
+	return file_relation_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *GetFriendListReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetFriendListReq) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *GetFriendListReq) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type GetFriendListResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Friends       []*FriendInfo          `protobuf:"bytes,1,rep,name=friends,proto3" json:"friends,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFriendListResp) Reset() {
+	*x = GetFriendListResp{}
+	mi := &file_relation_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFriendListResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFriendListResp) ProtoMessage() {}
+
+func (x *GetFriendListResp) ProtoReflect() protoreflect.Message {
+	mi := &file_relation_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFriendListResp.ProtoReflect.Descriptor instead.
+func (*GetFriendListResp) Descriptor() ([]byte, []int) {
+	return file_relation_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *GetFriendListResp) GetFriends() []*FriendInfo {
+	if x != nil {
+		return x.Friends
+	}
+	return nil
+}
+
+func (x *GetFriendListResp) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type GetFullFriendUserIDsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	IdHash        uint64                 `protobuf:"varint,2,opt,name=id_hash,json=idHash,proto3" json:"id_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFullFriendUserIDsReq) Reset() {
+	*x = GetFullFriendUserIDsReq{}
+	mi := &file_relation_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFullFriendUserIDsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFullFriendUserIDsReq) ProtoMessage() {}
+
+func (x *GetFullFriendUserIDsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_relation_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFullFriendUserIDsReq.ProtoReflect.Descriptor instead.
+func (*GetFullFriendUserIDsReq) Descriptor() ([]byte, []int) {
+	return file_relation_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetFullFriendUserIDsReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetFullFriendUserIDsReq) GetIdHash() uint64 {
+	if x != nil {
+		return x.IdHash
+	}
+	return 0
+}
+
+type GetFullFriendUserIDsResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       uint64                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	Equal         bool                   `protobuf:"varint,3,opt,name=equal,proto3" json:"equal,omitempty"`
+	UserIds       []string               `protobuf:"bytes,4,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFullFriendUserIDsResp) Reset() {
+	*x = GetFullFriendUserIDsResp{}
+	mi := &file_relation_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFullFriendUserIDsResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFullFriendUserIDsResp) ProtoMessage() {}
+
+func (x *GetFullFriendUserIDsResp) ProtoReflect() protoreflect.Message {
+	mi := &file_relation_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFullFriendUserIDsResp.ProtoReflect.Descriptor instead.
+func (*GetFullFriendUserIDsResp) Descriptor() ([]byte, []int) {
+	return file_relation_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *GetFullFriendUserIDsResp) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *GetFullFriendUserIDsResp) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *GetFullFriendUserIDsResp) GetEqual() bool {
+	if x != nil {
+		return x.Equal
+	}
+	return false
+}
+
+func (x *GetFullFriendUserIDsResp) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
+type GetBlackListReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBlackListReq) Reset() {
+	*x = GetBlackListReq{}
+	mi := &file_relation_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBlackListReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlackListReq) ProtoMessage() {}
+
+func (x *GetBlackListReq) ProtoReflect() protoreflect.Message {
+	mi := &file_relation_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlackListReq.ProtoReflect.Descriptor instead.
+func (*GetBlackListReq) Descriptor() ([]byte, []int) {
+	return file_relation_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *GetBlackListReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetBlackListReq) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *GetBlackListReq) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type GetBlackListResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Blacks        []*BlackInfo           `protobuf:"bytes,1,rep,name=blacks,proto3" json:"blacks,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBlackListResp) Reset() {
+	*x = GetBlackListResp{}
+	mi := &file_relation_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBlackListResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBlackListResp) ProtoMessage() {}
+
+func (x *GetBlackListResp) ProtoReflect() protoreflect.Message {
+	mi := &file_relation_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBlackListResp.ProtoReflect.Descriptor instead.
+func (*GetBlackListResp) Descriptor() ([]byte, []int) {
+	return file_relation_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *GetBlackListResp) GetBlacks() []*BlackInfo {
+	if x != nil {
+		return x.Blacks
+	}
+	return nil
+}
+
+func (x *GetBlackListResp) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
 var File_relation_proto protoreflect.FileDescriptor
 
 const file_relation_proto_rawDesc = "" +
@@ -1542,7 +1886,30 @@ const file_relation_proto_rawDesc = "" +
 	"\x04full\x18\x03 \x01(\bR\x04full\x12\x16\n" +
 	"\x06delete\x18\x04 \x03(\tR\x06delete\x12+\n" +
 	"\x06insert\x18\x05 \x03(\v2\x13.relation.BlackInfoR\x06insert\x12+\n" +
-	"\x06update\x18\x06 \x03(\v2\x13.relation.BlackInfoR\x06update2\x84\x06\n" +
+	"\x06update\x18\x06 \x03(\v2\x13.relation.BlackInfoR\x06update\"Y\n" +
+	"\x10GetFriendListReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"Y\n" +
+	"\x11GetFriendListResp\x12.\n" +
+	"\afriends\x18\x01 \x03(\v2\x14.relation.FriendInfoR\afriends\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"K\n" +
+	"\x17GetFullFriendUserIDsReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
+	"\aid_hash\x18\x02 \x01(\x04R\x06idHash\"\x84\x01\n" +
+	"\x18GetFullFriendUserIDsResp\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\x04R\aversion\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12\x14\n" +
+	"\x05equal\x18\x03 \x01(\bR\x05equal\x12\x19\n" +
+	"\buser_ids\x18\x04 \x03(\tR\auserIds\"X\n" +
+	"\x0fGetBlackListReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"U\n" +
+	"\x10GetBlackListResp\x12+\n" +
+	"\x06blacks\x18\x01 \x03(\v2\x13.relation.BlackInfoR\x06blacks\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total2\xf4\a\n" +
 	"\x0fRelationService\x12T\n" +
 	"\x11SendFriendRequest\x12\x1e.relation.SendFriendRequestReq\x1a\x1f.relation.SendFriendRequestResp\x12W\n" +
 	"\x12RespondFriendApply\x12\x1f.relation.RespondFriendApplyReq\x1a .relation.RespondFriendApplyResp\x12E\n" +
@@ -1553,7 +1920,10 @@ const file_relation_proto_rawDesc = "" +
 	"\bIsFriend\x12\x15.relation.IsFriendReq\x1a\x16.relation.IsFriendResp\x126\n" +
 	"\aIsBlack\x12\x14.relation.IsBlackReq\x1a\x15.relation.IsBlackResp\x12`\n" +
 	"\x15GetIncrementalFriends\x12\".relation.GetIncrementalFriendsReq\x1a#.relation.GetIncrementalFriendsResp\x12]\n" +
-	"\x14GetIncrementalBlacks\x12!.relation.GetIncrementalBlacksReq\x1a\".relation.GetIncrementalBlacksRespB-Z+github.com/lisuhang11/SuIM/proto/relationpbb\x06proto3"
+	"\x14GetIncrementalBlacks\x12!.relation.GetIncrementalBlacksReq\x1a\".relation.GetIncrementalBlacksResp\x12H\n" +
+	"\rGetFriendList\x12\x1a.relation.GetFriendListReq\x1a\x1b.relation.GetFriendListResp\x12]\n" +
+	"\x14GetFullFriendUserIDs\x12!.relation.GetFullFriendUserIDsReq\x1a\".relation.GetFullFriendUserIDsResp\x12E\n" +
+	"\fGetBlackList\x12\x19.relation.GetBlackListReq\x1a\x1a.relation.GetBlackListRespB-Z+github.com/lisuhang11/SuIM/proto/relationpbb\x06proto3"
 
 var (
 	file_relation_proto_rawDescOnce sync.Once
@@ -1567,7 +1937,7 @@ func file_relation_proto_rawDescGZIP() []byte {
 	return file_relation_proto_rawDescData
 }
 
-var file_relation_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_relation_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_relation_proto_goTypes = []any{
 	(*FriendRequestInfo)(nil),         // 0: relation.FriendRequestInfo
 	(*SendFriendRequestReq)(nil),      // 1: relation.SendFriendRequestReq
@@ -1593,6 +1963,12 @@ var file_relation_proto_goTypes = []any{
 	(*GetIncrementalFriendsResp)(nil), // 21: relation.GetIncrementalFriendsResp
 	(*GetIncrementalBlacksReq)(nil),   // 22: relation.GetIncrementalBlacksReq
 	(*GetIncrementalBlacksResp)(nil),  // 23: relation.GetIncrementalBlacksResp
+	(*GetFriendListReq)(nil),          // 24: relation.GetFriendListReq
+	(*GetFriendListResp)(nil),         // 25: relation.GetFriendListResp
+	(*GetFullFriendUserIDsReq)(nil),   // 26: relation.GetFullFriendUserIDsReq
+	(*GetFullFriendUserIDsResp)(nil),  // 27: relation.GetFullFriendUserIDsResp
+	(*GetBlackListReq)(nil),           // 28: relation.GetBlackListReq
+	(*GetBlackListResp)(nil),          // 29: relation.GetBlackListResp
 }
 var file_relation_proto_depIdxs = []int32{
 	17, // 0: relation.FriendInfo.friend_user:type_name -> relation.PublicUserInfo
@@ -1601,31 +1977,39 @@ var file_relation_proto_depIdxs = []int32{
 	18, // 3: relation.GetIncrementalFriendsResp.update:type_name -> relation.FriendInfo
 	19, // 4: relation.GetIncrementalBlacksResp.insert:type_name -> relation.BlackInfo
 	19, // 5: relation.GetIncrementalBlacksResp.update:type_name -> relation.BlackInfo
-	1,  // 6: relation.RelationService.SendFriendRequest:input_type -> relation.SendFriendRequestReq
-	3,  // 7: relation.RelationService.RespondFriendApply:input_type -> relation.RespondFriendApplyReq
-	5,  // 8: relation.RelationService.DeleteFriend:input_type -> relation.DeleteFriendReq
-	7,  // 9: relation.RelationService.UpdateFriend:input_type -> relation.UpdateFriendReq
-	9,  // 10: relation.RelationService.BlockUser:input_type -> relation.BlockUserReq
-	11, // 11: relation.RelationService.UnblockUser:input_type -> relation.UnblockUserReq
-	13, // 12: relation.RelationService.IsFriend:input_type -> relation.IsFriendReq
-	15, // 13: relation.RelationService.IsBlack:input_type -> relation.IsBlackReq
-	20, // 14: relation.RelationService.GetIncrementalFriends:input_type -> relation.GetIncrementalFriendsReq
-	22, // 15: relation.RelationService.GetIncrementalBlacks:input_type -> relation.GetIncrementalBlacksReq
-	2,  // 16: relation.RelationService.SendFriendRequest:output_type -> relation.SendFriendRequestResp
-	4,  // 17: relation.RelationService.RespondFriendApply:output_type -> relation.RespondFriendApplyResp
-	6,  // 18: relation.RelationService.DeleteFriend:output_type -> relation.DeleteFriendResp
-	8,  // 19: relation.RelationService.UpdateFriend:output_type -> relation.UpdateFriendResp
-	10, // 20: relation.RelationService.BlockUser:output_type -> relation.BlockUserResp
-	12, // 21: relation.RelationService.UnblockUser:output_type -> relation.UnblockUserResp
-	14, // 22: relation.RelationService.IsFriend:output_type -> relation.IsFriendResp
-	16, // 23: relation.RelationService.IsBlack:output_type -> relation.IsBlackResp
-	21, // 24: relation.RelationService.GetIncrementalFriends:output_type -> relation.GetIncrementalFriendsResp
-	23, // 25: relation.RelationService.GetIncrementalBlacks:output_type -> relation.GetIncrementalBlacksResp
-	16, // [16:26] is the sub-list for method output_type
-	6,  // [6:16] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	18, // 6: relation.GetFriendListResp.friends:type_name -> relation.FriendInfo
+	19, // 7: relation.GetBlackListResp.blacks:type_name -> relation.BlackInfo
+	1,  // 8: relation.RelationService.SendFriendRequest:input_type -> relation.SendFriendRequestReq
+	3,  // 9: relation.RelationService.RespondFriendApply:input_type -> relation.RespondFriendApplyReq
+	5,  // 10: relation.RelationService.DeleteFriend:input_type -> relation.DeleteFriendReq
+	7,  // 11: relation.RelationService.UpdateFriend:input_type -> relation.UpdateFriendReq
+	9,  // 12: relation.RelationService.BlockUser:input_type -> relation.BlockUserReq
+	11, // 13: relation.RelationService.UnblockUser:input_type -> relation.UnblockUserReq
+	13, // 14: relation.RelationService.IsFriend:input_type -> relation.IsFriendReq
+	15, // 15: relation.RelationService.IsBlack:input_type -> relation.IsBlackReq
+	20, // 16: relation.RelationService.GetIncrementalFriends:input_type -> relation.GetIncrementalFriendsReq
+	22, // 17: relation.RelationService.GetIncrementalBlacks:input_type -> relation.GetIncrementalBlacksReq
+	24, // 18: relation.RelationService.GetFriendList:input_type -> relation.GetFriendListReq
+	26, // 19: relation.RelationService.GetFullFriendUserIDs:input_type -> relation.GetFullFriendUserIDsReq
+	28, // 20: relation.RelationService.GetBlackList:input_type -> relation.GetBlackListReq
+	2,  // 21: relation.RelationService.SendFriendRequest:output_type -> relation.SendFriendRequestResp
+	4,  // 22: relation.RelationService.RespondFriendApply:output_type -> relation.RespondFriendApplyResp
+	6,  // 23: relation.RelationService.DeleteFriend:output_type -> relation.DeleteFriendResp
+	8,  // 24: relation.RelationService.UpdateFriend:output_type -> relation.UpdateFriendResp
+	10, // 25: relation.RelationService.BlockUser:output_type -> relation.BlockUserResp
+	12, // 26: relation.RelationService.UnblockUser:output_type -> relation.UnblockUserResp
+	14, // 27: relation.RelationService.IsFriend:output_type -> relation.IsFriendResp
+	16, // 28: relation.RelationService.IsBlack:output_type -> relation.IsBlackResp
+	21, // 29: relation.RelationService.GetIncrementalFriends:output_type -> relation.GetIncrementalFriendsResp
+	23, // 30: relation.RelationService.GetIncrementalBlacks:output_type -> relation.GetIncrementalBlacksResp
+	25, // 31: relation.RelationService.GetFriendList:output_type -> relation.GetFriendListResp
+	27, // 32: relation.RelationService.GetFullFriendUserIDs:output_type -> relation.GetFullFriendUserIDsResp
+	29, // 33: relation.RelationService.GetBlackList:output_type -> relation.GetBlackListResp
+	21, // [21:34] is the sub-list for method output_type
+	8,  // [8:21] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_relation_proto_init() }
@@ -1640,7 +2024,7 @@ func file_relation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_relation_proto_rawDesc), len(file_relation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

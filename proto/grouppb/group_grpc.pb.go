@@ -19,17 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GroupService_CreateGroup_FullMethodName           = "/group.GroupService/CreateGroup"
-	GroupService_DismissGroup_FullMethodName          = "/group.GroupService/DismissGroup"
-	GroupService_TransferGroupOwner_FullMethodName    = "/group.GroupService/TransferGroupOwner"
-	GroupService_UpdateGroupInfo_FullMethodName       = "/group.GroupService/UpdateGroupInfo"
-	GroupService_GetGroupsInfo_FullMethodName         = "/group.GroupService/GetGroupsInfo"
-	GroupService_InviteUserToGroup_FullMethodName     = "/group.GroupService/InviteUserToGroup"
-	GroupService_KickGroupMember_FullMethodName       = "/group.GroupService/KickGroupMember"
-	GroupService_QuitGroup_FullMethodName             = "/group.GroupService/QuitGroup"
-	GroupService_GetGroupMembers_FullMethodName       = "/group.GroupService/GetGroupMembers"
-	GroupService_GetGroupMemberUserIDs_FullMethodName = "/group.GroupService/GetGroupMemberUserIDs"
-	GroupService_GetJoinedGroups_FullMethodName       = "/group.GroupService/GetJoinedGroups"
+	GroupService_CreateGroup_FullMethodName                     = "/group.GroupService/CreateGroup"
+	GroupService_DismissGroup_FullMethodName                    = "/group.GroupService/DismissGroup"
+	GroupService_TransferGroupOwner_FullMethodName              = "/group.GroupService/TransferGroupOwner"
+	GroupService_UpdateGroupInfo_FullMethodName                 = "/group.GroupService/UpdateGroupInfo"
+	GroupService_GetGroupsInfo_FullMethodName                   = "/group.GroupService/GetGroupsInfo"
+	GroupService_InviteUserToGroup_FullMethodName               = "/group.GroupService/InviteUserToGroup"
+	GroupService_KickGroupMember_FullMethodName                 = "/group.GroupService/KickGroupMember"
+	GroupService_QuitGroup_FullMethodName                       = "/group.GroupService/QuitGroup"
+	GroupService_GetGroupMembers_FullMethodName                 = "/group.GroupService/GetGroupMembers"
+	GroupService_GetGroupMemberUserIDs_FullMethodName           = "/group.GroupService/GetGroupMemberUserIDs"
+	GroupService_GetJoinedGroups_FullMethodName                 = "/group.GroupService/GetJoinedGroups"
+	GroupService_GetIncrementalJoinGroups_FullMethodName        = "/group.GroupService/GetIncrementalJoinGroups"
+	GroupService_GetFullJoinGroupIDs_FullMethodName             = "/group.GroupService/GetFullJoinGroupIDs"
+	GroupService_GetIncrementalGroupMembers_FullMethodName      = "/group.GroupService/GetIncrementalGroupMembers"
+	GroupService_BatchGetIncrementalGroupMembers_FullMethodName = "/group.GroupService/BatchGetIncrementalGroupMembers"
+	GroupService_GetFullGroupMemberUserIDs_FullMethodName       = "/group.GroupService/GetFullGroupMemberUserIDs"
 )
 
 // GroupServiceClient is the client API for GroupService service.
@@ -49,6 +54,12 @@ type GroupServiceClient interface {
 	GetGroupMembers(ctx context.Context, in *GetGroupMembersReq, opts ...grpc.CallOption) (*GetGroupMembersResp, error)
 	GetGroupMemberUserIDs(ctx context.Context, in *GetGroupMemberUserIDsReq, opts ...grpc.CallOption) (*GetGroupMemberUserIDsResp, error)
 	GetJoinedGroups(ctx context.Context, in *GetJoinedGroupsReq, opts ...grpc.CallOption) (*GetJoinedGroupsResp, error)
+	// Incremental sync. full=true carries no profiles; the client pages GetJoinedGroups or GetGroupMembers, then fetches IDs.
+	GetIncrementalJoinGroups(ctx context.Context, in *GetIncrementalJoinGroupsReq, opts ...grpc.CallOption) (*GetIncrementalJoinGroupsResp, error)
+	GetFullJoinGroupIDs(ctx context.Context, in *GetFullJoinGroupIDsReq, opts ...grpc.CallOption) (*GetFullJoinGroupIDsResp, error)
+	GetIncrementalGroupMembers(ctx context.Context, in *GetIncrementalGroupMembersReq, opts ...grpc.CallOption) (*GetIncrementalGroupMembersResp, error)
+	BatchGetIncrementalGroupMembers(ctx context.Context, in *BatchGetIncrementalGroupMembersReq, opts ...grpc.CallOption) (*BatchGetIncrementalGroupMembersResp, error)
+	GetFullGroupMemberUserIDs(ctx context.Context, in *GetFullGroupMemberUserIDsReq, opts ...grpc.CallOption) (*GetFullGroupMemberUserIDsResp, error)
 }
 
 type groupServiceClient struct {
@@ -169,6 +180,56 @@ func (c *groupServiceClient) GetJoinedGroups(ctx context.Context, in *GetJoinedG
 	return out, nil
 }
 
+func (c *groupServiceClient) GetIncrementalJoinGroups(ctx context.Context, in *GetIncrementalJoinGroupsReq, opts ...grpc.CallOption) (*GetIncrementalJoinGroupsResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetIncrementalJoinGroupsResp)
+	err := c.cc.Invoke(ctx, GroupService_GetIncrementalJoinGroups_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) GetFullJoinGroupIDs(ctx context.Context, in *GetFullJoinGroupIDsReq, opts ...grpc.CallOption) (*GetFullJoinGroupIDsResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFullJoinGroupIDsResp)
+	err := c.cc.Invoke(ctx, GroupService_GetFullJoinGroupIDs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) GetIncrementalGroupMembers(ctx context.Context, in *GetIncrementalGroupMembersReq, opts ...grpc.CallOption) (*GetIncrementalGroupMembersResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetIncrementalGroupMembersResp)
+	err := c.cc.Invoke(ctx, GroupService_GetIncrementalGroupMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) BatchGetIncrementalGroupMembers(ctx context.Context, in *BatchGetIncrementalGroupMembersReq, opts ...grpc.CallOption) (*BatchGetIncrementalGroupMembersResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BatchGetIncrementalGroupMembersResp)
+	err := c.cc.Invoke(ctx, GroupService_BatchGetIncrementalGroupMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) GetFullGroupMemberUserIDs(ctx context.Context, in *GetFullGroupMemberUserIDsReq, opts ...grpc.CallOption) (*GetFullGroupMemberUserIDsResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFullGroupMemberUserIDsResp)
+	err := c.cc.Invoke(ctx, GroupService_GetFullGroupMemberUserIDs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GroupServiceServer is the server API for GroupService service.
 // All implementations must embed UnimplementedGroupServiceServer
 // for forward compatibility.
@@ -186,6 +247,12 @@ type GroupServiceServer interface {
 	GetGroupMembers(context.Context, *GetGroupMembersReq) (*GetGroupMembersResp, error)
 	GetGroupMemberUserIDs(context.Context, *GetGroupMemberUserIDsReq) (*GetGroupMemberUserIDsResp, error)
 	GetJoinedGroups(context.Context, *GetJoinedGroupsReq) (*GetJoinedGroupsResp, error)
+	// Incremental sync. full=true carries no profiles; the client pages GetJoinedGroups or GetGroupMembers, then fetches IDs.
+	GetIncrementalJoinGroups(context.Context, *GetIncrementalJoinGroupsReq) (*GetIncrementalJoinGroupsResp, error)
+	GetFullJoinGroupIDs(context.Context, *GetFullJoinGroupIDsReq) (*GetFullJoinGroupIDsResp, error)
+	GetIncrementalGroupMembers(context.Context, *GetIncrementalGroupMembersReq) (*GetIncrementalGroupMembersResp, error)
+	BatchGetIncrementalGroupMembers(context.Context, *BatchGetIncrementalGroupMembersReq) (*BatchGetIncrementalGroupMembersResp, error)
+	GetFullGroupMemberUserIDs(context.Context, *GetFullGroupMemberUserIDsReq) (*GetFullGroupMemberUserIDsResp, error)
 	mustEmbedUnimplementedGroupServiceServer()
 }
 
@@ -228,6 +295,21 @@ func (UnimplementedGroupServiceServer) GetGroupMemberUserIDs(context.Context, *G
 }
 func (UnimplementedGroupServiceServer) GetJoinedGroups(context.Context, *GetJoinedGroupsReq) (*GetJoinedGroupsResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetJoinedGroups not implemented")
+}
+func (UnimplementedGroupServiceServer) GetIncrementalJoinGroups(context.Context, *GetIncrementalJoinGroupsReq) (*GetIncrementalJoinGroupsResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIncrementalJoinGroups not implemented")
+}
+func (UnimplementedGroupServiceServer) GetFullJoinGroupIDs(context.Context, *GetFullJoinGroupIDsReq) (*GetFullJoinGroupIDsResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFullJoinGroupIDs not implemented")
+}
+func (UnimplementedGroupServiceServer) GetIncrementalGroupMembers(context.Context, *GetIncrementalGroupMembersReq) (*GetIncrementalGroupMembersResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIncrementalGroupMembers not implemented")
+}
+func (UnimplementedGroupServiceServer) BatchGetIncrementalGroupMembers(context.Context, *BatchGetIncrementalGroupMembersReq) (*BatchGetIncrementalGroupMembersResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method BatchGetIncrementalGroupMembers not implemented")
+}
+func (UnimplementedGroupServiceServer) GetFullGroupMemberUserIDs(context.Context, *GetFullGroupMemberUserIDsReq) (*GetFullGroupMemberUserIDsResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFullGroupMemberUserIDs not implemented")
 }
 func (UnimplementedGroupServiceServer) mustEmbedUnimplementedGroupServiceServer() {}
 func (UnimplementedGroupServiceServer) testEmbeddedByValue()                      {}
@@ -448,6 +530,96 @@ func _GroupService_GetJoinedGroups_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GroupService_GetIncrementalJoinGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIncrementalJoinGroupsReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).GetIncrementalJoinGroups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_GetIncrementalJoinGroups_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).GetIncrementalJoinGroups(ctx, req.(*GetIncrementalJoinGroupsReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_GetFullJoinGroupIDs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFullJoinGroupIDsReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).GetFullJoinGroupIDs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_GetFullJoinGroupIDs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).GetFullJoinGroupIDs(ctx, req.(*GetFullJoinGroupIDsReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_GetIncrementalGroupMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIncrementalGroupMembersReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).GetIncrementalGroupMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_GetIncrementalGroupMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).GetIncrementalGroupMembers(ctx, req.(*GetIncrementalGroupMembersReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_BatchGetIncrementalGroupMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchGetIncrementalGroupMembersReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).BatchGetIncrementalGroupMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_BatchGetIncrementalGroupMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).BatchGetIncrementalGroupMembers(ctx, req.(*BatchGetIncrementalGroupMembersReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_GetFullGroupMemberUserIDs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFullGroupMemberUserIDsReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).GetFullGroupMemberUserIDs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_GetFullGroupMemberUserIDs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).GetFullGroupMemberUserIDs(ctx, req.(*GetFullGroupMemberUserIDsReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GroupService_ServiceDesc is the grpc.ServiceDesc for GroupService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -498,6 +670,26 @@ var GroupService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetJoinedGroups",
 			Handler:    _GroupService_GetJoinedGroups_Handler,
+		},
+		{
+			MethodName: "GetIncrementalJoinGroups",
+			Handler:    _GroupService_GetIncrementalJoinGroups_Handler,
+		},
+		{
+			MethodName: "GetFullJoinGroupIDs",
+			Handler:    _GroupService_GetFullJoinGroupIDs_Handler,
+		},
+		{
+			MethodName: "GetIncrementalGroupMembers",
+			Handler:    _GroupService_GetIncrementalGroupMembers_Handler,
+		},
+		{
+			MethodName: "BatchGetIncrementalGroupMembers",
+			Handler:    _GroupService_BatchGetIncrementalGroupMembers_Handler,
+		},
+		{
+			MethodName: "GetFullGroupMemberUserIDs",
+			Handler:    _GroupService_GetFullGroupMemberUserIDs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

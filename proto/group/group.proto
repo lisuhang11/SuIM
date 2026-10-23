@@ -20,6 +20,12 @@ service GroupService {
   rpc GetGroupMemberUserIDs(GetGroupMemberUserIDsReq) returns (GetGroupMemberUserIDsResp);
   rpc GetJoinedGroups(GetJoinedGroupsReq) returns (GetJoinedGroupsResp);
 
+  // Incremental sync. full=true carries no profiles; the client pages GetJoinedGroups or GetGroupMembers, then fetches IDs.
+  rpc GetIncrementalJoinGroups(GetIncrementalJoinGroupsReq) returns (GetIncrementalJoinGroupsResp);
+  rpc GetFullJoinGroupIDs(GetFullJoinGroupIDsReq) returns (GetFullJoinGroupIDsResp);
+  rpc GetIncrementalGroupMembers(GetIncrementalGroupMembersReq) returns (GetIncrementalGroupMembersResp);
+  rpc BatchGetIncrementalGroupMembers(BatchGetIncrementalGroupMembersReq) returns (BatchGetIncrementalGroupMembersResp);
+  rpc GetFullGroupMemberUserIDs(GetFullGroupMemberUserIDsReq) returns (GetFullGroupMemberUserIDsResp);
 }
 
 
@@ -187,4 +193,72 @@ message GetJoinedGroupsReq {
 message GetJoinedGroupsResp {
   repeated GroupInfo groups = 1;
   int32 total = 2;
+}
+
+// --------------- incremental join groups ---------------
+// version 0 or an unknown version_id returns full=true and empty insert/update/delete.
+message GetIncrementalJoinGroupsReq {
+  string user_id = 1;
+  string version_id = 2;
+  uint64 version = 3;
+}
+message GetIncrementalJoinGroupsResp {
+  uint64 version = 1;
+  string version_id = 2;
+  bool full = 3;
+  repeated string delete = 4;
+  repeated GroupInfo insert = 5;
+  repeated GroupInfo update = 6;
+}
+
+// id_hash is the hash of the client's ordered group ID list.
+// equal=true means the list is unchanged and group_ids is empty.
+message GetFullJoinGroupIDsReq {
+  string user_id = 1;
+  uint64 id_hash = 2;
+}
+message GetFullJoinGroupIDsResp {
+  uint64 version = 1;
+  string version_id = 2;
+  bool equal = 3;
+  repeated string group_ids = 4;
+}
+
+// --------------- incremental group members ---------------
+// user_id is the caller and must already be a member.
+// An empty element id in the version log means the group profile changed.
+message GetIncrementalGroupMembersReq {
+  string group_id = 1;
+  string user_id = 2;
+  string version_id = 3;
+  uint64 version = 4;
+}
+message GetIncrementalGroupMembersResp {
+  uint64 version = 1;
+  string version_id = 2;
+  bool full = 3;
+  repeated string delete = 4;
+  repeated GroupMemberFullInfo insert = 5;
+  repeated GroupMemberFullInfo update = 6;
+  GroupInfo group = 7;
+  uint64 sort_version = 8;
+}
+
+message BatchGetIncrementalGroupMembersReq {
+  string user_id = 1;
+  repeated GetIncrementalGroupMembersReq groups = 2;
+}
+message BatchGetIncrementalGroupMembersResp {
+  map<string, GetIncrementalGroupMembersResp> groups = 1;
+}
+
+message GetFullGroupMemberUserIDsReq {
+  string group_id = 1;
+  uint64 id_hash = 2;
+}
+message GetFullGroupMemberUserIDsResp {
+  uint64 version = 1;
+  string version_id = 2;
+  bool equal = 3;
+  repeated string user_ids = 4;
 }

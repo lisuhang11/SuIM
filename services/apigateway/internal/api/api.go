@@ -24,6 +24,9 @@
 //	POST /friend/is_black
 //	POST /friend/incremental_friends
 //	POST /friend/incremental_blacks
+//	POST /friend/list
+//	POST /friend/friend_ids
+//	POST /friend/blacks
 //	POST /group/create
 //	POST /group/dismiss
 //	POST /group/transfer
@@ -36,6 +39,11 @@
 //	POST /group/members
 //	POST /group/member_ids
 //	POST /group/joined
+//	POST /group/incremental_joined
+//	POST /group/joined_ids
+//	POST /group/incremental_members
+//	POST /group/incremental_members_batch
+//	POST /group/full_member_ids
 //	POST /object/part_limit
 //	POST /object/initiate_multipart_upload
 //	POST /object/auth_sign
@@ -114,6 +122,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /friend/is_black", s.auth(s.isBlack))
 	mux.HandleFunc("POST /friend/incremental_friends", s.auth(s.incrementalFriends))
 	mux.HandleFunc("POST /friend/incremental_blacks", s.auth(s.incrementalBlacks))
+	mux.HandleFunc("POST /friend/list", s.auth(s.friendList))
+	mux.HandleFunc("POST /friend/friend_ids", s.auth(s.fullFriendUserIDs))
+	mux.HandleFunc("POST /friend/blacks", s.auth(s.blackList))
 
 	mux.HandleFunc("POST /group/create", s.auth(s.createGroup))
 	mux.HandleFunc("POST /group/dismiss", s.auth(s.dismissGroup))
@@ -126,6 +137,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /group/members", s.auth(s.getGroupMembers))
 	mux.HandleFunc("POST /group/member_ids", s.auth(s.getGroupMemberUserIDs))
 	mux.HandleFunc("POST /group/joined", s.auth(s.getJoinedGroups))
+	mux.HandleFunc("POST /group/incremental_joined", s.auth(s.incrementalJoinedGroups))
+	mux.HandleFunc("POST /group/joined_ids", s.auth(s.fullJoinGroupIDs))
+	mux.HandleFunc("POST /group/incremental_members", s.auth(s.incrementalGroupMembers))
+	mux.HandleFunc("POST /group/incremental_members_batch", s.auth(s.batchIncrementalGroupMembers))
+	mux.HandleFunc("POST /group/full_member_ids", s.auth(s.fullGroupMemberUserIDs))
 
 	mux.HandleFunc("POST /object/part_limit", s.auth(s.partLimit))
 	mux.HandleFunc("POST /object/initiate_multipart_upload", s.auth(s.initiateMultipartUpload))

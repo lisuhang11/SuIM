@@ -1665,6 +1665,661 @@ func (x *GetJoinedGroupsResp) GetTotal() int32 {
 	return 0
 }
 
+// --------------- incremental join groups ---------------
+// version 0 or an unknown version_id returns full=true and empty insert/update/delete.
+type GetIncrementalJoinGroupsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	Version       uint64                 `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIncrementalJoinGroupsReq) Reset() {
+	*x = GetIncrementalJoinGroupsReq{}
+	mi := &file_group_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIncrementalJoinGroupsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIncrementalJoinGroupsReq) ProtoMessage() {}
+
+func (x *GetIncrementalJoinGroupsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIncrementalJoinGroupsReq.ProtoReflect.Descriptor instead.
+func (*GetIncrementalJoinGroupsReq) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *GetIncrementalJoinGroupsReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetIncrementalJoinGroupsReq) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *GetIncrementalJoinGroupsReq) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type GetIncrementalJoinGroupsResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       uint64                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	Full          bool                   `protobuf:"varint,3,opt,name=full,proto3" json:"full,omitempty"`
+	Delete        []string               `protobuf:"bytes,4,rep,name=delete,proto3" json:"delete,omitempty"`
+	Insert        []*GroupInfo           `protobuf:"bytes,5,rep,name=insert,proto3" json:"insert,omitempty"`
+	Update        []*GroupInfo           `protobuf:"bytes,6,rep,name=update,proto3" json:"update,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIncrementalJoinGroupsResp) Reset() {
+	*x = GetIncrementalJoinGroupsResp{}
+	mi := &file_group_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIncrementalJoinGroupsResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIncrementalJoinGroupsResp) ProtoMessage() {}
+
+func (x *GetIncrementalJoinGroupsResp) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIncrementalJoinGroupsResp.ProtoReflect.Descriptor instead.
+func (*GetIncrementalJoinGroupsResp) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetIncrementalJoinGroupsResp) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *GetIncrementalJoinGroupsResp) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *GetIncrementalJoinGroupsResp) GetFull() bool {
+	if x != nil {
+		return x.Full
+	}
+	return false
+}
+
+func (x *GetIncrementalJoinGroupsResp) GetDelete() []string {
+	if x != nil {
+		return x.Delete
+	}
+	return nil
+}
+
+func (x *GetIncrementalJoinGroupsResp) GetInsert() []*GroupInfo {
+	if x != nil {
+		return x.Insert
+	}
+	return nil
+}
+
+func (x *GetIncrementalJoinGroupsResp) GetUpdate() []*GroupInfo {
+	if x != nil {
+		return x.Update
+	}
+	return nil
+}
+
+// id_hash is the hash of the client's ordered group ID list.
+// equal=true means the list is unchanged and group_ids is empty.
+type GetFullJoinGroupIDsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	IdHash        uint64                 `protobuf:"varint,2,opt,name=id_hash,json=idHash,proto3" json:"id_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFullJoinGroupIDsReq) Reset() {
+	*x = GetFullJoinGroupIDsReq{}
+	mi := &file_group_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFullJoinGroupIDsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFullJoinGroupIDsReq) ProtoMessage() {}
+
+func (x *GetFullJoinGroupIDsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFullJoinGroupIDsReq.ProtoReflect.Descriptor instead.
+func (*GetFullJoinGroupIDsReq) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *GetFullJoinGroupIDsReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetFullJoinGroupIDsReq) GetIdHash() uint64 {
+	if x != nil {
+		return x.IdHash
+	}
+	return 0
+}
+
+type GetFullJoinGroupIDsResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       uint64                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	Equal         bool                   `protobuf:"varint,3,opt,name=equal,proto3" json:"equal,omitempty"`
+	GroupIds      []string               `protobuf:"bytes,4,rep,name=group_ids,json=groupIds,proto3" json:"group_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFullJoinGroupIDsResp) Reset() {
+	*x = GetFullJoinGroupIDsResp{}
+	mi := &file_group_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFullJoinGroupIDsResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFullJoinGroupIDsResp) ProtoMessage() {}
+
+func (x *GetFullJoinGroupIDsResp) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFullJoinGroupIDsResp.ProtoReflect.Descriptor instead.
+func (*GetFullJoinGroupIDsResp) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *GetFullJoinGroupIDsResp) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *GetFullJoinGroupIDsResp) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *GetFullJoinGroupIDsResp) GetEqual() bool {
+	if x != nil {
+		return x.Equal
+	}
+	return false
+}
+
+func (x *GetFullJoinGroupIDsResp) GetGroupIds() []string {
+	if x != nil {
+		return x.GroupIds
+	}
+	return nil
+}
+
+// --------------- incremental group members ---------------
+// user_id is the caller and must already be a member.
+// An empty element id in the version log means the group profile changed.
+type GetIncrementalGroupMembersReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GroupId       string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	VersionId     string                 `protobuf:"bytes,3,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	Version       uint64                 `protobuf:"varint,4,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIncrementalGroupMembersReq) Reset() {
+	*x = GetIncrementalGroupMembersReq{}
+	mi := &file_group_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIncrementalGroupMembersReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIncrementalGroupMembersReq) ProtoMessage() {}
+
+func (x *GetIncrementalGroupMembersReq) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIncrementalGroupMembersReq.ProtoReflect.Descriptor instead.
+func (*GetIncrementalGroupMembersReq) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *GetIncrementalGroupMembersReq) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *GetIncrementalGroupMembersReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetIncrementalGroupMembersReq) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *GetIncrementalGroupMembersReq) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type GetIncrementalGroupMembersResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       uint64                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	Full          bool                   `protobuf:"varint,3,opt,name=full,proto3" json:"full,omitempty"`
+	Delete        []string               `protobuf:"bytes,4,rep,name=delete,proto3" json:"delete,omitempty"`
+	Insert        []*GroupMemberFullInfo `protobuf:"bytes,5,rep,name=insert,proto3" json:"insert,omitempty"`
+	Update        []*GroupMemberFullInfo `protobuf:"bytes,6,rep,name=update,proto3" json:"update,omitempty"`
+	Group         *GroupInfo             `protobuf:"bytes,7,opt,name=group,proto3" json:"group,omitempty"`
+	SortVersion   uint64                 `protobuf:"varint,8,opt,name=sort_version,json=sortVersion,proto3" json:"sort_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIncrementalGroupMembersResp) Reset() {
+	*x = GetIncrementalGroupMembersResp{}
+	mi := &file_group_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIncrementalGroupMembersResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIncrementalGroupMembersResp) ProtoMessage() {}
+
+func (x *GetIncrementalGroupMembersResp) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIncrementalGroupMembersResp.ProtoReflect.Descriptor instead.
+func (*GetIncrementalGroupMembersResp) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *GetIncrementalGroupMembersResp) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *GetIncrementalGroupMembersResp) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *GetIncrementalGroupMembersResp) GetFull() bool {
+	if x != nil {
+		return x.Full
+	}
+	return false
+}
+
+func (x *GetIncrementalGroupMembersResp) GetDelete() []string {
+	if x != nil {
+		return x.Delete
+	}
+	return nil
+}
+
+func (x *GetIncrementalGroupMembersResp) GetInsert() []*GroupMemberFullInfo {
+	if x != nil {
+		return x.Insert
+	}
+	return nil
+}
+
+func (x *GetIncrementalGroupMembersResp) GetUpdate() []*GroupMemberFullInfo {
+	if x != nil {
+		return x.Update
+	}
+	return nil
+}
+
+func (x *GetIncrementalGroupMembersResp) GetGroup() *GroupInfo {
+	if x != nil {
+		return x.Group
+	}
+	return nil
+}
+
+func (x *GetIncrementalGroupMembersResp) GetSortVersion() uint64 {
+	if x != nil {
+		return x.SortVersion
+	}
+	return 0
+}
+
+type BatchGetIncrementalGroupMembersReq struct {
+	state         protoimpl.MessageState           `protogen:"open.v1"`
+	UserId        string                           `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Groups        []*GetIncrementalGroupMembersReq `protobuf:"bytes,2,rep,name=groups,proto3" json:"groups,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchGetIncrementalGroupMembersReq) Reset() {
+	*x = BatchGetIncrementalGroupMembersReq{}
+	mi := &file_group_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchGetIncrementalGroupMembersReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchGetIncrementalGroupMembersReq) ProtoMessage() {}
+
+func (x *BatchGetIncrementalGroupMembersReq) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchGetIncrementalGroupMembersReq.ProtoReflect.Descriptor instead.
+func (*BatchGetIncrementalGroupMembersReq) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *BatchGetIncrementalGroupMembersReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *BatchGetIncrementalGroupMembersReq) GetGroups() []*GetIncrementalGroupMembersReq {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+type BatchGetIncrementalGroupMembersResp struct {
+	state         protoimpl.MessageState                     `protogen:"open.v1"`
+	Groups        map[string]*GetIncrementalGroupMembersResp `protobuf:"bytes,1,rep,name=groups,proto3" json:"groups,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchGetIncrementalGroupMembersResp) Reset() {
+	*x = BatchGetIncrementalGroupMembersResp{}
+	mi := &file_group_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchGetIncrementalGroupMembersResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchGetIncrementalGroupMembersResp) ProtoMessage() {}
+
+func (x *BatchGetIncrementalGroupMembersResp) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchGetIncrementalGroupMembersResp.ProtoReflect.Descriptor instead.
+func (*BatchGetIncrementalGroupMembersResp) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *BatchGetIncrementalGroupMembersResp) GetGroups() map[string]*GetIncrementalGroupMembersResp {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+type GetFullGroupMemberUserIDsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GroupId       string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	IdHash        uint64                 `protobuf:"varint,2,opt,name=id_hash,json=idHash,proto3" json:"id_hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFullGroupMemberUserIDsReq) Reset() {
+	*x = GetFullGroupMemberUserIDsReq{}
+	mi := &file_group_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFullGroupMemberUserIDsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFullGroupMemberUserIDsReq) ProtoMessage() {}
+
+func (x *GetFullGroupMemberUserIDsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFullGroupMemberUserIDsReq.ProtoReflect.Descriptor instead.
+func (*GetFullGroupMemberUserIDsReq) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *GetFullGroupMemberUserIDsReq) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *GetFullGroupMemberUserIDsReq) GetIdHash() uint64 {
+	if x != nil {
+		return x.IdHash
+	}
+	return 0
+}
+
+type GetFullGroupMemberUserIDsResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       uint64                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	Equal         bool                   `protobuf:"varint,3,opt,name=equal,proto3" json:"equal,omitempty"`
+	UserIds       []string               `protobuf:"bytes,4,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFullGroupMemberUserIDsResp) Reset() {
+	*x = GetFullGroupMemberUserIDsResp{}
+	mi := &file_group_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFullGroupMemberUserIDsResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFullGroupMemberUserIDsResp) ProtoMessage() {}
+
+func (x *GetFullGroupMemberUserIDsResp) ProtoReflect() protoreflect.Message {
+	mi := &file_group_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFullGroupMemberUserIDsResp.ProtoReflect.Descriptor instead.
+func (*GetFullGroupMemberUserIDsResp) Descriptor() ([]byte, []int) {
+	return file_group_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *GetFullGroupMemberUserIDsResp) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *GetFullGroupMemberUserIDsResp) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *GetFullGroupMemberUserIDsResp) GetEqual() bool {
+	if x != nil {
+		return x.Equal
+	}
+	return false
+}
+
+func (x *GetFullGroupMemberUserIDsResp) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
 var File_group_proto protoreflect.FileDescriptor
 
 const file_group_proto_rawDesc = "" +
@@ -1814,7 +2469,63 @@ const file_group_proto_rawDesc = "" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limit\"U\n" +
 	"\x13GetJoinedGroupsResp\x12(\n" +
 	"\x06groups\x18\x01 \x03(\v2\x10.group.GroupInfoR\x06groups\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total2\xb0\x06\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"o\n" +
+	"\x1bGetIncrementalJoinGroupsReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\x04R\aversion\"\xd7\x01\n" +
+	"\x1cGetIncrementalJoinGroupsResp\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\x04R\aversion\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12\x12\n" +
+	"\x04full\x18\x03 \x01(\bR\x04full\x12\x16\n" +
+	"\x06delete\x18\x04 \x03(\tR\x06delete\x12(\n" +
+	"\x06insert\x18\x05 \x03(\v2\x10.group.GroupInfoR\x06insert\x12(\n" +
+	"\x06update\x18\x06 \x03(\v2\x10.group.GroupInfoR\x06update\"J\n" +
+	"\x16GetFullJoinGroupIDsReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
+	"\aid_hash\x18\x02 \x01(\x04R\x06idHash\"\x85\x01\n" +
+	"\x17GetFullJoinGroupIDsResp\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\x04R\aversion\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12\x14\n" +
+	"\x05equal\x18\x03 \x01(\bR\x05equal\x12\x1b\n" +
+	"\tgroup_ids\x18\x04 \x03(\tR\bgroupIds\"\x8c\x01\n" +
+	"\x1dGetIncrementalGroupMembersReq\x12\x19\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x03 \x01(\tR\tversionId\x12\x18\n" +
+	"\aversion\x18\x04 \x01(\x04R\aversion\"\xb8\x02\n" +
+	"\x1eGetIncrementalGroupMembersResp\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\x04R\aversion\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12\x12\n" +
+	"\x04full\x18\x03 \x01(\bR\x04full\x12\x16\n" +
+	"\x06delete\x18\x04 \x03(\tR\x06delete\x122\n" +
+	"\x06insert\x18\x05 \x03(\v2\x1a.group.GroupMemberFullInfoR\x06insert\x122\n" +
+	"\x06update\x18\x06 \x03(\v2\x1a.group.GroupMemberFullInfoR\x06update\x12&\n" +
+	"\x05group\x18\a \x01(\v2\x10.group.GroupInfoR\x05group\x12!\n" +
+	"\fsort_version\x18\b \x01(\x04R\vsortVersion\"{\n" +
+	"\"BatchGetIncrementalGroupMembersReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12<\n" +
+	"\x06groups\x18\x02 \x03(\v2$.group.GetIncrementalGroupMembersReqR\x06groups\"\xd7\x01\n" +
+	"#BatchGetIncrementalGroupMembersResp\x12N\n" +
+	"\x06groups\x18\x01 \x03(\v26.group.BatchGetIncrementalGroupMembersResp.GroupsEntryR\x06groups\x1a`\n" +
+	"\vGroupsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12;\n" +
+	"\x05value\x18\x02 \x01(\v2%.group.GetIncrementalGroupMembersRespR\x05value:\x028\x01\"R\n" +
+	"\x1cGetFullGroupMemberUserIDsReq\x12\x19\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x17\n" +
+	"\aid_hash\x18\x02 \x01(\x04R\x06idHash\"\x89\x01\n" +
+	"\x1dGetFullGroupMemberUserIDsResp\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\x04R\aversion\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12\x14\n" +
+	"\x05equal\x18\x03 \x01(\bR\x05equal\x12\x19\n" +
+	"\buser_ids\x18\x04 \x03(\tR\auserIds2\xb8\n" +
+	"\n" +
 	"\fGroupService\x12<\n" +
 	"\vCreateGroup\x12\x15.group.CreateGroupReq\x1a\x16.group.CreateGroupResp\x12?\n" +
 	"\fDismissGroup\x12\x16.group.DismissGroupReq\x1a\x17.group.DismissGroupResp\x12Q\n" +
@@ -1826,7 +2537,12 @@ const file_group_proto_rawDesc = "" +
 	"\tQuitGroup\x12\x13.group.QuitGroupReq\x1a\x14.group.QuitGroupResp\x12H\n" +
 	"\x0fGetGroupMembers\x12\x19.group.GetGroupMembersReq\x1a\x1a.group.GetGroupMembersResp\x12Z\n" +
 	"\x15GetGroupMemberUserIDs\x12\x1f.group.GetGroupMemberUserIDsReq\x1a .group.GetGroupMemberUserIDsResp\x12H\n" +
-	"\x0fGetJoinedGroups\x12\x19.group.GetJoinedGroupsReq\x1a\x1a.group.GetJoinedGroupsRespB*Z(github.com/lisuhang11/SuIM/proto/grouppbb\x06proto3"
+	"\x0fGetJoinedGroups\x12\x19.group.GetJoinedGroupsReq\x1a\x1a.group.GetJoinedGroupsResp\x12c\n" +
+	"\x18GetIncrementalJoinGroups\x12\".group.GetIncrementalJoinGroupsReq\x1a#.group.GetIncrementalJoinGroupsResp\x12T\n" +
+	"\x13GetFullJoinGroupIDs\x12\x1d.group.GetFullJoinGroupIDsReq\x1a\x1e.group.GetFullJoinGroupIDsResp\x12i\n" +
+	"\x1aGetIncrementalGroupMembers\x12$.group.GetIncrementalGroupMembersReq\x1a%.group.GetIncrementalGroupMembersResp\x12x\n" +
+	"\x1fBatchGetIncrementalGroupMembers\x12).group.BatchGetIncrementalGroupMembersReq\x1a*.group.BatchGetIncrementalGroupMembersResp\x12f\n" +
+	"\x19GetFullGroupMemberUserIDs\x12#.group.GetFullGroupMemberUserIDsReq\x1a$.group.GetFullGroupMemberUserIDsRespB*Z(github.com/lisuhang11/SuIM/proto/grouppbb\x06proto3"
 
 var (
 	file_group_proto_rawDescOnce sync.Once
@@ -1840,33 +2556,44 @@ func file_group_proto_rawDescGZIP() []byte {
 	return file_group_proto_rawDescData
 }
 
-var file_group_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_group_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_group_proto_goTypes = []any{
-	(*GroupInfo)(nil),                 // 0: group.GroupInfo
-	(*GroupMemberFullInfo)(nil),       // 1: group.GroupMemberFullInfo
-	(*GroupRequestInfo)(nil),          // 2: group.GroupRequestInfo
-	(*CreateGroupReq)(nil),            // 3: group.CreateGroupReq
-	(*CreateGroupResp)(nil),           // 4: group.CreateGroupResp
-	(*DismissGroupReq)(nil),           // 5: group.DismissGroupReq
-	(*DismissGroupResp)(nil),          // 6: group.DismissGroupResp
-	(*TransferGroupOwnerReq)(nil),     // 7: group.TransferGroupOwnerReq
-	(*TransferGroupOwnerResp)(nil),    // 8: group.TransferGroupOwnerResp
-	(*UpdateGroupInfoReq)(nil),        // 9: group.UpdateGroupInfoReq
-	(*UpdateGroupInfoResp)(nil),       // 10: group.UpdateGroupInfoResp
-	(*GetGroupsInfoReq)(nil),          // 11: group.GetGroupsInfoReq
-	(*GetGroupsInfoResp)(nil),         // 12: group.GetGroupsInfoResp
-	(*InviteUserToGroupReq)(nil),      // 13: group.InviteUserToGroupReq
-	(*InviteUserToGroupResp)(nil),     // 14: group.InviteUserToGroupResp
-	(*KickGroupMemberReq)(nil),        // 15: group.KickGroupMemberReq
-	(*KickGroupMemberResp)(nil),       // 16: group.KickGroupMemberResp
-	(*QuitGroupReq)(nil),              // 17: group.QuitGroupReq
-	(*QuitGroupResp)(nil),             // 18: group.QuitGroupResp
-	(*GetGroupMembersReq)(nil),        // 19: group.GetGroupMembersReq
-	(*GetGroupMembersResp)(nil),       // 20: group.GetGroupMembersResp
-	(*GetGroupMemberUserIDsReq)(nil),  // 21: group.GetGroupMemberUserIDsReq
-	(*GetGroupMemberUserIDsResp)(nil), // 22: group.GetGroupMemberUserIDsResp
-	(*GetJoinedGroupsReq)(nil),        // 23: group.GetJoinedGroupsReq
-	(*GetJoinedGroupsResp)(nil),       // 24: group.GetJoinedGroupsResp
+	(*GroupInfo)(nil),                           // 0: group.GroupInfo
+	(*GroupMemberFullInfo)(nil),                 // 1: group.GroupMemberFullInfo
+	(*GroupRequestInfo)(nil),                    // 2: group.GroupRequestInfo
+	(*CreateGroupReq)(nil),                      // 3: group.CreateGroupReq
+	(*CreateGroupResp)(nil),                     // 4: group.CreateGroupResp
+	(*DismissGroupReq)(nil),                     // 5: group.DismissGroupReq
+	(*DismissGroupResp)(nil),                    // 6: group.DismissGroupResp
+	(*TransferGroupOwnerReq)(nil),               // 7: group.TransferGroupOwnerReq
+	(*TransferGroupOwnerResp)(nil),              // 8: group.TransferGroupOwnerResp
+	(*UpdateGroupInfoReq)(nil),                  // 9: group.UpdateGroupInfoReq
+	(*UpdateGroupInfoResp)(nil),                 // 10: group.UpdateGroupInfoResp
+	(*GetGroupsInfoReq)(nil),                    // 11: group.GetGroupsInfoReq
+	(*GetGroupsInfoResp)(nil),                   // 12: group.GetGroupsInfoResp
+	(*InviteUserToGroupReq)(nil),                // 13: group.InviteUserToGroupReq
+	(*InviteUserToGroupResp)(nil),               // 14: group.InviteUserToGroupResp
+	(*KickGroupMemberReq)(nil),                  // 15: group.KickGroupMemberReq
+	(*KickGroupMemberResp)(nil),                 // 16: group.KickGroupMemberResp
+	(*QuitGroupReq)(nil),                        // 17: group.QuitGroupReq
+	(*QuitGroupResp)(nil),                       // 18: group.QuitGroupResp
+	(*GetGroupMembersReq)(nil),                  // 19: group.GetGroupMembersReq
+	(*GetGroupMembersResp)(nil),                 // 20: group.GetGroupMembersResp
+	(*GetGroupMemberUserIDsReq)(nil),            // 21: group.GetGroupMemberUserIDsReq
+	(*GetGroupMemberUserIDsResp)(nil),           // 22: group.GetGroupMemberUserIDsResp
+	(*GetJoinedGroupsReq)(nil),                  // 23: group.GetJoinedGroupsReq
+	(*GetJoinedGroupsResp)(nil),                 // 24: group.GetJoinedGroupsResp
+	(*GetIncrementalJoinGroupsReq)(nil),         // 25: group.GetIncrementalJoinGroupsReq
+	(*GetIncrementalJoinGroupsResp)(nil),        // 26: group.GetIncrementalJoinGroupsResp
+	(*GetFullJoinGroupIDsReq)(nil),              // 27: group.GetFullJoinGroupIDsReq
+	(*GetFullJoinGroupIDsResp)(nil),             // 28: group.GetFullJoinGroupIDsResp
+	(*GetIncrementalGroupMembersReq)(nil),       // 29: group.GetIncrementalGroupMembersReq
+	(*GetIncrementalGroupMembersResp)(nil),      // 30: group.GetIncrementalGroupMembersResp
+	(*BatchGetIncrementalGroupMembersReq)(nil),  // 31: group.BatchGetIncrementalGroupMembersReq
+	(*BatchGetIncrementalGroupMembersResp)(nil), // 32: group.BatchGetIncrementalGroupMembersResp
+	(*GetFullGroupMemberUserIDsReq)(nil),        // 33: group.GetFullGroupMemberUserIDsReq
+	(*GetFullGroupMemberUserIDsResp)(nil),       // 34: group.GetFullGroupMemberUserIDsResp
+	nil,                                         // 35: group.BatchGetIncrementalGroupMembersResp.GroupsEntry
 }
 var file_group_proto_depIdxs = []int32{
 	0,  // 0: group.CreateGroupResp.group:type_name -> group.GroupInfo
@@ -1874,33 +2601,51 @@ var file_group_proto_depIdxs = []int32{
 	0,  // 2: group.GetGroupsInfoResp.groups:type_name -> group.GroupInfo
 	1,  // 3: group.GetGroupMembersResp.members:type_name -> group.GroupMemberFullInfo
 	0,  // 4: group.GetJoinedGroupsResp.groups:type_name -> group.GroupInfo
-	3,  // 5: group.GroupService.CreateGroup:input_type -> group.CreateGroupReq
-	5,  // 6: group.GroupService.DismissGroup:input_type -> group.DismissGroupReq
-	7,  // 7: group.GroupService.TransferGroupOwner:input_type -> group.TransferGroupOwnerReq
-	9,  // 8: group.GroupService.UpdateGroupInfo:input_type -> group.UpdateGroupInfoReq
-	11, // 9: group.GroupService.GetGroupsInfo:input_type -> group.GetGroupsInfoReq
-	13, // 10: group.GroupService.InviteUserToGroup:input_type -> group.InviteUserToGroupReq
-	15, // 11: group.GroupService.KickGroupMember:input_type -> group.KickGroupMemberReq
-	17, // 12: group.GroupService.QuitGroup:input_type -> group.QuitGroupReq
-	19, // 13: group.GroupService.GetGroupMembers:input_type -> group.GetGroupMembersReq
-	21, // 14: group.GroupService.GetGroupMemberUserIDs:input_type -> group.GetGroupMemberUserIDsReq
-	23, // 15: group.GroupService.GetJoinedGroups:input_type -> group.GetJoinedGroupsReq
-	4,  // 16: group.GroupService.CreateGroup:output_type -> group.CreateGroupResp
-	6,  // 17: group.GroupService.DismissGroup:output_type -> group.DismissGroupResp
-	8,  // 18: group.GroupService.TransferGroupOwner:output_type -> group.TransferGroupOwnerResp
-	10, // 19: group.GroupService.UpdateGroupInfo:output_type -> group.UpdateGroupInfoResp
-	12, // 20: group.GroupService.GetGroupsInfo:output_type -> group.GetGroupsInfoResp
-	14, // 21: group.GroupService.InviteUserToGroup:output_type -> group.InviteUserToGroupResp
-	16, // 22: group.GroupService.KickGroupMember:output_type -> group.KickGroupMemberResp
-	18, // 23: group.GroupService.QuitGroup:output_type -> group.QuitGroupResp
-	20, // 24: group.GroupService.GetGroupMembers:output_type -> group.GetGroupMembersResp
-	22, // 25: group.GroupService.GetGroupMemberUserIDs:output_type -> group.GetGroupMemberUserIDsResp
-	24, // 26: group.GroupService.GetJoinedGroups:output_type -> group.GetJoinedGroupsResp
-	16, // [16:27] is the sub-list for method output_type
-	5,  // [5:16] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	0,  // 5: group.GetIncrementalJoinGroupsResp.insert:type_name -> group.GroupInfo
+	0,  // 6: group.GetIncrementalJoinGroupsResp.update:type_name -> group.GroupInfo
+	1,  // 7: group.GetIncrementalGroupMembersResp.insert:type_name -> group.GroupMemberFullInfo
+	1,  // 8: group.GetIncrementalGroupMembersResp.update:type_name -> group.GroupMemberFullInfo
+	0,  // 9: group.GetIncrementalGroupMembersResp.group:type_name -> group.GroupInfo
+	29, // 10: group.BatchGetIncrementalGroupMembersReq.groups:type_name -> group.GetIncrementalGroupMembersReq
+	35, // 11: group.BatchGetIncrementalGroupMembersResp.groups:type_name -> group.BatchGetIncrementalGroupMembersResp.GroupsEntry
+	30, // 12: group.BatchGetIncrementalGroupMembersResp.GroupsEntry.value:type_name -> group.GetIncrementalGroupMembersResp
+	3,  // 13: group.GroupService.CreateGroup:input_type -> group.CreateGroupReq
+	5,  // 14: group.GroupService.DismissGroup:input_type -> group.DismissGroupReq
+	7,  // 15: group.GroupService.TransferGroupOwner:input_type -> group.TransferGroupOwnerReq
+	9,  // 16: group.GroupService.UpdateGroupInfo:input_type -> group.UpdateGroupInfoReq
+	11, // 17: group.GroupService.GetGroupsInfo:input_type -> group.GetGroupsInfoReq
+	13, // 18: group.GroupService.InviteUserToGroup:input_type -> group.InviteUserToGroupReq
+	15, // 19: group.GroupService.KickGroupMember:input_type -> group.KickGroupMemberReq
+	17, // 20: group.GroupService.QuitGroup:input_type -> group.QuitGroupReq
+	19, // 21: group.GroupService.GetGroupMembers:input_type -> group.GetGroupMembersReq
+	21, // 22: group.GroupService.GetGroupMemberUserIDs:input_type -> group.GetGroupMemberUserIDsReq
+	23, // 23: group.GroupService.GetJoinedGroups:input_type -> group.GetJoinedGroupsReq
+	25, // 24: group.GroupService.GetIncrementalJoinGroups:input_type -> group.GetIncrementalJoinGroupsReq
+	27, // 25: group.GroupService.GetFullJoinGroupIDs:input_type -> group.GetFullJoinGroupIDsReq
+	29, // 26: group.GroupService.GetIncrementalGroupMembers:input_type -> group.GetIncrementalGroupMembersReq
+	31, // 27: group.GroupService.BatchGetIncrementalGroupMembers:input_type -> group.BatchGetIncrementalGroupMembersReq
+	33, // 28: group.GroupService.GetFullGroupMemberUserIDs:input_type -> group.GetFullGroupMemberUserIDsReq
+	4,  // 29: group.GroupService.CreateGroup:output_type -> group.CreateGroupResp
+	6,  // 30: group.GroupService.DismissGroup:output_type -> group.DismissGroupResp
+	8,  // 31: group.GroupService.TransferGroupOwner:output_type -> group.TransferGroupOwnerResp
+	10, // 32: group.GroupService.UpdateGroupInfo:output_type -> group.UpdateGroupInfoResp
+	12, // 33: group.GroupService.GetGroupsInfo:output_type -> group.GetGroupsInfoResp
+	14, // 34: group.GroupService.InviteUserToGroup:output_type -> group.InviteUserToGroupResp
+	16, // 35: group.GroupService.KickGroupMember:output_type -> group.KickGroupMemberResp
+	18, // 36: group.GroupService.QuitGroup:output_type -> group.QuitGroupResp
+	20, // 37: group.GroupService.GetGroupMembers:output_type -> group.GetGroupMembersResp
+	22, // 38: group.GroupService.GetGroupMemberUserIDs:output_type -> group.GetGroupMemberUserIDsResp
+	24, // 39: group.GroupService.GetJoinedGroups:output_type -> group.GetJoinedGroupsResp
+	26, // 40: group.GroupService.GetIncrementalJoinGroups:output_type -> group.GetIncrementalJoinGroupsResp
+	28, // 41: group.GroupService.GetFullJoinGroupIDs:output_type -> group.GetFullJoinGroupIDsResp
+	30, // 42: group.GroupService.GetIncrementalGroupMembers:output_type -> group.GetIncrementalGroupMembersResp
+	32, // 43: group.GroupService.BatchGetIncrementalGroupMembers:output_type -> group.BatchGetIncrementalGroupMembersResp
+	34, // 44: group.GroupService.GetFullGroupMemberUserIDs:output_type -> group.GetFullGroupMemberUserIDsResp
+	29, // [29:45] is the sub-list for method output_type
+	13, // [13:29] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_group_proto_init() }
@@ -1915,7 +2660,7 @@ func file_group_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_group_proto_rawDesc), len(file_group_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

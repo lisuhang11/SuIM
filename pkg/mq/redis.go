@@ -46,6 +46,7 @@ type RedisConsumer struct {
 	stream   string
 	group    string
 	consumer string
+	start    string
 }
 
 func NewRedisConsumer(rdb redis.UniversalClient, prefix, topic, group string) *RedisConsumer {
@@ -61,6 +62,14 @@ func NewRedisConsumer(rdb redis.UniversalClient, prefix, topic, group string) *R
 		stream:   streamName(prefix, topic),
 		group:    group,
 		consumer: fmt.Sprintf("%s-%d", host, os.Getpid()),
+	}
+}
+
+// ConsumeNew starts a new consumer group at the end of the stream.
+// A restarted process with the same group still receives messages it has not acked.
+func (c *RedisConsumer) ConsumeNew() {
+	if c != nil && c.start == "" {
+		c.start = "$"
 	}
 }
 
@@ -102,7 +111,11 @@ func (c *RedisConsumer) Subscribe(ctx context.Context, fn func(context.Context, 
 }
 
 func (c *RedisConsumer) ensureGroup(ctx context.Context) error {
-	err := c.rdb.XGroupCreateMkStream(ctx, c.stream, c.group, "0").Err()
+	start := c.start
+	if start == "" {
+		start = "0"
+	}
+	err := c.rdb.XGroupCreateMkStream(ctx, c.stream, c.group, start).Err()
 	if err == nil || strings.Contains(err.Error(), "BUSYGROUP") {
 		return nil
 	}

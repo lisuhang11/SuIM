@@ -1,0 +1,43 @@
+listenIP: 0.0.0.0
+registerIP: 127.0.0.1
+port: 8084
+signExpireSeconds: 86400
+
+# Part bytes are PUT to presigned MinIO URLs. signEndpoint is that public host.
+# Leave signEndpoint empty when clients can reach endpoint directly.
+minio:
+  endpoint: http://127.0.0.1:9000
+  signEndpoint: ""
+  bucket: suim
+  accessKey: minioadmin
+  secretKey: minioadmin
+
+mysql:
+  address:
+    - 127.0.0.1:3306
+  username: suim
+  password: ""
+  database: suim
+  maxOpenConn: 20
+  maxIdleConn: 10
+
+redis:
+  address:
+    - 127.0.0.1:6379
+  username: ""
+  password: ""
+  redisMode: standalone
+  db: 0
+  maxRetry: 3
+  poolSize: 10
+
+registry:
+  type: etcd
+  etcd:
+    endpoints:
+      - 127.0.0.1:2379
+    rootDir: /services
+    username: ""
+    password: ""
+    dialTimeout: 5
+    ttl: 10

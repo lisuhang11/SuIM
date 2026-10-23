@@ -76,7 +76,9 @@ func (t *Transfer) BatchInsertChat2Cache(ctx context.Context, conversationID str
 		for _, msg := range fresh {
 			seq++
 			msg.Seq = seq
-			msg.SendTime = sendTime
+			if msg.SendTime == 0 {
+				msg.SendTime = sendTime
+			}
 			if msg.ServerMsgId == "" {
 				msg.ServerMsgId, err = serverMsgID(conversationID, msg.ClientMsgId)
 				if err != nil {

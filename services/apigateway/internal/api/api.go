@@ -1,4 +1,4 @@
-// Package api is the HTTP entry in front of the user, relation, and group services.
+// Package api is the HTTP entry in front of the user, relation, group, and third services.
 //
 // Public:
 //
@@ -36,6 +36,13 @@
 //	POST /group/members
 //	POST /group/member_ids
 //	POST /group/joined
+//	POST /object/part_limit
+//	POST /object/initiate_multipart_upload
+//	POST /object/auth_sign
+//	POST /object/complete_multipart_upload
+//
+// Part bytes are PUT to the presigned MinIO URL returned by third.
+// This gateway does not receive the file body.
 //
 // Bodies and data use the protobuf JSON names, for example user_id.
 // Responses are {"code":0,"msg":"","data":{...}}. code 0 is success.
@@ -56,6 +63,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/proto/grouppb"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
+	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 	"github.com/lisuhang11/SuIM/proto/userpb"
 )
 
@@ -72,10 +80,11 @@ type Server struct {
 	users   userpb.UserServiceClient
 	friends relationpb.RelationServiceClient
 	groups  grouppb.GroupServiceClient
+	third   thirdpb.ThirdServiceClient
 }
 
-func New(users userpb.UserServiceClient, friends relationpb.RelationServiceClient, groups grouppb.GroupServiceClient) *Server {
-	return &Server{users: users, friends: friends, groups: groups}
+func New(users userpb.UserServiceClient, friends relationpb.RelationServiceClient, groups grouppb.GroupServiceClient, third thirdpb.ThirdServiceClient) *Server {
+	return &Server{users: users, friends: friends, groups: groups, third: third}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -114,6 +123,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /group/members", s.auth(s.getGroupMembers))
 	mux.HandleFunc("POST /group/member_ids", s.auth(s.getGroupMemberUserIDs))
 	mux.HandleFunc("POST /group/joined", s.auth(s.getJoinedGroups))
+
+	mux.HandleFunc("POST /object/part_limit", s.auth(s.partLimit))
+	mux.HandleFunc("POST /object/initiate_multipart_upload", s.auth(s.initiateMultipartUpload))
+	mux.HandleFunc("POST /object/auth_sign", s.auth(s.authSign))
+	mux.HandleFunc("POST /object/complete_multipart_upload", s.auth(s.completeMultipartUpload))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, code: http.StatusOK}
@@ -163,6 +177,15 @@ func tokenFrom(r *http.Request) string {
 func current(r *http.Request) session {
 	v, _ := r.Context().Value(ctxKey{}).(session)
 	return v
+}
+
+func (s *Server) actor(w http.ResponseWriter, r *http.Request, id string) (string, bool) {
+	self := current(r).userID
+	if id != "" && id != self {
+		writeErr(w, errorcode.ErrNoPermission)
+		return "", false
+	}
+	return self, true
 }
 
 func (s *Server) requireSelf(w http.ResponseWriter, r *http.Request, id string) bool {

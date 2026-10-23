@@ -48,3 +48,100 @@ message PushMsgData {
   MsgData msg_data = 1;
   string conversation_id = 2;
 }
+
+// PullMsgs is one conversation page inside a websocket push or pull response.
+message PullMsgs {
+  repeated MsgData msgs = 1;
+  bool is_end = 2;
+  int64 end_seq = 3;
+}
+
+// PushMessages is the body of websocket push, pull, and seq-list responses.
+message PushMessages {
+  map<string, PullMsgs> msgs = 1;
+  map<string, PullMsgs> notification_msgs = 2;
+}
+
+message SendMsgResp {
+  string server_msg_id = 1;
+  string client_msg_id = 2;
+  int64 send_time = 3;
+}
+
+message GetMaxSeqReq {
+  string user_id = 1;
+}
+
+message GetMaxSeqResp {
+  map<string, int64> max_seqs = 1;
+  map<string, int64> min_seqs = 2;
+}
+
+message SeqRange {
+  string conversation_id = 1;
+  int64 begin = 2;
+  int64 end = 3;
+  int64 num = 4;
+}
+
+message PullMessageBySeqsReq {
+  string user_id = 1;
+  repeated SeqRange seq_ranges = 2;
+  int32 order = 3;
+}
+
+message Seqs {
+  int64 max_seq = 1;
+  int64 has_read_seq = 2;
+  int64 max_seq_time = 3;
+}
+
+message GetConversationsHasReadAndMaxSeqReq {
+  string user_id = 1;
+  repeated string conversation_ids = 2;
+  bool return_pinned = 3;
+}
+
+message GetConversationsHasReadAndMaxSeqResp {
+  map<string, Seqs> seqs = 1;
+  repeated string pinned_conversation_ids = 2;
+}
+
+message ConversationSeqs {
+  string conversation_id = 2;
+  repeated int64 seqs = 3;
+}
+
+message GetSeqMessageReq {
+  string user_id = 1;
+  repeated ConversationSeqs conversations = 2;
+  int32 order = 3;
+}
+
+message GetLastMessageReq {
+  string user_id = 1;
+  repeated string conversation_ids = 2;
+}
+
+message GetLastMessageResp {
+  map<string, MsgData> msgs = 1;
+}
+
+message SetAppBackgroundStatusReq {
+  string user_id = 1;
+  bool is_background = 2;
+}
+
+message SubUserOnlineStatus {
+  repeated string subscribe_user_id = 1;
+  repeated string unsubscribe_user_id = 2;
+}
+
+message SubUserOnlineStatusElem {
+  string user_id = 1;
+  repeated int32 online_platform_ids = 2;
+}
+
+message SubUserOnlineStatusTips {
+  repeated SubUserOnlineStatusElem subscribers = 1;
+}

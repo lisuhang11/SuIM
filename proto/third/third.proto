@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package third;
+
+option go_package = "github.com/lisuhang11/SuIM/proto/third;thirdpb";
+
+// ThirdService accepts multipart uploads.
+//
+//  1. PartLimit returns the slice limits. The client cuts the file and
+//     hashes each part. hash is MD5(partMD5s joined by ",").
+//  2. InitiateMultipartUpload opens a session and returns signed PUT URLs.
+//     When hash is already stored, url is set and upload is empty.
+//  3. The client PUTs part bytes to those URLs. The URLs are presigned
+//     MinIO addresses, not this service and not the API gateway.
+//  4. AuthSign returns more part URLs for the same upload_id.
+//  5. CompleteMultipartUpload checks the part hashes, merges the file,
+//     and returns url (url_prefix + name).
+//
+// Download is not part of this service. Callers store url and resolve it later.
+service ThirdService {
+  rpc PartLimit(PartLimitReq) returns (PartLimitResp);
+  rpc InitiateMultipartUpload(InitiateMultipartUploadReq) returns (InitiateMultipartUploadResp);
+  rpc AuthSign(AuthSignReq) returns (AuthSignResp);
+  rpc CompleteMultipartUpload(CompleteMultipartUploadReq) returns (CompleteMultipartUploadResp);
+}
+
+// KeyValues is one signed-request header or query key.
+message KeyValues {
+  string key = 1 [json_name = "key"];
+  repeated string values = 2 [json_name = "values"];
+}
+
+// SignPart is the PUT target for one part.
+message SignPart {
+  int32 part_number = 1 [json_name = "part_number"];
+  string url = 2 [json_name = "url"];
+  repeated KeyValues query = 3 [json_name = "query"];
+  repeated KeyValues header = 4 [json_name = "header"];
+}
+
+// AuthSignParts is a batch of part PUT URLs.
+message AuthSignParts {
+  string url = 1 [json_name = "url"];
+  repeated KeyValues query = 2 [json_name = "query"];
+  repeated KeyValues header = 3 [json_name = "header"];
+  repeated SignPart parts = 4 [json_name = "parts"];
+}
+
+message PartLimitReq {}
+
+message PartLimitResp {
+  int64 min_part_size = 1 [json_name = "min_part_size"];
+  int64 max_part_size = 2 [json_name = "max_part_size"];
+  int32 max_num_size = 3 [json_name = "max_num_size"];
+}
+
+message InitiateMultipartUploadReq {
+  // user_id is the token user. The gateway overwrites it.
+  string user_id = 1 [json_name = "user_id"];
+  string hash = 2 [json_name = "hash"];
+  int64 size = 3 [json_name = "size"];
+  // part_size is optional. When set it must match the server plan.
+  int64 part_size = 4 [json_name = "part_size"];
+  // max_parts is how many leading part URLs to return. Zero means 20.
+  int32 max_parts = 5 [json_name = "max_parts"];
+  string cause = 6 [json_name = "cause"];
+  string name = 7 [json_name = "name"];
+  string content_type = 8 [json_name = "content_type"];
+  string url_prefix = 9 [json_name = "url_prefix"];
+}
+
+message UploadInfo {
+  string upload_id = 1 [json_name = "upload_id"];
+  int64 part_size = 2 [json_name = "part_size"];
+  AuthSignParts sign = 3 [json_name = "sign"];
+  // expire_time is Unix milliseconds.
+  int64 expire_time = 4 [json_name = "expire_time"];
+}
+
+message InitiateMultipartUploadResp {
+  string url = 1 [json_name = "url"];
+  UploadInfo upload = 2 [json_name = "upload"];
+}
+
+message AuthSignReq {
+  string user_id = 1 [json_name = "user_id"];
+  string upload_id = 2 [json_name = "upload_id"];
+  repeated int32 part_numbers = 3 [json_name = "part_numbers"];
+}
+
+message AuthSignResp {
+  string url = 1 [json_name = "url"];
+  repeated KeyValues query = 2 [json_name = "query"];
+  repeated KeyValues header = 3 [json_name = "header"];
+  repeated SignPart parts = 4 [json_name = "parts"];
+}
+
+message CompleteMultipartUploadReq {
+  string user_id = 1 [json_name = "user_id"];
+  string upload_id = 2 [json_name = "upload_id"];
+  // parts are the lowercase MD5 hex of each part, in order.
+  repeated string parts = 3 [json_name = "parts"];
+  string name = 4 [json_name = "name"];
+  string content_type = 5 [json_name = "content_type"];
+  string cause = 6 [json_name = "cause"];
+  string url_prefix = 7 [json_name = "url_prefix"];
+}
+
+message CompleteMultipartUploadResp {
+  string url = 1 [json_name = "url"];
+}

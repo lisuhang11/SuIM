@@ -401,6 +401,984 @@ func (x *PushMsgData) GetConversationId() string {
 	return ""
 }
 
+// PullMsgs is one conversation page inside a websocket push or pull response.
+type PullMsgs struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Msgs          []*MsgData             `protobuf:"bytes,1,rep,name=msgs,proto3" json:"msgs,omitempty"`
+	IsEnd         bool                   `protobuf:"varint,2,opt,name=is_end,json=isEnd,proto3" json:"is_end,omitempty"`
+	EndSeq        int64                  `protobuf:"varint,3,opt,name=end_seq,json=endSeq,proto3" json:"end_seq,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PullMsgs) Reset() {
+	*x = PullMsgs{}
+	mi := &file_msg_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PullMsgs) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullMsgs) ProtoMessage() {}
+
+func (x *PullMsgs) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullMsgs.ProtoReflect.Descriptor instead.
+func (*PullMsgs) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *PullMsgs) GetMsgs() []*MsgData {
+	if x != nil {
+		return x.Msgs
+	}
+	return nil
+}
+
+func (x *PullMsgs) GetIsEnd() bool {
+	if x != nil {
+		return x.IsEnd
+	}
+	return false
+}
+
+func (x *PullMsgs) GetEndSeq() int64 {
+	if x != nil {
+		return x.EndSeq
+	}
+	return 0
+}
+
+// PushMessages is the body of websocket push, pull, and seq-list responses.
+type PushMessages struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Msgs             map[string]*PullMsgs   `protobuf:"bytes,1,rep,name=msgs,proto3" json:"msgs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	NotificationMsgs map[string]*PullMsgs   `protobuf:"bytes,2,rep,name=notification_msgs,json=notificationMsgs,proto3" json:"notification_msgs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *PushMessages) Reset() {
+	*x = PushMessages{}
+	mi := &file_msg_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PushMessages) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PushMessages) ProtoMessage() {}
+
+func (x *PushMessages) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PushMessages.ProtoReflect.Descriptor instead.
+func (*PushMessages) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *PushMessages) GetMsgs() map[string]*PullMsgs {
+	if x != nil {
+		return x.Msgs
+	}
+	return nil
+}
+
+func (x *PushMessages) GetNotificationMsgs() map[string]*PullMsgs {
+	if x != nil {
+		return x.NotificationMsgs
+	}
+	return nil
+}
+
+type SendMsgResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ServerMsgId   string                 `protobuf:"bytes,1,opt,name=server_msg_id,json=serverMsgId,proto3" json:"server_msg_id,omitempty"`
+	ClientMsgId   string                 `protobuf:"bytes,2,opt,name=client_msg_id,json=clientMsgId,proto3" json:"client_msg_id,omitempty"`
+	SendTime      int64                  `protobuf:"varint,3,opt,name=send_time,json=sendTime,proto3" json:"send_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendMsgResp) Reset() {
+	*x = SendMsgResp{}
+	mi := &file_msg_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendMsgResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendMsgResp) ProtoMessage() {}
+
+func (x *SendMsgResp) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendMsgResp.ProtoReflect.Descriptor instead.
+func (*SendMsgResp) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SendMsgResp) GetServerMsgId() string {
+	if x != nil {
+		return x.ServerMsgId
+	}
+	return ""
+}
+
+func (x *SendMsgResp) GetClientMsgId() string {
+	if x != nil {
+		return x.ClientMsgId
+	}
+	return ""
+}
+
+func (x *SendMsgResp) GetSendTime() int64 {
+	if x != nil {
+		return x.SendTime
+	}
+	return 0
+}
+
+type GetMaxSeqReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMaxSeqReq) Reset() {
+	*x = GetMaxSeqReq{}
+	mi := &file_msg_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMaxSeqReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMaxSeqReq) ProtoMessage() {}
+
+func (x *GetMaxSeqReq) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMaxSeqReq.ProtoReflect.Descriptor instead.
+func (*GetMaxSeqReq) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetMaxSeqReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type GetMaxSeqResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MaxSeqs       map[string]int64       `protobuf:"bytes,1,rep,name=max_seqs,json=maxSeqs,proto3" json:"max_seqs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	MinSeqs       map[string]int64       `protobuf:"bytes,2,rep,name=min_seqs,json=minSeqs,proto3" json:"min_seqs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMaxSeqResp) Reset() {
+	*x = GetMaxSeqResp{}
+	mi := &file_msg_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMaxSeqResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMaxSeqResp) ProtoMessage() {}
+
+func (x *GetMaxSeqResp) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMaxSeqResp.ProtoReflect.Descriptor instead.
+func (*GetMaxSeqResp) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetMaxSeqResp) GetMaxSeqs() map[string]int64 {
+	if x != nil {
+		return x.MaxSeqs
+	}
+	return nil
+}
+
+func (x *GetMaxSeqResp) GetMinSeqs() map[string]int64 {
+	if x != nil {
+		return x.MinSeqs
+	}
+	return nil
+}
+
+type SeqRange struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Begin          int64                  `protobuf:"varint,2,opt,name=begin,proto3" json:"begin,omitempty"`
+	End            int64                  `protobuf:"varint,3,opt,name=end,proto3" json:"end,omitempty"`
+	Num            int64                  `protobuf:"varint,4,opt,name=num,proto3" json:"num,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SeqRange) Reset() {
+	*x = SeqRange{}
+	mi := &file_msg_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SeqRange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SeqRange) ProtoMessage() {}
+
+func (x *SeqRange) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SeqRange.ProtoReflect.Descriptor instead.
+func (*SeqRange) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SeqRange) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *SeqRange) GetBegin() int64 {
+	if x != nil {
+		return x.Begin
+	}
+	return 0
+}
+
+func (x *SeqRange) GetEnd() int64 {
+	if x != nil {
+		return x.End
+	}
+	return 0
+}
+
+func (x *SeqRange) GetNum() int64 {
+	if x != nil {
+		return x.Num
+	}
+	return 0
+}
+
+type PullMessageBySeqsReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	SeqRanges     []*SeqRange            `protobuf:"bytes,2,rep,name=seq_ranges,json=seqRanges,proto3" json:"seq_ranges,omitempty"`
+	Order         int32                  `protobuf:"varint,3,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PullMessageBySeqsReq) Reset() {
+	*x = PullMessageBySeqsReq{}
+	mi := &file_msg_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PullMessageBySeqsReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullMessageBySeqsReq) ProtoMessage() {}
+
+func (x *PullMessageBySeqsReq) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullMessageBySeqsReq.ProtoReflect.Descriptor instead.
+func (*PullMessageBySeqsReq) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *PullMessageBySeqsReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *PullMessageBySeqsReq) GetSeqRanges() []*SeqRange {
+	if x != nil {
+		return x.SeqRanges
+	}
+	return nil
+}
+
+func (x *PullMessageBySeqsReq) GetOrder() int32 {
+	if x != nil {
+		return x.Order
+	}
+	return 0
+}
+
+type Seqs struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MaxSeq        int64                  `protobuf:"varint,1,opt,name=max_seq,json=maxSeq,proto3" json:"max_seq,omitempty"`
+	HasReadSeq    int64                  `protobuf:"varint,2,opt,name=has_read_seq,json=hasReadSeq,proto3" json:"has_read_seq,omitempty"`
+	MaxSeqTime    int64                  `protobuf:"varint,3,opt,name=max_seq_time,json=maxSeqTime,proto3" json:"max_seq_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Seqs) Reset() {
+	*x = Seqs{}
+	mi := &file_msg_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Seqs) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Seqs) ProtoMessage() {}
+
+func (x *Seqs) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Seqs.ProtoReflect.Descriptor instead.
+func (*Seqs) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *Seqs) GetMaxSeq() int64 {
+	if x != nil {
+		return x.MaxSeq
+	}
+	return 0
+}
+
+func (x *Seqs) GetHasReadSeq() int64 {
+	if x != nil {
+		return x.HasReadSeq
+	}
+	return 0
+}
+
+func (x *Seqs) GetMaxSeqTime() int64 {
+	if x != nil {
+		return x.MaxSeqTime
+	}
+	return 0
+}
+
+type GetConversationsHasReadAndMaxSeqReq struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	UserId          string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ConversationIds []string               `protobuf:"bytes,2,rep,name=conversation_ids,json=conversationIds,proto3" json:"conversation_ids,omitempty"`
+	ReturnPinned    bool                   `protobuf:"varint,3,opt,name=return_pinned,json=returnPinned,proto3" json:"return_pinned,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetConversationsHasReadAndMaxSeqReq) Reset() {
+	*x = GetConversationsHasReadAndMaxSeqReq{}
+	mi := &file_msg_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConversationsHasReadAndMaxSeqReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConversationsHasReadAndMaxSeqReq) ProtoMessage() {}
+
+func (x *GetConversationsHasReadAndMaxSeqReq) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConversationsHasReadAndMaxSeqReq.ProtoReflect.Descriptor instead.
+func (*GetConversationsHasReadAndMaxSeqReq) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetConversationsHasReadAndMaxSeqReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetConversationsHasReadAndMaxSeqReq) GetConversationIds() []string {
+	if x != nil {
+		return x.ConversationIds
+	}
+	return nil
+}
+
+func (x *GetConversationsHasReadAndMaxSeqReq) GetReturnPinned() bool {
+	if x != nil {
+		return x.ReturnPinned
+	}
+	return false
+}
+
+type GetConversationsHasReadAndMaxSeqResp struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Seqs                  map[string]*Seqs       `protobuf:"bytes,1,rep,name=seqs,proto3" json:"seqs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	PinnedConversationIds []string               `protobuf:"bytes,2,rep,name=pinned_conversation_ids,json=pinnedConversationIds,proto3" json:"pinned_conversation_ids,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *GetConversationsHasReadAndMaxSeqResp) Reset() {
+	*x = GetConversationsHasReadAndMaxSeqResp{}
+	mi := &file_msg_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConversationsHasReadAndMaxSeqResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConversationsHasReadAndMaxSeqResp) ProtoMessage() {}
+
+func (x *GetConversationsHasReadAndMaxSeqResp) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConversationsHasReadAndMaxSeqResp.ProtoReflect.Descriptor instead.
+func (*GetConversationsHasReadAndMaxSeqResp) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetConversationsHasReadAndMaxSeqResp) GetSeqs() map[string]*Seqs {
+	if x != nil {
+		return x.Seqs
+	}
+	return nil
+}
+
+func (x *GetConversationsHasReadAndMaxSeqResp) GetPinnedConversationIds() []string {
+	if x != nil {
+		return x.PinnedConversationIds
+	}
+	return nil
+}
+
+type ConversationSeqs struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Seqs           []int64                `protobuf:"varint,3,rep,packed,name=seqs,proto3" json:"seqs,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ConversationSeqs) Reset() {
+	*x = ConversationSeqs{}
+	mi := &file_msg_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationSeqs) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationSeqs) ProtoMessage() {}
+
+func (x *ConversationSeqs) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationSeqs.ProtoReflect.Descriptor instead.
+func (*ConversationSeqs) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ConversationSeqs) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ConversationSeqs) GetSeqs() []int64 {
+	if x != nil {
+		return x.Seqs
+	}
+	return nil
+}
+
+type GetSeqMessageReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Conversations []*ConversationSeqs    `protobuf:"bytes,2,rep,name=conversations,proto3" json:"conversations,omitempty"`
+	Order         int32                  `protobuf:"varint,3,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSeqMessageReq) Reset() {
+	*x = GetSeqMessageReq{}
+	mi := &file_msg_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSeqMessageReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSeqMessageReq) ProtoMessage() {}
+
+func (x *GetSeqMessageReq) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSeqMessageReq.ProtoReflect.Descriptor instead.
+func (*GetSeqMessageReq) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetSeqMessageReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetSeqMessageReq) GetConversations() []*ConversationSeqs {
+	if x != nil {
+		return x.Conversations
+	}
+	return nil
+}
+
+func (x *GetSeqMessageReq) GetOrder() int32 {
+	if x != nil {
+		return x.Order
+	}
+	return 0
+}
+
+type GetLastMessageReq struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	UserId          string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ConversationIds []string               `protobuf:"bytes,2,rep,name=conversation_ids,json=conversationIds,proto3" json:"conversation_ids,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetLastMessageReq) Reset() {
+	*x = GetLastMessageReq{}
+	mi := &file_msg_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetLastMessageReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLastMessageReq) ProtoMessage() {}
+
+func (x *GetLastMessageReq) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLastMessageReq.ProtoReflect.Descriptor instead.
+func (*GetLastMessageReq) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetLastMessageReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetLastMessageReq) GetConversationIds() []string {
+	if x != nil {
+		return x.ConversationIds
+	}
+	return nil
+}
+
+type GetLastMessageResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Msgs          map[string]*MsgData    `protobuf:"bytes,1,rep,name=msgs,proto3" json:"msgs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetLastMessageResp) Reset() {
+	*x = GetLastMessageResp{}
+	mi := &file_msg_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetLastMessageResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLastMessageResp) ProtoMessage() {}
+
+func (x *GetLastMessageResp) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLastMessageResp.ProtoReflect.Descriptor instead.
+func (*GetLastMessageResp) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetLastMessageResp) GetMsgs() map[string]*MsgData {
+	if x != nil {
+		return x.Msgs
+	}
+	return nil
+}
+
+type SetAppBackgroundStatusReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	IsBackground  bool                   `protobuf:"varint,2,opt,name=is_background,json=isBackground,proto3" json:"is_background,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetAppBackgroundStatusReq) Reset() {
+	*x = SetAppBackgroundStatusReq{}
+	mi := &file_msg_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetAppBackgroundStatusReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetAppBackgroundStatusReq) ProtoMessage() {}
+
+func (x *SetAppBackgroundStatusReq) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetAppBackgroundStatusReq.ProtoReflect.Descriptor instead.
+func (*SetAppBackgroundStatusReq) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SetAppBackgroundStatusReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *SetAppBackgroundStatusReq) GetIsBackground() bool {
+	if x != nil {
+		return x.IsBackground
+	}
+	return false
+}
+
+type SubUserOnlineStatus struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	SubscribeUserId   []string               `protobuf:"bytes,1,rep,name=subscribe_user_id,json=subscribeUserId,proto3" json:"subscribe_user_id,omitempty"`
+	UnsubscribeUserId []string               `protobuf:"bytes,2,rep,name=unsubscribe_user_id,json=unsubscribeUserId,proto3" json:"unsubscribe_user_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *SubUserOnlineStatus) Reset() {
+	*x = SubUserOnlineStatus{}
+	mi := &file_msg_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubUserOnlineStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubUserOnlineStatus) ProtoMessage() {}
+
+func (x *SubUserOnlineStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubUserOnlineStatus.ProtoReflect.Descriptor instead.
+func (*SubUserOnlineStatus) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SubUserOnlineStatus) GetSubscribeUserId() []string {
+	if x != nil {
+		return x.SubscribeUserId
+	}
+	return nil
+}
+
+func (x *SubUserOnlineStatus) GetUnsubscribeUserId() []string {
+	if x != nil {
+		return x.UnsubscribeUserId
+	}
+	return nil
+}
+
+type SubUserOnlineStatusElem struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	UserId            string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	OnlinePlatformIds []int32                `protobuf:"varint,2,rep,packed,name=online_platform_ids,json=onlinePlatformIds,proto3" json:"online_platform_ids,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *SubUserOnlineStatusElem) Reset() {
+	*x = SubUserOnlineStatusElem{}
+	mi := &file_msg_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubUserOnlineStatusElem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubUserOnlineStatusElem) ProtoMessage() {}
+
+func (x *SubUserOnlineStatusElem) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubUserOnlineStatusElem.ProtoReflect.Descriptor instead.
+func (*SubUserOnlineStatusElem) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SubUserOnlineStatusElem) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *SubUserOnlineStatusElem) GetOnlinePlatformIds() []int32 {
+	if x != nil {
+		return x.OnlinePlatformIds
+	}
+	return nil
+}
+
+type SubUserOnlineStatusTips struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Subscribers   []*SubUserOnlineStatusElem `protobuf:"bytes,1,rep,name=subscribers,proto3" json:"subscribers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubUserOnlineStatusTips) Reset() {
+	*x = SubUserOnlineStatusTips{}
+	mi := &file_msg_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubUserOnlineStatusTips) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubUserOnlineStatusTips) ProtoMessage() {}
+
+func (x *SubUserOnlineStatusTips) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubUserOnlineStatusTips.ProtoReflect.Descriptor instead.
+func (*SubUserOnlineStatusTips) Descriptor() ([]byte, []int) {
+	return file_msg_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *SubUserOnlineStatusTips) GetSubscribers() []*SubUserOnlineStatusElem {
+	if x != nil {
+		return x.Subscribers
+	}
+	return nil
+}
+
 var File_msg_proto protoreflect.FileDescriptor
 
 const file_msg_proto_rawDesc = "" +
@@ -444,7 +1422,87 @@ const file_msg_proto_rawDesc = "" +
 	"\blast_seq\x18\x03 \x01(\x03R\alastSeq\"_\n" +
 	"\vPushMsgData\x12'\n" +
 	"\bmsg_data\x18\x01 \x01(\v2\f.msg.MsgDataR\amsgData\x12'\n" +
-	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationIdB,Z*github.com/lisuhang11/SuIM/proto/msg;msgpbb\x06proto3"
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\"\\\n" +
+	"\bPullMsgs\x12 \n" +
+	"\x04msgs\x18\x01 \x03(\v2\f.msg.MsgDataR\x04msgs\x12\x15\n" +
+	"\x06is_end\x18\x02 \x01(\bR\x05isEnd\x12\x17\n" +
+	"\aend_seq\x18\x03 \x01(\x03R\x06endSeq\"\xb1\x02\n" +
+	"\fPushMessages\x12/\n" +
+	"\x04msgs\x18\x01 \x03(\v2\x1b.msg.PushMessages.MsgsEntryR\x04msgs\x12T\n" +
+	"\x11notification_msgs\x18\x02 \x03(\v2'.msg.PushMessages.NotificationMsgsEntryR\x10notificationMsgs\x1aF\n" +
+	"\tMsgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12#\n" +
+	"\x05value\x18\x02 \x01(\v2\r.msg.PullMsgsR\x05value:\x028\x01\x1aR\n" +
+	"\x15NotificationMsgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12#\n" +
+	"\x05value\x18\x02 \x01(\v2\r.msg.PullMsgsR\x05value:\x028\x01\"r\n" +
+	"\vSendMsgResp\x12\"\n" +
+	"\rserver_msg_id\x18\x01 \x01(\tR\vserverMsgId\x12\"\n" +
+	"\rclient_msg_id\x18\x02 \x01(\tR\vclientMsgId\x12\x1b\n" +
+	"\tsend_time\x18\x03 \x01(\x03R\bsendTime\"'\n" +
+	"\fGetMaxSeqReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xff\x01\n" +
+	"\rGetMaxSeqResp\x12:\n" +
+	"\bmax_seqs\x18\x01 \x03(\v2\x1f.msg.GetMaxSeqResp.MaxSeqsEntryR\amaxSeqs\x12:\n" +
+	"\bmin_seqs\x18\x02 \x03(\v2\x1f.msg.GetMaxSeqResp.MinSeqsEntryR\aminSeqs\x1a:\n" +
+	"\fMaxSeqsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\x1a:\n" +
+	"\fMinSeqsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"m\n" +
+	"\bSeqRange\x12'\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x14\n" +
+	"\x05begin\x18\x02 \x01(\x03R\x05begin\x12\x10\n" +
+	"\x03end\x18\x03 \x01(\x03R\x03end\x12\x10\n" +
+	"\x03num\x18\x04 \x01(\x03R\x03num\"s\n" +
+	"\x14PullMessageBySeqsReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12,\n" +
+	"\n" +
+	"seq_ranges\x18\x02 \x03(\v2\r.msg.SeqRangeR\tseqRanges\x12\x14\n" +
+	"\x05order\x18\x03 \x01(\x05R\x05order\"c\n" +
+	"\x04Seqs\x12\x17\n" +
+	"\amax_seq\x18\x01 \x01(\x03R\x06maxSeq\x12 \n" +
+	"\fhas_read_seq\x18\x02 \x01(\x03R\n" +
+	"hasReadSeq\x12 \n" +
+	"\fmax_seq_time\x18\x03 \x01(\x03R\n" +
+	"maxSeqTime\"\x8e\x01\n" +
+	"#GetConversationsHasReadAndMaxSeqReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12)\n" +
+	"\x10conversation_ids\x18\x02 \x03(\tR\x0fconversationIds\x12#\n" +
+	"\rreturn_pinned\x18\x03 \x01(\bR\freturnPinned\"\xeb\x01\n" +
+	"$GetConversationsHasReadAndMaxSeqResp\x12G\n" +
+	"\x04seqs\x18\x01 \x03(\v23.msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntryR\x04seqs\x126\n" +
+	"\x17pinned_conversation_ids\x18\x02 \x03(\tR\x15pinnedConversationIds\x1aB\n" +
+	"\tSeqsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1f\n" +
+	"\x05value\x18\x02 \x01(\v2\t.msg.SeqsR\x05value:\x028\x01\"O\n" +
+	"\x10ConversationSeqs\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x12\n" +
+	"\x04seqs\x18\x03 \x03(\x03R\x04seqs\"~\n" +
+	"\x10GetSeqMessageReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12;\n" +
+	"\rconversations\x18\x02 \x03(\v2\x15.msg.ConversationSeqsR\rconversations\x12\x14\n" +
+	"\x05order\x18\x03 \x01(\x05R\x05order\"W\n" +
+	"\x11GetLastMessageReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12)\n" +
+	"\x10conversation_ids\x18\x02 \x03(\tR\x0fconversationIds\"\x92\x01\n" +
+	"\x12GetLastMessageResp\x125\n" +
+	"\x04msgs\x18\x01 \x03(\v2!.msg.GetLastMessageResp.MsgsEntryR\x04msgs\x1aE\n" +
+	"\tMsgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\"\n" +
+	"\x05value\x18\x02 \x01(\v2\f.msg.MsgDataR\x05value:\x028\x01\"Y\n" +
+	"\x19SetAppBackgroundStatusReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12#\n" +
+	"\ris_background\x18\x02 \x01(\bR\fisBackground\"q\n" +
+	"\x13SubUserOnlineStatus\x12*\n" +
+	"\x11subscribe_user_id\x18\x01 \x03(\tR\x0fsubscribeUserId\x12.\n" +
+	"\x13unsubscribe_user_id\x18\x02 \x03(\tR\x11unsubscribeUserId\"b\n" +
+	"\x17SubUserOnlineStatusElem\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12.\n" +
+	"\x13online_platform_ids\x18\x02 \x03(\x05R\x11onlinePlatformIds\"Y\n" +
+	"\x17SubUserOnlineStatusTips\x12>\n" +
+	"\vsubscribers\x18\x01 \x03(\v2\x1c.msg.SubUserOnlineStatusElemR\vsubscribersB,Z*github.com/lisuhang11/SuIM/proto/msg;msgpbb\x06proto3"
 
 var (
 	file_msg_proto_rawDescOnce sync.Once
@@ -458,23 +1516,61 @@ func file_msg_proto_rawDescGZIP() []byte {
 	return file_msg_proto_rawDescData
 }
 
-var file_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_msg_proto_goTypes = []any{
-	(*MsgData)(nil),        // 0: msg.MsgData
-	(*TipsComm)(nil),       // 1: msg.TipsComm
-	(*MsgDataToMySQL)(nil), // 2: msg.MsgDataToMySQL
-	(*PushMsgData)(nil),    // 3: msg.PushMsgData
-	nil,                    // 4: msg.MsgData.OptionsEntry
+	(*MsgData)(nil),                              // 0: msg.MsgData
+	(*TipsComm)(nil),                             // 1: msg.TipsComm
+	(*MsgDataToMySQL)(nil),                       // 2: msg.MsgDataToMySQL
+	(*PushMsgData)(nil),                          // 3: msg.PushMsgData
+	(*PullMsgs)(nil),                             // 4: msg.PullMsgs
+	(*PushMessages)(nil),                         // 5: msg.PushMessages
+	(*SendMsgResp)(nil),                          // 6: msg.SendMsgResp
+	(*GetMaxSeqReq)(nil),                         // 7: msg.GetMaxSeqReq
+	(*GetMaxSeqResp)(nil),                        // 8: msg.GetMaxSeqResp
+	(*SeqRange)(nil),                             // 9: msg.SeqRange
+	(*PullMessageBySeqsReq)(nil),                 // 10: msg.PullMessageBySeqsReq
+	(*Seqs)(nil),                                 // 11: msg.Seqs
+	(*GetConversationsHasReadAndMaxSeqReq)(nil),  // 12: msg.GetConversationsHasReadAndMaxSeqReq
+	(*GetConversationsHasReadAndMaxSeqResp)(nil), // 13: msg.GetConversationsHasReadAndMaxSeqResp
+	(*ConversationSeqs)(nil),                     // 14: msg.ConversationSeqs
+	(*GetSeqMessageReq)(nil),                     // 15: msg.GetSeqMessageReq
+	(*GetLastMessageReq)(nil),                    // 16: msg.GetLastMessageReq
+	(*GetLastMessageResp)(nil),                   // 17: msg.GetLastMessageResp
+	(*SetAppBackgroundStatusReq)(nil),            // 18: msg.SetAppBackgroundStatusReq
+	(*SubUserOnlineStatus)(nil),                  // 19: msg.SubUserOnlineStatus
+	(*SubUserOnlineStatusElem)(nil),              // 20: msg.SubUserOnlineStatusElem
+	(*SubUserOnlineStatusTips)(nil),              // 21: msg.SubUserOnlineStatusTips
+	nil,                                          // 22: msg.MsgData.OptionsEntry
+	nil,                                          // 23: msg.PushMessages.MsgsEntry
+	nil,                                          // 24: msg.PushMessages.NotificationMsgsEntry
+	nil,                                          // 25: msg.GetMaxSeqResp.MaxSeqsEntry
+	nil,                                          // 26: msg.GetMaxSeqResp.MinSeqsEntry
+	nil,                                          // 27: msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
+	nil,                                          // 28: msg.GetLastMessageResp.MsgsEntry
 }
 var file_msg_proto_depIdxs = []int32{
-	4, // 0: msg.MsgData.options:type_name -> msg.MsgData.OptionsEntry
-	0, // 1: msg.MsgDataToMySQL.msg_data:type_name -> msg.MsgData
-	0, // 2: msg.PushMsgData.msg_data:type_name -> msg.MsgData
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	22, // 0: msg.MsgData.options:type_name -> msg.MsgData.OptionsEntry
+	0,  // 1: msg.MsgDataToMySQL.msg_data:type_name -> msg.MsgData
+	0,  // 2: msg.PushMsgData.msg_data:type_name -> msg.MsgData
+	0,  // 3: msg.PullMsgs.msgs:type_name -> msg.MsgData
+	23, // 4: msg.PushMessages.msgs:type_name -> msg.PushMessages.MsgsEntry
+	24, // 5: msg.PushMessages.notification_msgs:type_name -> msg.PushMessages.NotificationMsgsEntry
+	25, // 6: msg.GetMaxSeqResp.max_seqs:type_name -> msg.GetMaxSeqResp.MaxSeqsEntry
+	26, // 7: msg.GetMaxSeqResp.min_seqs:type_name -> msg.GetMaxSeqResp.MinSeqsEntry
+	9,  // 8: msg.PullMessageBySeqsReq.seq_ranges:type_name -> msg.SeqRange
+	27, // 9: msg.GetConversationsHasReadAndMaxSeqResp.seqs:type_name -> msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
+	14, // 10: msg.GetSeqMessageReq.conversations:type_name -> msg.ConversationSeqs
+	28, // 11: msg.GetLastMessageResp.msgs:type_name -> msg.GetLastMessageResp.MsgsEntry
+	20, // 12: msg.SubUserOnlineStatusTips.subscribers:type_name -> msg.SubUserOnlineStatusElem
+	4,  // 13: msg.PushMessages.MsgsEntry.value:type_name -> msg.PullMsgs
+	4,  // 14: msg.PushMessages.NotificationMsgsEntry.value:type_name -> msg.PullMsgs
+	11, // 15: msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry.value:type_name -> msg.Seqs
+	0,  // 16: msg.GetLastMessageResp.MsgsEntry.value:type_name -> msg.MsgData
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_msg_proto_init() }
@@ -488,7 +1584,7 @@ func file_msg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_msg_proto_rawDesc), len(file_msg_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

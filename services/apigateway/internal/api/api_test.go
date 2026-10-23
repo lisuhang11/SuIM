@@ -15,6 +15,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/proto/grouppb"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
+	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 	"github.com/lisuhang11/SuIM/proto/userpb"
 )
 
@@ -85,17 +86,35 @@ func (s *groupStub) CreateGroup(_ context.Context, req *grouppb.CreateGroupReq) 
 	return &grouppb.CreateGroupResp{GroupId: "g1"}, nil
 }
 
+type thirdStub struct {
+	thirdpb.UnimplementedThirdServiceServer
+	userID string
+}
+
+func (s *thirdStub) InitiateMultipartUpload(_ context.Context, req *thirdpb.InitiateMultipartUploadReq) (*thirdpb.InitiateMultipartUploadResp, error) {
+	s.userID = req.GetUserId()
+	return &thirdpb.InitiateMultipartUploadResp{Url: "https://cdn/" + req.GetName()}, nil
+}
+
 func TestGateway(t *testing.T) {
 	users := &userStub{}
 	friends := &relationStub{}
 	groups := &groupStub{}
+	uploads := &thirdStub{}
 	userLis := serve(t, func(gs *grpc.Server) { userpb.RegisterUserServiceServer(gs, users) })
 	relLis := serve(t, func(gs *grpc.Server) { relationpb.RegisterRelationServiceServer(gs, friends) })
 	groupLis := serve(t, func(gs *grpc.Server) { grouppb.RegisterGroupServiceServer(gs, groups) })
+	thirdLis := serve(t, func(gs *grpc.Server) { thirdpb.RegisterThirdServiceServer(gs, uploads) })
 	userConn := dial(t, userLis)
 	relConn := dial(t, relLis)
 	groupConn := dial(t, groupLis)
-	httpSrv := httptest.NewServer(New(userpb.NewUserServiceClient(userConn), relationpb.NewRelationServiceClient(relConn), grouppb.NewGroupServiceClient(groupConn)).Handler())
+	thirdConn := dial(t, thirdLis)
+	httpSrv := httptest.NewServer(New(
+		userpb.NewUserServiceClient(userConn),
+		relationpb.NewRelationServiceClient(relConn),
+		grouppb.NewGroupServiceClient(groupConn),
+		thirdpb.NewThirdServiceClient(thirdConn),
+	).Handler())
 	t.Cleanup(httpSrv.Close)
 
 	res := post(t, httpSrv.URL+"/user/register", "", `{"username":"Ada","email":"a@b.c","password":"secret1"}`)
@@ -155,6 +174,18 @@ func TestGateway(t *testing.T) {
 	res = post(t, httpSrv.URL+"/group/create", "good", `{"creator_user_id":"u1","group_name":"g","group_type":2}`)
 	if res.Status != http.StatusOK || groups.creator != "u1" {
 		t.Fatalf("create %+v creator=%s", res, groups.creator)
+	}
+	res = post(t, httpSrv.URL+"/object/initiate_multipart_upload", "", `{"name":"u1/a.bin","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1}`)
+	if res.Status != http.StatusUnauthorized || res.Code != int32(errorcode.TokenRequired) {
+		t.Fatalf("upload missing token %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/object/initiate_multipart_upload", "good", `{"user_id":"u2","name":"u1/a.bin","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("upload as other %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/object/initiate_multipart_upload", "good", `{"name":"u1/a.bin","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1}`)
+	if res.Status != http.StatusOK || uploads.userID != "u1" || !bytes.Contains(res.Data, []byte(`"url":"https://cdn/u1/a.bin"`)) {
+		t.Fatalf("upload %+v user=%s", res, uploads.userID)
 	}
 	res = post(t, httpSrv.URL+"/user/login", "", `{`)
 	if res.Status != http.StatusBadRequest || res.Code != int32(errorcode.InvalidJSON) {

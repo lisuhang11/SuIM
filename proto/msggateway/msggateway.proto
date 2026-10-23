@@ -1,5 +1,30 @@
+syntax = "proto3";
 
+package msggateway;
 
+option go_package = "github.com/lisuhang11/SuIM/proto/msggateway;msggatewaypb";
+
+// MsgGateway reports which users are connected to this process.
 service MsgGateway {
   rpc GetUsersOnlineStatus(GetUsersOnlineStatusReq) returns (GetUsersOnlineStatusResp);
+}
+
+message GetUsersOnlineStatusReq {
+  repeated string user_ids = 1;
+}
+
+message GetUsersOnlineStatusResp {
+  repeated OnlineUser users = 1;
+}
+
+message OnlineUser {
+  string user_id = 1;
+  int32 status = 2;
+  repeated Platform platforms = 3;
+}
+
+message Platform {
+  int32 platform_id = 1;
+  string conn_id = 2;
+  bool is_background = 3;
 }

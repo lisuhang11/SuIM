@@ -19,6 +19,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/proto/grouppb"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
+	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 	"github.com/lisuhang11/SuIM/proto/userpb"
 	"github.com/lisuhang11/SuIM/services/apigateway/internal/api"
 	svcconfig "github.com/lisuhang11/SuIM/services/apigateway/internal/config"
@@ -67,6 +68,11 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial group service: %w", err)
 	}
 	defer groupConn.Close()
+	thirdConn, err := reg.Dial(ctx, "third", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dial third service: %w", err)
+	}
+	defer thirdConn.Close()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
@@ -77,6 +83,7 @@ func run(cfgPath string) error {
 			userpb.NewUserServiceClient(userConn),
 			relationpb.NewRelationServiceClient(relationConn),
 			grouppb.NewGroupServiceClient(groupConn),
+			thirdpb.NewThirdServiceClient(thirdConn),
 		).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

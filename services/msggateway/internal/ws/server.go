@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/msgconv"
+	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
 )
@@ -34,6 +35,12 @@ type GroupDirectory interface {
 	Joined(ctx context.Context, userID string) ([]JoinedGroup, error)
 }
 
+// JoinedGroups is the group service's joined-group incremental log and the full page behind it.
+type JoinedGroups interface {
+	IncrementalJoined(ctx context.Context, userID, versionID string, version uint64) (*grouppb.GetIncrementalJoinGroupsResp, error)
+	ListJoined(ctx context.Context, userID string) ([]*grouppb.GroupInfo, error)
+}
+
 // Messages is the msg service. The gateway checks the token, then forwards message work here.
 type Messages interface {
 	SendMsg(ctx context.Context, msg *msgpb.MsgData) (*msgpb.SendMsgResp, error)
@@ -50,6 +57,8 @@ type Server struct {
 	hub      *Hub
 	tokens   TokenChecker
 	groups   GroupDirectory
+	joined   JoinedGroups
+	syncLog  GroupSyncCache
 	messages Messages
 	maxConn  int64
 	upgrader websocket.Upgrader
@@ -58,6 +67,8 @@ type Server struct {
 type Options struct {
 	Tokens           TokenChecker
 	Groups           GroupDirectory
+	Joined           JoinedGroups
+	GroupSync        GroupSyncCache
 	Messages         Messages
 	MaxConn          int64
 	HandshakeTimeout time.Duration
@@ -74,6 +85,8 @@ func New(opts Options) *Server {
 		hub:      NewHub(),
 		tokens:   opts.Tokens,
 		groups:   opts.Groups,
+		joined:   opts.Joined,
+		syncLog:  opts.GroupSync,
 		messages: opts.Messages,
 		maxConn:  opts.MaxConn,
 		upgrader: websocket.Upgrader{

@@ -81,10 +81,13 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial group service: %w", err)
 	}
 	defer groupConn.Close()
+	groupClient := groups{rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn))}
 
 	server := ws.New(ws.Options{
 		Tokens:           rpc.NewUserClient(userpb.NewUserServiceClient(userConn)),
-		Groups:           groups{rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn))},
+		Groups:           groupClient,
+		Joined:           groupClient,
+		GroupSync:        ws.NewRedisGroupSync(rdb),
 		Messages:         rpc.NewMsgClient(msgpb.NewMsgServiceClient(msgConn)),
 		MaxConn:          cfg.MaxConn,
 		HandshakeTimeout: time.Duration(cfg.HandshakeTimeoutSec) * time.Second,
@@ -97,6 +100,7 @@ func run(cfgPath string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /msg/send", server.HandleSend)
 	mux.HandleFunc("POST /msg/pull", server.HandlePull)
+	mux.HandleFunc("POST /msg/sync_groups", server.HandleSyncGroups)
 	mux.Handle("/", server)
 	wsSrv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	rpcLis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.RPCPort))

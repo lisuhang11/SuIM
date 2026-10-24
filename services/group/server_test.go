@@ -68,7 +68,7 @@ func TestGroup(t *testing.T) {
 	d := "gd-" + suffix
 	t.Cleanup(func() { cleanupGroup(t, mysqlCfg, a, b, c, d) })
 
-	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}, d: {}})
+	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}, d: {}}, nil)
 
 	if _, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{CreatorUserId: a, GroupName: "n", GroupType: 3}); !isCode(err, codes.InvalidArgument, errorcode.GroupTypeUnsupported) {
 		t.Fatalf("type code=%v err=%v", status.Code(err), err)
@@ -279,7 +279,7 @@ func TestGroupSync(t *testing.T) {
 	c := "sc-" + suffix
 	d := "sd-" + suffix
 	t.Cleanup(func() { cleanupGroup(t, mysqlCfg, a, b, c, d) })
-	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}, d: {}})
+	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}, d: {}}, nil)
 
 	created, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{
 		CreatorUserId: a,

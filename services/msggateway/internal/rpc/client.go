@@ -53,7 +53,29 @@ func (c *GroupClient) MemberUserIDs(ctx context.Context, groupID string) ([]stri
 }
 
 func (c *GroupClient) Joined(ctx context.Context, userID string) ([]JoinedGroup, error) {
-	var out []JoinedGroup
+	groups, err := c.ListJoined(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]JoinedGroup, 0, len(groups))
+	for _, group := range groups {
+		out = append(out, JoinedGroup{ID: group.GetGroupId(), Super: group.GetGroupType() == 2})
+	}
+	return out, nil
+}
+
+// IncrementalJoined reads one page of the user's joined-group version log.
+func (c *GroupClient) IncrementalJoined(ctx context.Context, userID, versionID string, version uint64) (*grouppb.GetIncrementalJoinGroupsResp, error) {
+	return c.client.GetIncrementalJoinGroups(ctx, &grouppb.GetIncrementalJoinGroupsReq{
+		UserId:    userID,
+		VersionId: versionID,
+		Version:   version,
+	})
+}
+
+// ListJoined pages every group the user still belongs to.
+func (c *GroupClient) ListJoined(ctx context.Context, userID string) ([]*grouppb.GroupInfo, error) {
+	var out []*grouppb.GroupInfo
 	for offset := int32(0); ; offset += pageLimit {
 		resp, err := c.client.GetJoinedGroups(ctx, &grouppb.GetJoinedGroupsReq{
 			UserId: userID,
@@ -63,12 +85,7 @@ func (c *GroupClient) Joined(ctx context.Context, userID string) ([]JoinedGroup,
 		if err != nil {
 			return nil, err
 		}
-		for _, group := range resp.GetGroups() {
-			if group.GetGroupId() == "" {
-				continue
-			}
-			out = append(out, JoinedGroup{ID: group.GetGroupId(), Super: group.GetGroupType() == 2})
-		}
+		out = append(out, resp.GetGroups()...)
 		if int(offset)+len(resp.GetGroups()) >= int(resp.GetTotal()) || len(resp.GetGroups()) == 0 {
 			break
 		}

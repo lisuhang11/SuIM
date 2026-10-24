@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lisuhang11/SuIM/proto/group"
+	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 	"github.com/lisuhang11/SuIM/services/group/internal/store"
 )
@@ -14,13 +15,19 @@ type Users interface {
 	GetUsers(ctx context.Context, ids []string) (map[string]model.UserProfile, error)
 }
 
-type Server struct {
-	grouppb.UnimplementedGroupServiceServer
-	store *store.Store
-	users Users
-	now   func() time.Time
+// MsgSender publishes one notification. msgtransfer assigns the seq and msggateway pushes it.
+type MsgSender interface {
+	SendNotification(ctx context.Context, msg *msgpb.MsgData) error
 }
 
-func New(st *store.Store, users Users) *Server {
-	return &Server{store: st, users: users, now: time.Now}
+type Server struct {
+	grouppb.UnimplementedGroupServiceServer
+	store  *store.Store
+	users  Users
+	sender MsgSender
+	now    func() time.Time
+}
+
+func New(st *store.Store, users Users, sender MsgSender) *Server {
+	return &Server{store: st, users: users, sender: sender, now: time.Now}
 }

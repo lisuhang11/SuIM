@@ -83,6 +83,10 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 	if err := s.store.AddMembers(ctx, groupID, members, now); err != nil {
 		return nil, mapStore(err)
 	}
-	// 4. 入群通知和入群后 webhook 尚未接入。
+	// 4. 入群后 webhook 尚未接入。邀请通知带上新的成员版本。
+	if latest, err := s.store.TakeGroup(ctx, groupID); err == nil {
+		group = latest
+	}
+	s.notifyInvited(ctx, op, group, opMember, members)
 	return &grouppb.InviteUserToGroupResp{}, nil
 }

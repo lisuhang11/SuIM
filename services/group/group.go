@@ -18,9 +18,11 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/proto/group"
+	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/proto/userpb"
 	svcconfig "github.com/lisuhang11/SuIM/services/group/internal/config"
 	"github.com/lisuhang11/SuIM/services/group/internal/logic"
+	"github.com/lisuhang11/SuIM/services/group/internal/msgclient"
 	"github.com/lisuhang11/SuIM/services/group/internal/store"
 	"github.com/lisuhang11/SuIM/services/group/internal/userclient"
 )
@@ -89,13 +91,23 @@ func run(cfgPath, migratePath string) error {
 	}
 	defer userConn.Close()
 
+	msgConn, err := reg.Dial(ctx, "msg", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dial msg service: %w", err)
+	}
+	defer msgConn.Close()
+
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
 
 	srv := grpc.NewServer()
-	grouppb.RegisterGroupServiceServer(srv, logic.New(st, userclient.New(userpb.NewUserServiceClient(userConn))))
+	grouppb.RegisterGroupServiceServer(srv, logic.New(
+		st,
+		userclient.New(userpb.NewUserServiceClient(userConn)),
+		msgclient.New(msgpb.NewMsgServiceClient(msgConn)),
+	))
 
 	id, err := newID()
 	if err != nil {

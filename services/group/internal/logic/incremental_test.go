@@ -9,7 +9,7 @@ import (
 )
 
 func TestBatchRejectsTooManyGroups(t *testing.T) {
-	srv := New(nil, nil)
+	srv := New(nil, nil, nil)
 	groups := make([]*grouppb.GetIncrementalGroupMembersReq, batchMemberLimit+1)
 	for i := range groups {
 		groups[i] = &grouppb.GetIncrementalGroupMembersReq{GroupId: "g"}

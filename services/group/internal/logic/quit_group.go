@@ -28,6 +28,9 @@ func (s *Server) QuitGroup(ctx context.Context, req *grouppb.QuitGroupReq) (*gro
 	if err := s.store.DeleteMember(ctx, groupID, userID, s.now()); err != nil {
 		return nil, mapStore(err)
 	}
-	// 退群通知、会话 seq 和 webhook 尚未接入。
+	// 会话 seq 和 webhook 尚未接入。退群通知推给仍在群里的成员。
+	if group, err := s.store.TakeGroup(ctx, groupID); err == nil {
+		s.notifyQuit(ctx, group, member)
+	}
 	return &grouppb.QuitGroupResp{}, nil
 }

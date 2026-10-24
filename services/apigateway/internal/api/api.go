@@ -74,7 +74,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 	"github.com/lisuhang11/SuIM/proto/userpb"

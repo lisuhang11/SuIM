@@ -17,7 +17,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/idhash"
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/services/group/internal/logic"
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 	"github.com/lisuhang11/SuIM/services/group/internal/store"

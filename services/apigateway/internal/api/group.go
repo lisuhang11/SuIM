@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 )
 
 // 创建群聊

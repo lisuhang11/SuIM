@@ -17,7 +17,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 	"github.com/lisuhang11/SuIM/proto/userpb"

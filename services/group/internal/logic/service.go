@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 	"github.com/lisuhang11/SuIM/services/group/internal/store"
 )

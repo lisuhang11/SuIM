@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/userpb"
 )
 

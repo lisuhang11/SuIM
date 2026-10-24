@@ -2542,7 +2542,7 @@ const file_group_proto_rawDesc = "" +
 	"\x13GetFullJoinGroupIDs\x12\x1d.group.GetFullJoinGroupIDsReq\x1a\x1e.group.GetFullJoinGroupIDsResp\x12i\n" +
 	"\x1aGetIncrementalGroupMembers\x12$.group.GetIncrementalGroupMembersReq\x1a%.group.GetIncrementalGroupMembersResp\x12x\n" +
 	"\x1fBatchGetIncrementalGroupMembers\x12).group.BatchGetIncrementalGroupMembersReq\x1a*.group.BatchGetIncrementalGroupMembersResp\x12f\n" +
-	"\x19GetFullGroupMemberUserIDs\x12#.group.GetFullGroupMemberUserIDsReq\x1a$.group.GetFullGroupMemberUserIDsRespB*Z(github.com/lisuhang11/SuIM/proto/grouppbb\x06proto3"
+	"\x19GetFullGroupMemberUserIDs\x12#.group.GetFullGroupMemberUserIDsReq\x1a$.group.GetFullGroupMemberUserIDsRespB0Z.github.com/lisuhang11/SuIM/proto/group;grouppbb\x06proto3"
 
 var (
 	file_group_proto_rawDescOnce sync.Once

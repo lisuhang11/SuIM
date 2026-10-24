@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 )
 

@@ -3,7 +3,7 @@ package logic
 import (
 	"context"
 
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 )
 
 // GetGroupMemberUserIDs 返回群内全部成员的用户 ID。

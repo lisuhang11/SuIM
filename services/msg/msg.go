@@ -19,7 +19,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/register"
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	svcconfig "github.com/lisuhang11/SuIM/services/msg/internal/config"

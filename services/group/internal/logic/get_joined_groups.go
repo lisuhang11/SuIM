@@ -3,7 +3,7 @@ package logic
 import (
 	"context"
 
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 )
 
 // GetJoinedGroups 分页返回用户已加入的群。

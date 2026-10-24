@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 )
 
 // GetGroupsInfo 按群 ID 取群资料。一个或多个 ID 走同一条逻辑，找不到的 ID 略过。

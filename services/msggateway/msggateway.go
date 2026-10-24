@@ -20,7 +20,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/register"
-	"github.com/lisuhang11/SuIM/proto/grouppb"
+	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
 	"github.com/lisuhang11/SuIM/proto/userpb"

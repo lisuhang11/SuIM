@@ -9,16 +9,15 @@ import (
 )
 
 type Config struct {
-	ListenIP             string          `yaml:"listenIP"`
-	RegisterIP           string          `yaml:"registerIP"`
-	RPCPort              int             `yaml:"rpcPort"`
-	WSPort               int             `yaml:"wsPort"`
-	MaxConn              int64           `yaml:"maxConn"`
-	HandshakeTimeoutSec  int             `yaml:"handshakeTimeoutSec"`
-	MySQL                config.MySQL    `yaml:"mysql"`
-	Redis                config.Redis    `yaml:"redis"`
-	Queue                Queue           `yaml:"queue"`
-	Registry             register.Config `yaml:"registry"`
+	ListenIP            string          `yaml:"listenIP"`
+	RegisterIP          string          `yaml:"registerIP"`
+	RPCPort             int             `yaml:"rpcPort"`
+	WSPort              int             `yaml:"wsPort"`
+	MaxConn             int64           `yaml:"maxConn"`
+	HandshakeTimeoutSec int             `yaml:"handshakeTimeoutSec"`
+	Redis               config.Redis    `yaml:"redis"`
+	Queue               Queue           `yaml:"queue"`
+	Registry            register.Config `yaml:"registry"`
 }
 
 type Queue struct {
@@ -41,9 +40,6 @@ func (c *Config) Validate() error {
 	}
 	if c.HandshakeTimeoutSec <= 0 {
 		c.HandshakeTimeoutSec = 10
-	}
-	if len(c.MySQL.Address) == 0 || c.MySQL.Username == "" || c.MySQL.Database == "" {
-		return fmt.Errorf("mysql address, username and database are required")
 	}
 	if len(c.Redis.Address) == 0 {
 		return fmt.Errorf("redis address is required")

@@ -5,15 +5,6 @@ wsPort: 10001
 maxConn: 100000
 handshakeTimeoutSec: 10
 
-mysql:
-  address:
-    - 127.0.0.1:3306
-  username: suim
-  password: suIM123
-  database: suim
-  maxOpenConn: 20
-  maxIdleConn: 10
-
 redis:
   address:
     - 127.0.0.1:6379

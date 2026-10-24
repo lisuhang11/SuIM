@@ -13,57 +13,14 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/pkg/mq"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
-	"github.com/lisuhang11/SuIM/services/msggateway/internal/history"
 )
 
-func TestSingleSendRequiresFriends(t *testing.T) {
-	relations := &fakeRelations{friend1: true}
-	prod := &fakeProducer{}
-	client := newTestClient(t, New(Options{Relations: relations, Publish: prod}))
-
-	msg := &msgpb.MsgData{SessionType: sessionSingle, RecvId: "b", Content: []byte("hi"), ClientMsgId: "c1"}
-	body, err := proto.Marshal(msg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := client.server.sendMsg(client, &Req{ReqIdentifier: reqSendMsg, Data: body}); err != nil {
-		t.Fatal(err)
-	}
-	resp := decodeResp(t, client)
-	if resp.ErrCode != int(errorcode.MsgNotFriend) {
-		t.Fatalf("code %d msg %s", resp.ErrCode, resp.ErrMsg)
-	}
-	if prod.n != 0 {
-		t.Fatalf("published %d", prod.n)
-	}
-}
-
-func TestSingleSendRejectsBlock(t *testing.T) {
-	relations := &fakeRelations{friend1: true, friend2: true, black2: true}
-	client := newTestClient(t, New(Options{Relations: relations, Publish: &fakeProducer{}}))
-	msg := &msgpb.MsgData{SessionType: sessionSingle, RecvId: "b", Content: []byte("hi")}
-	body, err := proto.Marshal(msg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := client.server.sendMsg(client, &Req{ReqIdentifier: reqSendMsg, Data: body}); err != nil {
-		t.Fatal(err)
-	}
-	resp := decodeResp(t, client)
-	if resp.ErrCode != int(errorcode.MsgBlocked) {
-		t.Fatalf("code %d msg %s", resp.ErrCode, resp.ErrMsg)
-	}
-}
-
-func TestSingleSendPublishes(t *testing.T) {
-	relations := &fakeRelations{friend1: true, friend2: true}
-	prod := &fakeProducer{}
-	client := newTestClient(t, New(Options{Relations: relations, Publish: prod}))
+func TestSendForwardsToMsg(t *testing.T) {
+	messages := &fakeMessages{}
+	client := newTestClient(t, New(Options{Messages: messages}))
 	client.userID = "a"
-	msg := &msgpb.MsgData{SessionType: sessionSingle, RecvId: "b", Content: []byte("hi"), ClientMsgId: "c1"}
-	body, err := proto.Marshal(msg)
+	body, err := proto.Marshal(&msgpb.MsgData{SessionType: sessionSingle, RecvId: "b", Content: []byte("hi"), ClientMsgId: "c1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,26 +35,36 @@ func TestSingleSendPublishes(t *testing.T) {
 	if err := proto.Unmarshal(resp.Data, out); err != nil {
 		t.Fatal(err)
 	}
-	if out.ServerMsgId == "" || out.ClientMsgId != "c1" || out.SendTime == 0 {
+	if out.ClientMsgId != "c1" || out.ServerMsgId != "s1" {
 		t.Fatalf("resp %+v", out)
 	}
-	if prod.n != 1 || prod.key != "si_a_b" {
-		t.Fatalf("publish n=%d key=%s", prod.n, prod.key)
+	if messages.sent == nil || messages.sent.SendId != "a" || messages.sent.RecvId != "b" {
+		t.Fatalf("sent %+v", messages.sent)
+	}
+}
+
+func TestSendMapsNotFriend(t *testing.T) {
+	client := newTestClient(t, New(Options{Messages: &fakeMessages{sendErr: errorcode.ErrMsgNotFriend}}))
+	body, err := proto.Marshal(&msgpb.MsgData{SessionType: sessionSingle, RecvId: "b", Content: []byte("hi")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.server.sendMsg(client, &Req{ReqIdentifier: reqSendMsg, Data: body}); err != nil {
+		t.Fatal(err)
+	}
+	resp := decodeResp(t, client)
+	if resp.ErrCode != int(errorcode.MsgNotFriend) {
+		t.Fatalf("code %d msg %s", resp.ErrCode, resp.ErrMsg)
 	}
 }
 
 func TestPullByRangeUses1002(t *testing.T) {
-	hist := &fakeHistory{msgs: []*msgpb.MsgData{{Seq: 1, Content: []byte("hi")}}, max: 3}
-	client := newTestClient(t, New(Options{History: hist}))
+	messages := &fakeMessages{pull: &msgpb.PushMessages{Msgs: map[string]*msgpb.PullMsgs{
+		"si_a_b": {Msgs: []*msgpb.MsgData{{Seq: 1, Content: []byte("hi")}}, IsEnd: false, MaxSeq: 3},
+	}}}
+	client := newTestClient(t, New(Options{Messages: messages}))
 	reqBody, err := proto.Marshal(&msgpb.PullMessageBySeqsReq{
-		UserId: "a",
-		Order:  orderAsc,
-		SeqRanges: []*msgpb.SeqRange{{
-			ConversationId: "si_a_b",
-			Begin:          1,
-			End:            1,
-			Num:            20,
-		}},
+		SeqRanges: []*msgpb.SeqRange{{ConversationId: "si_a_b", Begin: 1, End: 1, Num: 20}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -117,15 +84,14 @@ func TestPullByRangeUses1002(t *testing.T) {
 	if pull == nil || pull.IsEnd || len(pull.Msgs) != 1 || string(pull.Msgs[0].Content) != "hi" {
 		t.Fatalf("pull %+v", pull)
 	}
+	if messages.pullReq == nil || messages.pullReq.UserId != "a" {
+		t.Fatalf("pull user %v", messages.pullReq)
+	}
 }
 
 func TestHTTPSendText(t *testing.T) {
-	prod := &fakeProducer{}
-	srv := New(Options{
-		Tokens:    fakeTokens{},
-		Relations: &fakeRelations{friend1: true, friend2: true},
-		Publish:   prod,
-	})
+	messages := &fakeMessages{}
+	srv := New(Options{Tokens: fakeTokens{}, Messages: messages})
 	body := `{"recv_id":"b","content":" hi ","client_msg_id":"c1","session_type":1,"content_type":101}`
 	req := httptest.NewRequest(http.MethodPost, "/msg/send", strings.NewReader(body))
 	req.Header.Set("token", "t")
@@ -134,38 +100,49 @@ func TestHTTPSendText(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
 	}
+	if messages.sent == nil || messages.sent.SendId != "a" || string(messages.sent.Content) != `{"content":"hi"}` || messages.sent.ContentType != 101 {
+		t.Fatalf("sent %+v", messages.sent)
+	}
+}
+
+func TestHTTPPullText(t *testing.T) {
+	srv := New(Options{
+		Tokens: fakeTokens{},
+		Messages: &fakeMessages{pull: &msgpb.PushMessages{Msgs: map[string]*msgpb.PullMsgs{
+			"si_a_b": {Msgs: []*msgpb.MsgData{{
+				Seq: 1, SendId: "a", RecvId: "b", ClientMsgId: "c1", ServerMsgId: "s1",
+				ContentType: 101, Content: []byte(`{"content":"111"}`), SendTime: 10, Status: 2,
+			}}, IsEnd: true, MaxSeq: 1},
+		}}},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/msg/pull", strings.NewReader(
+		`{"conversation_id":"si_a_b","limit":20}`))
+	req.Header.Set("token", "t")
+	rr := httptest.NewRecorder()
+	srv.HandlePull(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
 	var out struct {
 		Code int `json:"code"`
 		Data struct {
-			ServerMsgID string `json:"server_msg_id"`
-			ClientMsgID string `json:"client_msg_id"`
-			SendTime    int64  `json:"send_time"`
+			IsEnd  bool  `json:"is_end"`
+			MaxSeq int64 `json:"max_seq"`
+			Msgs   []struct {
+				Text string `json:"text"`
+			} `json:"msgs"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if out.Code != 0 || out.Data.ClientMsgID != "c1" || out.Data.ServerMsgID == "" || out.Data.SendTime == 0 {
+	if out.Code != 0 || !out.Data.IsEnd || out.Data.MaxSeq != 1 || len(out.Data.Msgs) != 1 || out.Data.Msgs[0].Text != "111" {
 		t.Fatalf("resp %+v", out)
-	}
-	if prod.n != 1 || prod.key != "si_a_b" {
-		t.Fatalf("publish n=%d key=%s", prod.n, prod.key)
-	}
-	stored := &msgpb.MsgData{}
-	if err := proto.Unmarshal(prod.body, stored); err != nil {
-		t.Fatal(err)
-	}
-	if string(stored.Content) != `{"content":"hi"}` || stored.SendId != "a" || stored.ContentType != 101 {
-		t.Fatalf("stored %+v content %s", stored, stored.Content)
 	}
 }
 
 func TestHTTPSendRejectsStranger(t *testing.T) {
-	srv := New(Options{
-		Tokens:    fakeTokens{},
-		Relations: &fakeRelations{},
-		Publish:   &fakeProducer{},
-	})
+	srv := New(Options{Tokens: fakeTokens{}, Messages: &fakeMessages{sendErr: errorcode.ErrMsgNotFriend}})
 	req := httptest.NewRequest(http.MethodPost, "/msg/send", strings.NewReader(
 		`{"recv_id":"b","content":"hi","session_type":1,"content_type":101}`))
 	req.Header.Set("token", "t")
@@ -176,45 +153,47 @@ func TestHTTPSendRejectsStranger(t *testing.T) {
 	}
 }
 
-func TestRangeIsEnd(t *testing.T) {
-	if rangeIsEnd(orderAsc, 1, 2, 3) {
-		t.Fatal("ascending pull is not finished")
+type fakeMessages struct {
+	sendErr error
+	sent    *msgpb.MsgData
+	pull    *msgpb.PushMessages
+	pullReq *msgpb.PullMessageBySeqsReq
+}
+
+func (f *fakeMessages) SendMsg(_ context.Context, msg *msgpb.MsgData) (*msgpb.SendMsgResp, error) {
+	if f.sendErr != nil {
+		return nil, f.sendErr
 	}
-	if !rangeIsEnd(orderAsc, 1, 3, 3) {
-		t.Fatal("ascending pull is finished")
+	f.sent = proto.Clone(msg).(*msgpb.MsgData)
+	id := msg.ClientMsgId
+	if id == "" {
+		id = "c1"
 	}
-	if rangeIsEnd(orderDesc, 4, 6, 6) {
-		t.Fatal("descending pull is not finished")
+	return &msgpb.SendMsgResp{ServerMsgId: "s1", ClientMsgId: id, SendTime: 10}, nil
+}
+
+func (f *fakeMessages) GetMaxSeq(context.Context, string) (*msgpb.GetMaxSeqResp, error) {
+	return &msgpb.GetMaxSeqResp{}, nil
+}
+
+func (f *fakeMessages) PullMessageBySeqs(_ context.Context, req *msgpb.PullMessageBySeqsReq) (*msgpb.PushMessages, error) {
+	f.pullReq = req
+	if f.pull != nil {
+		return f.pull, nil
 	}
-	if !rangeIsEnd(orderDesc, 1, 3, 6) {
-		t.Fatal("descending pull is finished")
-	}
+	return &msgpb.PushMessages{Msgs: map[string]*msgpb.PullMsgs{}}, nil
 }
 
-type fakeRelations struct {
-	friend1, friend2 bool
-	black1, black2   bool
+func (f *fakeMessages) GetSeqMessage(context.Context, *msgpb.GetSeqMessageReq) (*msgpb.PushMessages, error) {
+	return &msgpb.PushMessages{Msgs: map[string]*msgpb.PullMsgs{}}, nil
 }
 
-func (f *fakeRelations) IsFriend(context.Context, string, string) (bool, bool, error) {
-	return f.friend1, f.friend2, nil
+func (f *fakeMessages) GetConversationsHasReadAndMaxSeq(context.Context, *msgpb.GetConversationsHasReadAndMaxSeqReq) (*msgpb.GetConversationsHasReadAndMaxSeqResp, error) {
+	return &msgpb.GetConversationsHasReadAndMaxSeqResp{}, nil
 }
 
-func (f *fakeRelations) IsBlack(context.Context, string, string) (bool, bool, error) {
-	return f.black1, f.black2, nil
-}
-
-type fakeProducer struct {
-	n    int
-	key  string
-	body []byte
-}
-
-func (f *fakeProducer) Send(_ context.Context, key string, body []byte) error {
-	f.n++
-	f.key = key
-	f.body = append([]byte(nil), body...)
-	return nil
+func (f *fakeMessages) GetLastMessage(context.Context, *msgpb.GetLastMessageReq) (*msgpb.GetLastMessageResp, error) {
+	return &msgpb.GetLastMessageResp{}, nil
 }
 
 type fakeTokens struct{}
@@ -222,26 +201,6 @@ type fakeTokens struct{}
 func (fakeTokens) Validate(context.Context, string) (string, int32, error) {
 	return "a", 5, nil
 }
-
-type fakeHistory struct {
-	msgs []*msgpb.MsgData
-	max  int64
-}
-
-func (f *fakeHistory) ConversationIDs(context.Context, string) ([]string, error) { return nil, nil }
-func (f *fakeHistory) MaxSeqs(context.Context, []string) (map[string]int64, error) {
-	return map[string]int64{"si_a_b": f.max}, nil
-}
-func (f *fakeHistory) SeqState(context.Context, string, []string) (map[string]history.SeqState, error) {
-	return nil, nil
-}
-func (f *fakeHistory) Range(context.Context, string, int64, int64, int64) ([]*msgpb.MsgData, error) {
-	return f.msgs, nil
-}
-func (f *fakeHistory) BySeqs(context.Context, string, []int64) ([]*msgpb.MsgData, error) {
-	return f.msgs, nil
-}
-func (f *fakeHistory) Last(context.Context, string) (*msgpb.MsgData, error) { return nil, nil }
 
 type memSocket struct {
 	mu     sync.Mutex
@@ -281,5 +240,3 @@ func decodeResp(t *testing.T, client *Client) Resp {
 	}
 	return resp
 }
-
-var _ mq.Producer = (*fakeProducer)(nil)

@@ -1,4 +1,4 @@
-package history
+package store
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 )
 
 // Store reads sequenced messages written by msgtransfer.
+// Seq assignment stays in msgtransfer. This service only reads the rows and publishes new sends.
 type Store struct {
 	db *sql.DB
 }

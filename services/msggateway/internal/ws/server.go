@@ -12,11 +12,9 @@ import (
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/msgconv"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
-	"github.com/lisuhang11/SuIM/services/msggateway/internal/history"
 )
 
 // TokenChecker validates a login token and returns the user and platform stored in it.
@@ -36,41 +34,31 @@ type GroupDirectory interface {
 	Joined(ctx context.Context, userID string) ([]JoinedGroup, error)
 }
 
-// Relations checks friendship and blocks before a single chat is accepted.
-type Relations interface {
-	IsFriend(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
-	IsBlack(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
-}
-
-// HistoryReader loads sequenced messages from MySQL.
-type HistoryReader interface {
-	ConversationIDs(ctx context.Context, userID string) ([]string, error)
-	MaxSeqs(ctx context.Context, conversationIDs []string) (map[string]int64, error)
-	SeqState(ctx context.Context, userID string, conversationIDs []string) (map[string]history.SeqState, error)
-	Range(ctx context.Context, conversationID string, begin, end, limit int64) ([]*msgpb.MsgData, error)
-	BySeqs(ctx context.Context, conversationID string, seqs []int64) ([]*msgpb.MsgData, error)
-	Last(ctx context.Context, conversationID string) (*msgpb.MsgData, error)
+// Messages is the msg service. The gateway checks the token, then forwards message work here.
+type Messages interface {
+	SendMsg(ctx context.Context, msg *msgpb.MsgData) (*msgpb.SendMsgResp, error)
+	GetMaxSeq(ctx context.Context, userID string) (*msgpb.GetMaxSeqResp, error)
+	PullMessageBySeqs(ctx context.Context, req *msgpb.PullMessageBySeqsReq) (*msgpb.PushMessages, error)
+	GetSeqMessage(ctx context.Context, req *msgpb.GetSeqMessageReq) (*msgpb.PushMessages, error)
+	GetConversationsHasReadAndMaxSeq(ctx context.Context, req *msgpb.GetConversationsHasReadAndMaxSeqReq) (*msgpb.GetConversationsHasReadAndMaxSeqResp, error)
+	GetLastMessage(ctx context.Context, req *msgpb.GetLastMessageReq) (*msgpb.GetLastMessageResp, error)
 }
 
 // Server accepts SDK websocket connections and pushes messages that arrive on toPush.
 type Server struct {
 	gatewaypb.UnimplementedMsgGatewayServer
-	hub       *Hub
-	tokens    TokenChecker
-	groups    GroupDirectory
-	relations Relations
-	history   HistoryReader
-	publish   mq.Producer
-	maxConn   int64
-	upgrader  websocket.Upgrader
+	hub      *Hub
+	tokens   TokenChecker
+	groups   GroupDirectory
+	messages Messages
+	maxConn  int64
+	upgrader websocket.Upgrader
 }
 
 type Options struct {
 	Tokens           TokenChecker
 	Groups           GroupDirectory
-	Relations        Relations
-	History          HistoryReader
-	Publish          mq.Producer
+	Messages         Messages
 	MaxConn          int64
 	HandshakeTimeout time.Duration
 }
@@ -83,13 +71,11 @@ func New(opts Options) *Server {
 		opts.HandshakeTimeout = 10 * time.Second
 	}
 	return &Server{
-		hub:       NewHub(),
-		tokens:    opts.Tokens,
-		groups:    opts.Groups,
-		relations: opts.Relations,
-		history:   opts.History,
-		publish:   opts.Publish,
-		maxConn:   opts.MaxConn,
+		hub:      NewHub(),
+		tokens:   opts.Tokens,
+		groups:   opts.Groups,
+		messages: opts.Messages,
+		maxConn:  opts.MaxConn,
 		upgrader: websocket.Upgrader{
 			HandshakeTimeout: opts.HandshakeTimeout,
 			CheckOrigin:      func(*http.Request) bool { return true },

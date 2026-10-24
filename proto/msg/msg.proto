@@ -4,6 +4,16 @@ package msg;
 
 option go_package = "github.com/lisuhang11/SuIM/proto/msg;msgpb";
 
+// MsgService accepts messages and reads history. msggateway calls it and keeps the websocket.
+service MsgService {
+  rpc SendMsg(SendMsgReq) returns (SendMsgResp);
+  rpc GetMaxSeq(GetMaxSeqReq) returns (GetMaxSeqResp);
+  rpc PullMessageBySeqs(PullMessageBySeqsReq) returns (PushMessages);
+  rpc GetSeqMessage(GetSeqMessageReq) returns (PushMessages);
+  rpc GetConversationsHasReadAndMaxSeq(GetConversationsHasReadAndMaxSeqReq) returns (GetConversationsHasReadAndMaxSeqResp);
+  rpc GetLastMessage(GetLastMessageReq) returns (GetLastMessageResp);
+}
+
 // MsgData is one chat message on the transfer queue.
 message MsgData {
   string send_id = 1;
@@ -54,12 +64,17 @@ message PullMsgs {
   repeated MsgData msgs = 1;
   bool is_end = 2;
   int64 end_seq = 3;
+  int64 max_seq = 4;
 }
 
 // PushMessages is the body of websocket push, pull, and seq-list responses.
 message PushMessages {
   map<string, PullMsgs> msgs = 1;
   map<string, PullMsgs> notification_msgs = 2;
+}
+
+message SendMsgReq {
+  MsgData msg_data = 1;
 }
 
 message SendMsgResp {

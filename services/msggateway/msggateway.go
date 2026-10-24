@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -22,11 +21,10 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/proto/grouppb"
+	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
 	"github.com/lisuhang11/SuIM/proto/userpb"
 	svcconfig "github.com/lisuhang11/SuIM/services/msggateway/internal/config"
-	"github.com/lisuhang11/SuIM/services/msggateway/internal/history"
 	"github.com/lisuhang11/SuIM/services/msggateway/internal/redisclient"
 	"github.com/lisuhang11/SuIM/services/msggateway/internal/rpc"
 	"github.com/lisuhang11/SuIM/services/msggateway/internal/ws"
@@ -34,15 +32,14 @@ import (
 
 func main() {
 	cfgPath := flag.String("c", "services/msggateway/etc/msggateway.yaml", "config file path")
-	migratePath := flag.String("migrate", "migrations/msg.sql", "sql file applied on startup")
 	flag.Parse()
-	if err := run(*cfgPath, *migratePath); err != nil {
+	if err := run(*cfgPath); err != nil {
 		slog.Error("msggateway stopped", "err", err)
 		os.Exit(1)
 	}
 }
 
-func run(cfgPath, migratePath string) error {
+func run(cfgPath string) error {
 	var cfg svcconfig.Config
 	if err := config.Load(cfgPath, &cfg); err != nil {
 		return err
@@ -53,19 +50,6 @@ func run(cfgPath, migratePath string) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-
-	records, err := history.Open(ctx, mysqlDSN(cfg.MySQL), cfg.MySQL.MaxOpenConn, cfg.MySQL.MaxIdleConn)
-	if err != nil {
-		return err
-	}
-	defer records.Close()
-	script, err := os.ReadFile(migratePath)
-	if err != nil {
-		return fmt.Errorf("read migration: %w", err)
-	}
-	if err := records.Migrate(ctx, string(script)); err != nil {
-		return err
-	}
 
 	rdb, err := redisclient.New(cfg.Redis)
 	if err != nil {
@@ -87,24 +71,21 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("dial user service: %w", err)
 	}
 	defer userConn.Close()
-	relationConn, err := reg.Dial(ctx, "relation", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	msgConn, err := reg.Dial(ctx, "msg", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return fmt.Errorf("dial relation service: %w", err)
+		return fmt.Errorf("dial msg service: %w", err)
 	}
-	defer relationConn.Close()
+	defer msgConn.Close()
 	groupConn, err := reg.Dial(ctx, "group", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dial group service: %w", err)
 	}
 	defer groupConn.Close()
 
-	publisher := mq.NewRedisProducer(rdb, cfg.Queue.StreamPrefix, mq.TopicToRedis, cfg.Queue.MaxLen)
 	server := ws.New(ws.Options{
 		Tokens:           rpc.NewUserClient(userpb.NewUserServiceClient(userConn)),
 		Groups:           groups{rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn))},
-		Relations:        rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)),
-		History:          records,
-		Publish:          publisher,
+		Messages:         rpc.NewMsgClient(msgpb.NewMsgServiceClient(msgConn)),
 		MaxConn:          cfg.MaxConn,
 		HandshakeTimeout: time.Duration(cfg.HandshakeTimeoutSec) * time.Second,
 	})
@@ -115,6 +96,7 @@ func run(cfgPath, migratePath string) error {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /msg/send", server.HandleSend)
+	mux.HandleFunc("POST /msg/pull", server.HandlePull)
 	mux.Handle("/", server)
 	wsSrv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	rpcLis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.RPCPort))
@@ -190,11 +172,6 @@ func (g groups) Joined(ctx context.Context, userID string) ([]ws.JoinedGroup, er
 		out[i] = ws.JoinedGroup{ID: item.ID, Super: item.Super}
 	}
 	return out, nil
-}
-
-func mysqlDSN(cfg config.MySQL) string {
-	return fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&charset=utf8mb4&loc=UTC&timeout=5s",
-		cfg.Username, cfg.Password, cfg.Address[0], cfg.Database)
 }
 
 func newID() (string, error) {

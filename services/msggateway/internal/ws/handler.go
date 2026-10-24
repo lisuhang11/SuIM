@@ -4,10 +4,11 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/pkg/msgconv"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
@@ -53,11 +54,14 @@ func (s *Server) sendMsg(c *Client, req *Req) error {
 	}
 	msg.SendId = c.userID
 	msg.SenderPlatformId = int32(c.platformID)
+	if s.messages == nil {
+		return c.reply(req, errInternal, "msg service is not configured", nil)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	code, text, resp := s.accept(ctx, msg)
-	if code != 0 {
-		return c.reply(req, code, text, nil)
+	resp, err := s.messages.SendMsg(ctx, msg)
+	if err != nil {
+		return replyErr(c, req, err)
 	}
 	body, err := proto.Marshal(resp)
 	if err != nil {
@@ -66,113 +70,17 @@ func (s *Server) sendMsg(c *Client, req *Req) error {
 	return c.reply(req, 0, "", body)
 }
 
-// accept checks one single or group message and publishes it to toRedis.
-func (s *Server) accept(ctx context.Context, msg *msgpb.MsgData) (int, string, *msgpb.SendMsgResp) {
-	switch msg.SessionType {
-	case 1, 4:
-		if msg.RecvId == "" {
-			return errArgs, "recv id is required", nil
-		}
-	case 2, 3:
-		if msg.GroupId == "" {
-			return errArgs, "group id is required", nil
-		}
-	default:
-		return errArgs, "session type is required", nil
-	}
-	if len(msg.Content) == 0 {
-		return errArgs, "content is required", nil
-	}
-	if code, text := s.authorizeSend(msg); code != 0 {
-		return code, text, nil
-	}
-	key := msgconv.QueueKey(msg)
-	if key == "" {
-		return errArgs, "conversation id is empty", nil
-	}
-	if msg.ClientMsgId == "" {
-		msg.ClientMsgId = newConnID()
-	}
-	if msg.ServerMsgId == "" {
-		msg.ServerMsgId = msgconv.ServerMsgID(key, msg.ClientMsgId)
-	}
-	now := time.Now().UnixMilli()
-	if msg.SendTime == 0 {
-		msg.SendTime = now
-	}
-	if msg.CreateTime == 0 {
-		msg.CreateTime = msg.SendTime
-	}
-	if msg.Status == 0 {
-		msg.Status = 1
-	}
-	body, err := proto.Marshal(msg)
-	if err != nil {
-		return errInternal, "marshal message", nil
-	}
-	if s.publish == nil {
-		return errInternal, "queue is not configured", nil
-	}
-	if err := s.publish.Send(ctx, key, body); err != nil {
-		return errInternal, "queue send failed", nil
-	}
-	return 0, "", &msgpb.SendMsgResp{
-		ServerMsgId: msg.ServerMsgId,
-		ClientMsgId: msg.ClientMsgId,
-		SendTime:    msg.SendTime,
-	}
-}
-
-// authorizeSend checks a single chat before it enters the queue.
-// Both users must be friends, and neither may have blocked the other.
-func (s *Server) authorizeSend(msg *msgpb.MsgData) (int, string) {
-	if msg.SessionType != sessionSingle {
-		return 0, ""
-	}
-	if msg.SendId == msg.RecvId {
-		return errArgs, "cannot message yourself"
-	}
-	if s.relations == nil {
-		return errInternal, "relation service is not configured"
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	blockedBySender, blockedByReceiver, err := s.relations.IsBlack(ctx, msg.SendId, msg.RecvId)
-	if err != nil {
-		return errInternal, "check black"
-	}
-	if blockedBySender || blockedByReceiver {
-		return int(errorcode.MsgBlocked), errorcode.ErrMsgBlocked.Error()
-	}
-	senderHasFriend, receiverHasFriend, err := s.relations.IsFriend(ctx, msg.SendId, msg.RecvId)
-	if err != nil {
-		return errInternal, "check friend"
-	}
-	if !senderHasFriend || !receiverHasFriend {
-		return int(errorcode.MsgNotFriend), errorcode.ErrMsgNotFriend.Error()
-	}
-	return 0, ""
-}
-
 func (s *Server) maxSeq(c *Client, req *Req) error {
+	if s.messages == nil {
+		return c.reply(req, errInternal, "msg service is not configured", nil)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	ids := s.userConversations(ctx, c.userID)
-	maxSeq := map[string]int64{}
-	var err error
-	if s.history != nil {
-		maxSeq, err = s.history.MaxSeqs(ctx, ids)
-		if err != nil {
-			return c.reply(req, errInternal, "query max seq", nil)
-		}
+	resp, err := s.messages.GetMaxSeq(ctx, c.userID)
+	if err != nil {
+		return replyErr(c, req, err)
 	}
-	minSeq := map[string]int64{}
-	for id, seq := range maxSeq {
-		if seq > 0 {
-			minSeq[id] = 1
-		}
-	}
-	body, err := proto.Marshal(&msgpb.GetMaxSeqResp{MaxSeqs: maxSeq, MinSeqs: minSeq})
+	body, err := proto.Marshal(resp)
 	if err != nil {
 		return c.reply(req, errInternal, "marshal max seq", nil)
 	}
@@ -186,23 +94,17 @@ func (s *Server) readAndMaxSeq(c *Client, req *Req) error {
 			return c.reply(req, errArgs, "invalid seq request", nil)
 		}
 	}
+	in.UserId = c.userID
+	if s.messages == nil {
+		return c.reply(req, errInternal, "msg service is not configured", nil)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	ids := in.ConversationIds
-	if len(ids) == 0 {
-		ids = s.userConversations(ctx, c.userID)
+	resp, err := s.messages.GetConversationsHasReadAndMaxSeq(ctx, in)
+	if err != nil {
+		return replyErr(c, req, err)
 	}
-	out := &msgpb.GetConversationsHasReadAndMaxSeqResp{Seqs: map[string]*msgpb.Seqs{}}
-	if s.history != nil {
-		state, err := s.history.SeqState(ctx, c.userID, ids)
-		if err != nil {
-			return c.reply(req, errInternal, "query read seq", nil)
-		}
-		for id, item := range state {
-			out.Seqs[id] = &msgpb.Seqs{MaxSeq: item.MaxSeq, HasReadSeq: item.HasReadSeq}
-		}
-	}
-	body, err := proto.Marshal(out)
+	body, err := proto.Marshal(resp)
 	if err != nil {
 		return c.reply(req, errInternal, "marshal read seq", nil)
 	}
@@ -214,36 +116,15 @@ func (s *Server) pullByRange(c *Client, req *Req) error {
 	if err := proto.Unmarshal(req.Data, in); err != nil {
 		return c.reply(req, errArgs, "invalid pull request", nil)
 	}
+	in.UserId = c.userID
+	if s.messages == nil {
+		return c.reply(req, errInternal, "msg service is not configured", nil)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out := &msgpb.PushMessages{Msgs: map[string]*msgpb.PullMsgs{}, NotificationMsgs: map[string]*msgpb.PullMsgs{}}
-	for _, item := range in.SeqRanges {
-		if item == nil || item.ConversationId == "" || s.history == nil {
-			continue
-		}
-		begin, end, limit := item.Begin, item.End, item.Num
-		if limit <= 0 || limit > 200 {
-			limit = 200
-		}
-		if begin <= 0 {
-			begin = 1
-		}
-		if end <= 0 {
-			end = begin + limit - 1
-		}
-		msgs, err := s.history.Range(ctx, item.ConversationId, begin, end, limit)
-		if err != nil {
-			return c.reply(req, errInternal, "query messages", nil)
-		}
-		maxSeq, err := s.history.MaxSeqs(ctx, []string{item.ConversationId})
-		if err != nil {
-			return c.reply(req, errInternal, "query max seq", nil)
-		}
-		putPull(out, item.ConversationId, &msgpb.PullMsgs{
-			Msgs:   msgs,
-			IsEnd:  rangeIsEnd(in.Order, begin, end, maxSeq[item.ConversationId]),
-			EndSeq: end,
-		})
+	out, err := s.messages.PullMessageBySeqs(ctx, in)
+	if err != nil {
+		return replyErr(c, req, err)
 	}
 	body, err := proto.Marshal(out)
 	if err != nil {
@@ -257,24 +138,50 @@ func (s *Server) pullBySeqList(c *Client, req *Req) error {
 	if err := proto.Unmarshal(req.Data, in); err != nil {
 		return c.reply(req, errArgs, "invalid seq list", nil)
 	}
+	in.UserId = c.userID
+	if s.messages == nil {
+		return c.reply(req, errInternal, "msg service is not configured", nil)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out := &msgpb.PushMessages{Msgs: map[string]*msgpb.PullMsgs{}, NotificationMsgs: map[string]*msgpb.PullMsgs{}}
-	for _, item := range in.Conversations {
-		if item == nil || item.ConversationId == "" || s.history == nil {
-			continue
-		}
-		msgs, err := s.history.BySeqs(ctx, item.ConversationId, item.Seqs)
-		if err != nil {
-			return c.reply(req, errInternal, "query messages", nil)
-		}
-		putPull(out, item.ConversationId, &msgpb.PullMsgs{Msgs: msgs, IsEnd: true})
+	out, err := s.messages.GetSeqMessage(ctx, in)
+	if err != nil {
+		return replyErr(c, req, err)
 	}
 	body, err := proto.Marshal(out)
 	if err != nil {
 		return c.reply(req, errInternal, "marshal messages", nil)
 	}
 	return c.reply(req, 0, "", body)
+}
+
+func replyErr(c *Client, req *Req, err error) error {
+	code, text := fromServiceErr(err)
+	return c.reply(req, code, text, nil)
+}
+
+func fromServiceErr(err error) (int, string) {
+	if code, ok := errorcode.CodeOf(err); ok {
+		switch code {
+		case errorcode.MsgNotFriend, errorcode.MsgBlocked, errorcode.MsgInvalidArgs, errorcode.NoPermission:
+			return int(code), status.Convert(err).Message()
+		}
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		return errInternal, "msg service"
+	}
+	switch st.Code() {
+	case codes.InvalidArgument:
+		return errArgs, st.Message()
+	case codes.PermissionDenied:
+		return int(errorcode.NoPermission), st.Message()
+	case codes.FailedPrecondition:
+		if code, ok := errorcode.CodeOf(err); ok {
+			return int(code), st.Message()
+		}
+	}
+	return errInternal, st.Message()
 }
 
 func (s *Server) lastMessages(c *Client, req *Req) error {
@@ -284,26 +191,17 @@ func (s *Server) lastMessages(c *Client, req *Req) error {
 			return c.reply(req, errArgs, "invalid last message request", nil)
 		}
 	}
+	in.UserId = c.userID
+	if s.messages == nil {
+		return c.reply(req, errInternal, "msg service is not configured", nil)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	ids := in.ConversationIds
-	if len(ids) == 0 {
-		ids = s.userConversations(ctx, c.userID)
+	resp, err := s.messages.GetLastMessage(ctx, in)
+	if err != nil {
+		return replyErr(c, req, err)
 	}
-	out := &msgpb.GetLastMessageResp{Msgs: map[string]*msgpb.MsgData{}}
-	for _, id := range ids {
-		if s.history == nil || id == "" {
-			continue
-		}
-		msg, err := s.history.Last(ctx, id)
-		if err != nil {
-			return c.reply(req, errInternal, "query last message", nil)
-		}
-		if msg != nil {
-			out.Msgs[id] = msg
-		}
-	}
-	body, err := proto.Marshal(out)
+	body, err := proto.Marshal(resp)
 	if err != nil {
 		return c.reply(req, errInternal, "marshal last message", nil)
 	}
@@ -341,54 +239,4 @@ func (s *Server) subscribe(c *Client, req *Req) error {
 		return c.reply(req, errInternal, "marshal online status", nil)
 	}
 	return c.reply(req, 0, "", body)
-}
-
-func (s *Server) userConversations(ctx context.Context, userID string) []string {
-	seen := map[string]struct{}{}
-	var ids []string
-	add := func(id string) {
-		if id == "" {
-			return
-		}
-		if _, ok := seen[id]; ok {
-			return
-		}
-		seen[id] = struct{}{}
-		ids = append(ids, id)
-	}
-	if s.history != nil {
-		found, err := s.history.ConversationIDs(ctx, userID)
-		if err == nil {
-			for _, id := range found {
-				add(id)
-			}
-		}
-	}
-	if s.groups != nil {
-		joined, err := s.groups.Joined(ctx, userID)
-		if err == nil {
-			for _, group := range joined {
-				add(msgconv.GroupConversationID(group.ID, group.Super))
-			}
-		}
-	}
-	return ids
-}
-
-func rangeIsEnd(order int32, begin, end, maxSeq int64) bool {
-	if order == orderDesc {
-		return begin <= 1
-	}
-	if maxSeq <= 0 {
-		return true
-	}
-	return maxSeq <= end
-}
-
-func putPull(out *msgpb.PushMessages, conversationID string, pull *msgpb.PullMsgs) {
-	if msgconv.IsNotificationConversation(conversationID) {
-		out.NotificationMsgs[conversationID] = pull
-		return
-	}
-	out.Msgs[conversationID] = pull
 }

@@ -53,7 +53,8 @@ func TestInsertAndReadSeq(t *testing.T) {
 		SendId: "a", RecvId: "b", SessionType: model.SessionSingle, ContentType: 101,
 		Content: []byte("hello"), ClientMsgId: "c1", ServerMsgId: "s1", Seq: 1,
 		Status: model.StatusSending, Options: map[string]bool{model.OptHistory: true},
-		AtUserIdList: []string{"b"},
+		AtUserIdList:    []string{"b"},
+		OfflinePushInfo: &msgpb.OfflinePushInfo{Title: "hello", Desc: "preview", IosBadgeCount: true, SignalInfo: "sig"},
 	}
 	if err := st.InsertMessages(ctx, conversationID, []*msgpb.MsgData{msg}); err != nil {
 		t.Fatal(err)
@@ -73,6 +74,9 @@ func TestInsertAndReadSeq(t *testing.T) {
 	}
 	if !got.Options[model.OptHistory] {
 		t.Fatalf("options %+v", got.Options)
+	}
+	if got.GetOfflinePushInfo().GetTitle() != "hello" || got.GetOfflinePushInfo().GetDesc() != "preview" || !got.GetOfflinePushInfo().GetIosBadgeCount() || got.GetOfflinePushInfo().GetSignalInfo() != "sig" {
+		t.Fatalf("offline push %+v", got.OfflinePushInfo)
 	}
 	if err := st.SaveMaxSeq(ctx, conversationID, 2); err != nil {
 		t.Fatal(err)

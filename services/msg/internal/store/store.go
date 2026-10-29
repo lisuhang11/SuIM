@@ -4,9 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
@@ -49,7 +52,7 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 		if stmt == "" {
 			continue
 		}
-		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !duplicateColumn(err) {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
@@ -59,6 +62,7 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 type SeqState struct {
 	MaxSeq     int64
 	HasReadSeq int64
+	MaxSeqTime int64
 }
 
 // ConversationIDs returns conversations this user has sent, received, or read.
@@ -121,12 +125,90 @@ func (s *Store) SeqState(ctx context.Context, userID string, conversationIDs []s
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
+		if err := rows.Close(); err != nil {
+			return nil, err
+		}
+	}
+	times, err := s.maxSeqTimes(ctx, conversationIDs)
+	if err != nil {
+		return nil, err
 	}
 	out := make(map[string]SeqState, len(conversationIDs))
 	for _, id := range conversationIDs {
-		out[id] = SeqState{MaxSeq: maxSeq[id], HasReadSeq: readSeq[id]}
+		out[id] = SeqState{MaxSeq: maxSeq[id], HasReadSeq: readSeq[id], MaxSeqTime: times[id]}
 	}
 	return out, nil
+}
+
+// maxSeqTimes is the send time of the message at each conversation's max sequence.
+func (s *Store) maxSeqTimes(ctx context.Context, conversationIDs []string) (map[string]int64, error) {
+	out := map[string]int64{}
+	if len(conversationIDs) == 0 {
+		return out, nil
+	}
+	query := `
+SELECT m.conversation_id, m.send_time
+FROM msg m
+INNER JOIN seq_conversation s ON s.conversation_id = m.conversation_id AND m.seq = s.max_seq
+WHERE m.conversation_id IN (` + placeholders(len(conversationIDs)) + `)`
+	rows, err := s.db.QueryContext(ctx, query, args(conversationIDs)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var sendTime int64
+		if err := rows.Scan(&id, &sendTime); err != nil {
+			return nil, err
+		}
+		out[id] = sendTime
+	}
+	return out, rows.Err()
+}
+
+// SeqBounds is the visible sequence window. A user's min or max replaces the conversation bound when it is tighter.
+func (s *Store) SeqBounds(ctx context.Context, userID, conversationID string) (int64, int64, error) {
+	var minSeq, maxSeq int64
+	err := s.db.QueryRowContext(ctx, `SELECT min_seq, max_seq FROM seq_conversation WHERE conversation_id = ?`, conversationID).Scan(&minSeq, &maxSeq)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, nil
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+	var userMin, userMax int64
+	err = s.db.QueryRowContext(ctx, `SELECT min_seq, max_seq FROM seq_user WHERE user_id = ? AND conversation_id = ?`, userID, conversationID).Scan(&userMin, &userMax)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, err
+	}
+	if userMin > minSeq {
+		minSeq = userMin
+	}
+	if userMax > 0 && userMax < maxSeq {
+		maxSeq = userMax
+	}
+	if minSeq <= 0 && maxSeq > 0 {
+		minSeq = 1
+	}
+	return minSeq, maxSeq, nil
+}
+
+// PinnedConversationIDs reads conversation.is_pinned. A missing table leaves the seq response intact.
+func (s *Store) PinnedConversationIDs(ctx context.Context, userID string) ([]string, error) {
+	if userID == "" {
+		return nil, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT conversation_id FROM conversation WHERE owner_user_id = ? AND is_pinned = 1`, userID)
+	if err != nil {
+		var me *mysql.MySQLError
+		if errors.As(err, &me) && me.Number == 1146 {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	return scanStrings(rows)
 }
 
 func (s *Store) Range(ctx context.Context, conversationID string, begin, end, limit int64) ([]*msgpb.MsgData, error) {
@@ -187,7 +269,9 @@ WHERE conversation_id = ? ORDER BY seq DESC LIMIT 1`, conversationID)
 const selectMsg = `
 SELECT seq, send_id, recv_id, group_id, client_msg_id, server_msg_id, sender_platform_id,
   sender_nickname, sender_face_url, session_type, msg_from, content_type, content,
-  send_time, create_time, status, is_read, options, at_user_id_list, attached_info, ex
+  send_time, create_time, status, is_read, options, at_user_id_list, attached_info, ex,
+  offline_push_title, offline_push_desc, offline_push_ex, offline_push_ios_sound,
+  offline_push_ios_badge_count, offline_push_signal_info
 FROM msg `
 
 func scanMsgs(rows *sql.Rows) ([]*msgpb.MsgData, error) {
@@ -195,18 +279,23 @@ func scanMsgs(rows *sql.Rows) ([]*msgpb.MsgData, error) {
 	for rows.Next() {
 		msg := &msgpb.MsgData{}
 		var (
-			options, atUsers, attached sql.NullString
-			contentBytes               []byte
-			read                       int
+			options, atUsers, attached         sql.NullString
+			contentBytes                       []byte
+			read                               int
+			pushTitle, pushDesc, pushEx, sound string
+			badge                              int
+			signal                             sql.NullString
 		)
 		if err := rows.Scan(
 			&msg.Seq, &msg.SendId, &msg.RecvId, &msg.GroupId, &msg.ClientMsgId, &msg.ServerMsgId, &msg.SenderPlatformId,
 			&msg.SenderNickname, &msg.SenderFaceUrl, &msg.SessionType, &msg.MsgFrom, &msg.ContentType, &contentBytes,
 			&msg.SendTime, &msg.CreateTime, &msg.Status, &read, &options, &atUsers, &attached, &msg.Ex,
+			&pushTitle, &pushDesc, &pushEx, &sound, &badge, &signal,
 		); err != nil {
 			return nil, err
 		}
 		msg.Content = contentBytes
+		msg.OfflinePushInfo = offlinePush(pushTitle, pushDesc, pushEx, sound, badge, signal.String)
 		msg.IsRead = read == 1
 		if attached.Valid {
 			msg.AttachedInfo = attached.String
@@ -254,4 +343,23 @@ func args(ids []string) []any {
 		out[i] = id
 	}
 	return out
+}
+
+func duplicateColumn(err error) bool {
+	var me *mysql.MySQLError
+	return errors.As(err, &me) && me.Number == 1060
+}
+
+func offlinePush(title, desc, ex, sound string, badge int, signal string) *msgpb.OfflinePushInfo {
+	if title == "" && desc == "" && ex == "" && sound == "" && badge == 0 && signal == "" {
+		return nil
+	}
+	return &msgpb.OfflinePushInfo{
+		Title:         title,
+		Desc:          desc,
+		Ex:            ex,
+		IosPushSound:  sound,
+		IosBadgeCount: badge == 1,
+		SignalInfo:    signal,
+	}
 }

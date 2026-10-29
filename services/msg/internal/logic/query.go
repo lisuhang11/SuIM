@@ -43,6 +43,14 @@ func (s *Server) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *msgp
 		}
 	}
 	out := &msgpb.GetConversationsHasReadAndMaxSeqResp{Seqs: map[string]*msgpb.Seqs{}}
+	// 1. 只有客户端要求时才查置顶。会话表不存在时仍返回序号。
+	if req.GetReturnPinned() && s.store != nil {
+		pinned, err := s.store.PinnedConversationIDs(ctx, req.GetUserId())
+		if err != nil {
+			return nil, errorcode.ErrInternal.WithMsg("query pinned conversations")
+		}
+		out.PinnedConversationIds = pinned
+	}
 	if s.store == nil || len(ids) == 0 {
 		return out, nil
 	}
@@ -51,7 +59,7 @@ func (s *Server) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *msgp
 		return nil, errorcode.ErrInternal.WithMsg("query read seq")
 	}
 	for id, item := range state {
-		out.Seqs[id] = &msgpb.Seqs{MaxSeq: item.MaxSeq, HasReadSeq: item.HasReadSeq}
+		out.Seqs[id] = &msgpb.Seqs{MaxSeq: item.MaxSeq, HasReadSeq: item.HasReadSeq, MaxSeqTime: item.MaxSeqTime}
 	}
 	return out, nil
 }
@@ -127,13 +135,53 @@ func (s *Server) GetSeqMessage(ctx context.Context, req *msgpb.GetSeqMessageReq)
 		if s.store == nil {
 			continue
 		}
-		msgs, err := s.store.BySeqs(ctx, item.ConversationId, item.Seqs)
+		// 1. 先按会话和用户的序号边界判断 isEnd，再只取范围内的序号。
+		minSeq, maxSeq, err := s.store.SeqBounds(ctx, req.GetUserId(), item.ConversationId)
 		if err != nil {
-			return nil, errorcode.ErrInternal.WithMsg("query messages")
+			return nil, errorcode.ErrInternal.WithMsg("query seq bounds")
 		}
-		putPull(out, item.ConversationId, &msgpb.PullMsgs{Msgs: msgs, IsEnd: true})
+		wanted, isEnd, endSeq := seqWindow(req.Order, minSeq, maxSeq, item.Seqs)
+		var msgs []*msgpb.MsgData
+		if len(wanted) > 0 {
+			if len(wanted) > 200 {
+				wanted = wanted[:200]
+			}
+			msgs, err = s.store.BySeqs(ctx, item.ConversationId, wanted)
+			if err != nil {
+				return nil, errorcode.ErrInternal.WithMsg("query messages")
+			}
+		}
+		putPull(out, item.ConversationId, &msgpb.PullMsgs{
+			Msgs:   msgs,
+			IsEnd:  isEnd,
+			EndSeq: endSeq,
+			MaxSeq: maxSeq,
+		})
 	}
 	return out, nil
+}
+
+// seqWindow keeps sequences inside [minSeq, maxSeq]. Order only decides which side is the end.
+func seqWindow(order int32, minSeq, maxSeq int64, seqs []int64) (wanted []int64, isEnd bool, endSeq int64) {
+	for _, seq := range seqs {
+		if seq <= 0 {
+			continue
+		}
+		if maxSeq > 0 && seq >= minSeq && seq <= maxSeq {
+			wanted = append(wanted, seq)
+			continue
+		}
+		if order == orderDesc && seq < minSeq {
+			isEnd = true
+			endSeq = minSeq
+			continue
+		}
+		if order != orderDesc && seq > maxSeq {
+			isEnd = true
+			endSeq = maxSeq
+		}
+	}
+	return wanted, isEnd, endSeq
 }
 
 func (s *Server) GetLastMessage(ctx context.Context, req *msgpb.GetLastMessageReq) (*msgpb.GetLastMessageResp, error) {

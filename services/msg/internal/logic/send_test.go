@@ -131,6 +131,10 @@ func (f *fakeProducer) Send(_ context.Context, key string, body []byte) error {
 type fakeHistory struct {
 	msgs       []*msgpb.MsgData
 	max        int64
+	min        int64
+	read       int64
+	seqTime    int64
+	pinned     []string
 	begin, end int64
 }
 
@@ -138,15 +142,45 @@ func (f *fakeHistory) ConversationIDs(context.Context, string) ([]string, error)
 func (f *fakeHistory) MaxSeqs(context.Context, []string) (map[string]int64, error) {
 	return map[string]int64{"si_a_b": f.max}, nil
 }
-func (f *fakeHistory) SeqState(context.Context, string, []string) (map[string]store.SeqState, error) {
-	return nil, nil
+func (f *fakeHistory) SeqState(_ context.Context, _ string, ids []string) (map[string]store.SeqState, error) {
+	if f.seqTime == 0 && f.read == 0 {
+		return nil, nil
+	}
+	out := map[string]store.SeqState{}
+	for _, id := range ids {
+		out[id] = store.SeqState{MaxSeq: f.max, HasReadSeq: f.read, MaxSeqTime: f.seqTime}
+	}
+	return out, nil
+}
+func (f *fakeHistory) SeqBounds(context.Context, string, string) (int64, int64, error) {
+	minSeq := f.min
+	if minSeq <= 0 && f.max > 0 {
+		minSeq = 1
+	}
+	return minSeq, f.max, nil
+}
+func (f *fakeHistory) PinnedConversationIDs(context.Context, string) ([]string, error) {
+	return f.pinned, nil
 }
 func (f *fakeHistory) Range(_ context.Context, _ string, begin, end, _ int64) ([]*msgpb.MsgData, error) {
 	f.begin, f.end = begin, end
 	return f.msgs, nil
 }
-func (f *fakeHistory) BySeqs(context.Context, string, []int64) ([]*msgpb.MsgData, error) {
-	return f.msgs, nil
+func (f *fakeHistory) BySeqs(_ context.Context, _ string, seqs []int64) ([]*msgpb.MsgData, error) {
+	want := map[int64]struct{}{}
+	for _, seq := range seqs {
+		want[seq] = struct{}{}
+	}
+	var out []*msgpb.MsgData
+	for _, msg := range f.msgs {
+		if msg == nil {
+			continue
+		}
+		if _, ok := want[msg.Seq]; ok {
+			out = append(out, msg)
+		}
+	}
+	return out, nil
 }
 func (f *fakeHistory) Last(context.Context, string) (*msgpb.MsgData, error) { return nil, nil }
 

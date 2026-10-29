@@ -32,7 +32,17 @@ func (s *Server) dispatch(c *Client, req *Req) error {
 	case reqPullConvLastMsg:
 		return s.lastMessages(c, req)
 	case reqLogoutMsg:
-		if err := c.reply(req, 0, "", nil); err != nil {
+		// 1. 接受登出请求。当前没有推送令牌表，所以只回空响应。
+		if len(req.Data) > 0 {
+			if err := proto.Unmarshal(req.Data, &msgpb.DelUserPushTokenReq{}); err != nil {
+				return c.reply(req, errArgs, "invalid logout request", nil)
+			}
+		}
+		body, err := proto.Marshal(&msgpb.DelUserPushTokenResp{})
+		if err != nil {
+			return c.reply(req, errInternal, "marshal response", nil)
+		}
+		if err := c.reply(req, 0, "", body); err != nil {
 			return err
 		}
 		return errLogout

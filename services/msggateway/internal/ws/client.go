@@ -3,7 +3,9 @@ package ws
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/gorilla/websocket"
@@ -19,6 +21,7 @@ type Client struct {
 	token      string
 	compress   bool
 	background bool
+	sdkVersion string
 	encoder    Encoder
 	conn       socket
 	server     *Server
@@ -29,9 +32,19 @@ type Client struct {
 func (c *Client) readLoop() {
 	defer c.close()
 	for {
-		_, data, err := c.conn.Read()
+		typ, data, err := c.conn.Read()
 		if err != nil {
 			return
+		}
+		// 1. 文本帧只处理心跳。业务帧仍是二进制。
+		if typ == websocket.TextMessage {
+			if err := c.pongText(data); err != nil {
+				return
+			}
+			continue
+		}
+		if typ != websocket.BinaryMessage {
+			continue
 		}
 		if c.compress {
 			data, err = decompress(data)
@@ -46,6 +59,29 @@ func (c *Client) readLoop() {
 		if err := c.server.dispatch(c, &req); err != nil {
 			return
 		}
+	}
+}
+
+func (c *Client) pongText(data []byte) error {
+	var msg struct {
+		Type string          `json:"type"`
+		Body json.RawMessage `json:"body"`
+	}
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return err
+	}
+	switch msg.Type {
+	case textPong:
+		return nil
+	case textPing:
+		msg.Type = textPong
+		body, err := json.Marshal(msg)
+		if err != nil {
+			return err
+		}
+		return c.conn.Write(websocket.TextMessage, body)
+	default:
+		return fmt.Errorf("unsupported text message %s", msg.Type)
 	}
 }
 

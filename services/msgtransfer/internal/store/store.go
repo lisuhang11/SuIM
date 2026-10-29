@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
+
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/services/msgtransfer/internal/model"
 )
@@ -49,7 +51,7 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 		if stmt == "" {
 			continue
 		}
-		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !duplicateColumn(err) {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
@@ -86,17 +88,21 @@ func (s *Store) InsertMessages(ctx context.Context, conversationID string, msgs 
 		if msg.IsRead {
 			read = 1
 		}
+		title, desc, pushEx, sound, signal, badge := offlineCols(msg.OfflinePushInfo)
 		_, err = tx.ExecContext(ctx, `
 INSERT IGNORE INTO msg (
   conversation_id, seq, send_id, recv_id, group_id, client_msg_id, server_msg_id,
   sender_platform_id, sender_nickname, sender_face_url, session_type, msg_from,
   content_type, content, send_time, create_time, status, is_read, options,
-  at_user_id_list, attached_info, ex
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  at_user_id_list, attached_info, ex,
+  offline_push_title, offline_push_desc, offline_push_ex, offline_push_ios_sound,
+  offline_push_ios_badge_count, offline_push_signal_info
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			conversationID, msg.Seq, msg.SendId, msg.RecvId, msg.GroupId, msg.ClientMsgId, msg.ServerMsgId,
 			msg.SenderPlatformId, msg.SenderNickname, msg.SenderFaceUrl, msg.SessionType, msg.MsgFrom,
 			msg.ContentType, msg.Content, msg.SendTime, msg.CreateTime, status, read, options,
 			atUsers, msg.AttachedInfo, msg.Ex,
+			title, desc, pushEx, sound, badge, signal,
 		)
 		if err != nil {
 			return err
@@ -110,18 +116,24 @@ func (s *Store) GetMessage(ctx context.Context, conversationID string, seq int64
 	row := s.db.QueryRowContext(ctx, `
 SELECT send_id, recv_id, group_id, client_msg_id, server_msg_id, sender_platform_id,
   sender_nickname, sender_face_url, session_type, msg_from, content_type, content,
-  send_time, create_time, status, is_read, options, at_user_id_list, attached_info, ex
+  send_time, create_time, status, is_read, options, at_user_id_list, attached_info, ex,
+  offline_push_title, offline_push_desc, offline_push_ex, offline_push_ios_sound,
+  offline_push_ios_badge_count, offline_push_signal_info
 FROM msg WHERE conversation_id = ? AND seq = ?`, conversationID, seq)
 	msg := &msgpb.MsgData{Seq: seq}
 	var (
-		options, atUsers, attached sql.NullString
-		contentBytes               []byte
-		read                       int
+		options, atUsers, attached         sql.NullString
+		contentBytes                       []byte
+		read                               int
+		pushTitle, pushDesc, pushEx, sound string
+		badge                              int
+		signal                             sql.NullString
 	)
 	err := row.Scan(
 		&msg.SendId, &msg.RecvId, &msg.GroupId, &msg.ClientMsgId, &msg.ServerMsgId, &msg.SenderPlatformId,
 		&msg.SenderNickname, &msg.SenderFaceUrl, &msg.SessionType, &msg.MsgFrom, &msg.ContentType, &contentBytes,
 		&msg.SendTime, &msg.CreateTime, &msg.Status, &read, &options, &atUsers, &attached, &msg.Ex,
+		&pushTitle, &pushDesc, &pushEx, &sound, &badge, &signal,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -131,6 +143,7 @@ FROM msg WHERE conversation_id = ? AND seq = ?`, conversationID, seq)
 	}
 	msg.Content = contentBytes
 	msg.IsRead = read == 1
+	msg.OfflinePushInfo = offlinePush(pushTitle, pushDesc, pushEx, sound, badge, signal.String)
 	if attached.Valid {
 		msg.AttachedInfo = attached.String
 	}
@@ -213,6 +226,35 @@ INSERT IGNORE INTO conversation (
 	}
 	_, err := s.db.ExecContext(ctx, query, recvID, conversationID, sendID)
 	return err
+}
+
+func duplicateColumn(err error) bool {
+	var me *mysql.MySQLError
+	return errors.As(err, &me) && me.Number == 1060
+}
+
+func offlineCols(info *msgpb.OfflinePushInfo) (title, desc, ex, sound, signal string, badge int) {
+	if info == nil {
+		return "", "", "", "", "", 0
+	}
+	if info.IosBadgeCount {
+		badge = 1
+	}
+	return info.Title, info.Desc, info.Ex, info.IosPushSound, info.SignalInfo, badge
+}
+
+func offlinePush(title, desc, ex, sound string, badge int, signal string) *msgpb.OfflinePushInfo {
+	if title == "" && desc == "" && ex == "" && sound == "" && badge == 0 && signal == "" {
+		return nil
+	}
+	return &msgpb.OfflinePushInfo{
+		Title:         title,
+		Desc:          desc,
+		Ex:            ex,
+		IosPushSound:  sound,
+		IosBadgeCount: badge == 1,
+		SignalInfo:    signal,
+	}
 }
 
 func jsonOrNil(v any) (any, error) {

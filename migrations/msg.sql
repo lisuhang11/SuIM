@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS `msg` (
   `offline_push_ex`       VARCHAR(1024) NOT NULL DEFAULT '',
   `offline_push_ios_sound` VARCHAR(255) NOT NULL DEFAULT '',
   `offline_push_ios_badge_count` TINYINT(1) NOT NULL DEFAULT 0,
+  `offline_push_signal_info` TEXT NULL,
   `revoke_role`           INT          NULL,
   `revoke_user_id`        VARCHAR(64)  NULL,
   `revoke_nickname`       VARCHAR(255) NULL,
@@ -58,3 +59,10 @@ CREATE TABLE IF NOT EXISTS `seq_user` (
   `read_seq`        BIGINT       NOT NULL DEFAULT 0,
   PRIMARY KEY (`user_id`, `conversation_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE `msg` ADD COLUMN `offline_push_title` VARCHAR(255) NOT NULL DEFAULT '';
+ALTER TABLE `msg` ADD COLUMN `offline_push_desc` VARCHAR(1024) NOT NULL DEFAULT '';
+ALTER TABLE `msg` ADD COLUMN `offline_push_ex` VARCHAR(1024) NOT NULL DEFAULT '';
+ALTER TABLE `msg` ADD COLUMN `offline_push_ios_sound` VARCHAR(255) NOT NULL DEFAULT '';
+ALTER TABLE `msg` ADD COLUMN `offline_push_ios_badge_count` TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE `msg` ADD COLUMN `offline_push_signal_info` TEXT NULL;

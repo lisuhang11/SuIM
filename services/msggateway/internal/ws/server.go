@@ -99,24 +99,31 @@ func New(opts Options) *Server {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	info, code, msg := parseDial(r)
 	if code != 0 {
-		writeErr(w, http.StatusBadRequest, code, msg)
+		s.failDial(w, r, info.SendResponse, http.StatusBadRequest, code, msg)
 		return
 	}
 	if s.hub.ConnCount() >= int(s.maxConn) {
-		writeErr(w, http.StatusServiceUnavailable, errInternal, "too many connections")
+		s.failDial(w, r, info.SendResponse, http.StatusServiceUnavailable, errInternal, "too many connections")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	userID, platformID, err := s.tokens.Validate(ctx, info.Token)
 	cancel()
 	if err != nil || userID == "" || userID != info.UserID || int(platformID) != info.PlatformID {
-		writeErr(w, http.StatusUnauthorized, errToken, "token invalid")
+		s.failDial(w, r, info.SendResponse, http.StatusUnauthorized, errToken, "token invalid")
 		return
 	}
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		slog.Warn("websocket upgrade", "err", err, "userID", info.UserID)
 		return
+	}
+	// 1. isMsgResp 时，升级成功后先回一帧空的成功 JSON。
+	if info.SendResponse {
+		if err := conn.WriteMessage(websocket.TextMessage, dialOK); err != nil {
+			_ = conn.Close()
+			return
+		}
 	}
 	client := &Client{
 		id:         newConnID(),
@@ -125,10 +132,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		token:      info.Token,
 		compress:   info.Compression == "gzip",
 		background: info.Background,
+		sdkVersion: info.SDKVersion,
 		encoder:    newEncoder(info.SDKType),
 		conn:       newSocket(conn),
 		server:     s,
 	}
+	slog.Debug("websocket connected", "userID", client.userID, "platformID", client.platformID, "sdkVersion", client.sdkVersion)
 	quiet, kicked := s.hub.Add(client)
 	for _, old := range quiet {
 		old.close()
@@ -155,9 +164,17 @@ func (s *Server) Deliver(ctx context.Context, msg *msgpb.MsgData, conversationID
 	}
 	for _, userID := range s.recipients(ctx, msg) {
 		for _, client := range s.hub.Clients(userID) {
+			// 2. 后台中的 iOS 不收在线推送，留给离线通知。
+			if !acceptsOnlinePush(client) {
+				continue
+			}
 			_ = client.write(Resp{ReqIdentifier: reqPushMsg, Data: body})
 		}
 	}
+}
+
+func acceptsOnlinePush(c *Client) bool {
+	return c != nil && !(c.platformID == platformIOS && c.background)
 }
 
 func (s *Server) recipients(ctx context.Context, msg *msgpb.MsgData) []string {
@@ -219,25 +236,36 @@ func pushBody(msg *msgpb.MsgData, conversationID string) *msgpb.PushMessages {
 }
 
 type dialInfo struct {
-	Token       string `json:"token"`
-	UserID      string `json:"userID"`
-	SendID      string `json:"sendID"`
-	PlatformID  int    `json:"platformID"`
-	OperationID string `json:"operationID"`
-	Compression string `json:"compression"`
-	SDKType     string `json:"sdkType"`
-	Background  bool   `json:"background"`
+	Token        string `json:"token"`
+	UserID       string `json:"userID"`
+	SendID       string `json:"sendID"`
+	PlatformID   int    `json:"platformID"`
+	OperationID  string `json:"operationID"`
+	Compression  string `json:"compression"`
+	SDKType      string `json:"sdkType"`
+	SDKVersion   string `json:"sdkVersion"`
+	Background   bool   `json:"background"`
+	SendResponse bool   `json:"sendResponse"`
 }
+
+var dialOK = []byte(`{"errCode":0,"errMsg":"","errDlt":""}`)
 
 func parseDial(r *http.Request) (dialInfo, int, string) {
 	var info dialInfo
 	query := r.URL.Query()
+	queryResp := false
+	if query.Get("isMsgResp") != "" {
+		queryResp, _ = strconv.ParseBool(query.Get("isMsgResp"))
+	}
+	querySDK := query.Get("sdkVersion")
 	if raw := query.Get("v"); raw != "" {
 		body, err := base64.RawURLEncoding.DecodeString(raw)
 		if err != nil {
+			info.SendResponse = queryResp
 			return info, errArgs, "handshake is not base64"
 		}
 		if err := json.Unmarshal(body, &info); err != nil {
+			info.SendResponse = queryResp
 			return info, errArgs, "handshake is not json"
 		}
 	} else {
@@ -246,14 +274,21 @@ func parseDial(r *http.Request) (dialInfo, int, string) {
 		info.OperationID = query.Get("operationID")
 		info.Compression = query.Get("compression")
 		info.SDKType = query.Get("sdkType")
+		info.SDKVersion = querySDK
+		info.SendResponse = queryResp
 		platformID, err := strconv.Atoi(query.Get("platformID"))
 		if err != nil {
+			info.SendResponse = queryResp
 			return info, errArgs, "platformID is invalid"
 		}
 		info.PlatformID = platformID
 		if query.Get("isBackground") != "" {
 			info.Background, _ = strconv.ParseBool(query.Get("isBackground"))
 		}
+	}
+	info.SendResponse = info.SendResponse || queryResp
+	if info.SDKVersion == "" {
+		info.SDKVersion = querySDK
 	}
 	if info.UserID == "" {
 		info.UserID = info.SendID
@@ -271,6 +306,23 @@ func parseDial(r *http.Request) (dialInfo, int, string) {
 		return info, errArgs, "sdkType is invalid"
 	}
 	return info, 0, ""
+}
+
+func (s *Server) failDial(w http.ResponseWriter, r *http.Request, send bool, status, code int, msg string) {
+	if !send {
+		writeErr(w, status, code, msg)
+		return
+	}
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	body, err := json.Marshal(map[string]any{"errCode": code, "errMsg": msg, "errDlt": ""})
+	if err != nil {
+		return
+	}
+	_ = conn.WriteMessage(websocket.TextMessage, body)
 }
 
 func writeErr(w http.ResponseWriter, status, code int, msg string) {

@@ -32,6 +32,10 @@ const (
 	errInternal = 500
 
 	onlineStatus = 1
+	platformIOS  = 1
+
+	textPing = "ping"
+	textPong = "pong"
 )
 
 // Req matches the SDK general websocket request. Field names are part of the gob encoding.

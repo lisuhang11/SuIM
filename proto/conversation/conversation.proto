@@ -319,7 +319,8 @@ message GetFullOwnerConversationIDsResp {
 }
 
 // --------------- incremental sync ---------------
-// version 为 0，或 version_id 对不上，返回全量（full=true，数据在 insert）。
+// version 为 0、version_id 为空，或 version_id 对不上当前头，返回 full=true，不带会话行。
+// 版本相同则变更列表为空。差额达到限额时同样返回 full=true。
 // 否则返回 version 之后的变更日志。
 message GetIncrementalConversationReq {
   string user_id = 1;

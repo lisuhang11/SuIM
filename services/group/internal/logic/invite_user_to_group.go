@@ -70,7 +70,9 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 		if err := s.store.CreateRequests(ctx, requests); err != nil {
 			return nil, mapStore(err)
 		}
-		// 入群申请通知尚未接入。
+		for _, request := range requests {
+			s.notifyJoinApplication(ctx, op, group, profiles[request.UserID], request)
+		}
 		return &grouppb.InviteUserToGroupResp{}, nil
 	}
 

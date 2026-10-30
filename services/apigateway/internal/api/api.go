@@ -1,4 +1,4 @@
-// Package api is the HTTP entry in front of the user, relation, group, and third services.
+// Package api is the HTTP entry in front of the user, relation, group, conversation, and third services.
 //
 // Public:
 //
@@ -46,6 +46,9 @@
 //	POST /group/incremental_members
 //	POST /group/incremental_members_batch
 //	POST /group/full_member_ids
+//	POST /conversation/set
+//	POST /conversation/full_ids
+//	POST /conversation/incremental
 //	POST /object/part_limit
 //	POST /object/initiate_multipart_upload
 //	POST /object/auth_sign
@@ -74,6 +77,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
@@ -90,14 +94,15 @@ type session struct {
 type ctxKey struct{}
 
 type Server struct {
-	users   userpb.UserServiceClient
-	friends relationpb.RelationServiceClient
-	groups  grouppb.GroupServiceClient
-	third   thirdpb.ThirdServiceClient
+	users         userpb.UserServiceClient
+	friends       relationpb.RelationServiceClient
+	groups        grouppb.GroupServiceClient
+	conversations conversationpb.ConversationServiceClient
+	third         thirdpb.ThirdServiceClient
 }
 
-func New(users userpb.UserServiceClient, friends relationpb.RelationServiceClient, groups grouppb.GroupServiceClient, third thirdpb.ThirdServiceClient) *Server {
-	return &Server{users: users, friends: friends, groups: groups, third: third}
+func New(users userpb.UserServiceClient, friends relationpb.RelationServiceClient, groups grouppb.GroupServiceClient, conversations conversationpb.ConversationServiceClient, third thirdpb.ThirdServiceClient) *Server {
+	return &Server{users: users, friends: friends, groups: groups, conversations: conversations, third: third}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -138,6 +143,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /group/invite", s.auth(s.inviteUserToGroup))
 	mux.HandleFunc("POST /group/kick", s.auth(s.kickGroupMember))
 	mux.HandleFunc("POST /group/quit", s.auth(s.quitGroup))
+	mux.HandleFunc("POST /group/join", s.auth(s.joinGroup))
+	mux.HandleFunc("POST /group/application_response", s.auth(s.groupApplicationResponse))
+	mux.HandleFunc("POST /group/recv_applications", s.auth(s.recvGroupApplications))
+	mux.HandleFunc("POST /group/sent_applications", s.auth(s.sentGroupApplications))
+	mux.HandleFunc("POST /group/set_member_info", s.auth(s.setGroupMemberInfo))
+	mux.HandleFunc("POST /group/mute_member", s.auth(s.muteGroupMember))
+	mux.HandleFunc("POST /group/cancel_mute_member", s.auth(s.cancelMuteGroupMember))
+	mux.HandleFunc("POST /group/mute", s.auth(s.muteGroup))
+	mux.HandleFunc("POST /group/cancel_mute", s.auth(s.cancelMuteGroup))
 	mux.HandleFunc("POST /group/members", s.auth(s.getGroupMembers))
 	mux.HandleFunc("POST /group/member_ids", s.auth(s.getGroupMemberUserIDs))
 	mux.HandleFunc("POST /group/joined", s.auth(s.getJoinedGroups))
@@ -146,6 +160,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /group/incremental_members", s.auth(s.incrementalGroupMembers))
 	mux.HandleFunc("POST /group/incremental_members_batch", s.auth(s.batchIncrementalGroupMembers))
 	mux.HandleFunc("POST /group/full_member_ids", s.auth(s.fullGroupMemberUserIDs))
+
+	mux.HandleFunc("POST /conversation/set", s.auth(s.setConversations))
+	mux.HandleFunc("POST /conversation/full_ids", s.auth(s.fullOwnerConversationIDs))
+	mux.HandleFunc("POST /conversation/incremental", s.auth(s.incrementalConversation))
 
 	mux.HandleFunc("POST /object/part_limit", s.auth(s.partLimit))
 	mux.HandleFunc("POST /object/initiate_multipart_upload", s.auth(s.initiateMultipartUpload))

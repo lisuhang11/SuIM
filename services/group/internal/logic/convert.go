@@ -23,6 +23,10 @@ func mapStore(err error) error {
 		return errorcode.ErrGroupAlreadyMember
 	case errors.Is(err, store.ErrRequestRepeated):
 		return errorcode.ErrGroupRequestRepeated
+	case errors.Is(err, store.ErrRequestNotFound):
+		return errorcode.ErrGroupRequestNotFound
+	case errors.Is(err, store.ErrRequestHandled):
+		return errorcode.ErrGroupRequestHandled
 	case errors.Is(err, store.ErrDismissed):
 		return errorcode.ErrGroupDismissed
 	default:

@@ -11,6 +11,23 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 )
 
+func TestUserNotificationIsSingle(t *testing.T) {
+	msg, err := userNotificationMsg("u1", "owner", contentJoinGroupApplication, joinApplicationTips{
+		ReqMsg:    "hi",
+		UUID:      "abc",
+		Applicant: noticePublicUser{UserID: "u1"},
+	}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.SessionType != sessionSingle || msg.SendId != "u1" || msg.RecvId != "owner" || msg.GroupId != "" || msg.ContentType != contentJoinGroupApplication {
+		t.Fatalf("msg = %+v", msg)
+	}
+	if msg.Options["isNotNotification"] {
+		t.Fatal("notification option must be false")
+	}
+}
+
 func TestNotificationMsgCarriesMemberVersion(t *testing.T) {
 	group := &model.Group{GroupID: "g1", GroupName: "test群", GroupType: model.GroupTypeSuper, OwnerUserID: "owner"}
 	msg, err := notificationMsg("owner", group, contentMemberInvited, memberInvitedTips{

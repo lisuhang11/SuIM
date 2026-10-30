@@ -133,6 +133,159 @@ func (s *Server) kickGroupMember(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, resp)
 }
 
+func (s *Server) joinGroup(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.JoinGroupReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetUserId()) {
+		return
+	}
+	resp, err := s.groups.JoinGroup(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) groupApplicationResponse(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.GroupApplicationResponseReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetOpUserId()) {
+		return
+	}
+	resp, err := s.groups.GroupApplicationResponse(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) recvGroupApplications(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.GetGroupApplicationListReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetFromUserId()) {
+		return
+	}
+	resp, err := s.groups.GetGroupApplicationList(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) sentGroupApplications(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.GetUserReqApplicationListReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetUserId()) {
+		return
+	}
+	resp, err := s.groups.GetUserReqApplicationList(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) setGroupMemberInfo(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.SetGroupMemberInfoReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetOpUserId()) {
+		return
+	}
+	resp, err := s.groups.SetGroupMemberInfo(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) muteGroupMember(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.MuteGroupMemberReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetOpUserId()) {
+		return
+	}
+	resp, err := s.groups.MuteGroupMember(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) cancelMuteGroupMember(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.CancelMuteGroupMemberReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetOpUserId()) {
+		return
+	}
+	resp, err := s.groups.CancelMuteGroupMember(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) muteGroup(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.MuteGroupReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetOpUserId()) {
+		return
+	}
+	resp, err := s.groups.MuteGroup(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) cancelMuteGroup(w http.ResponseWriter, r *http.Request) {
+	var req grouppb.CancelMuteGroupReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !s.requireSelf(w, r, req.GetOpUserId()) {
+		return
+	}
+	resp, err := s.groups.CancelMuteGroup(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
 func (s *Server) quitGroup(w http.ResponseWriter, r *http.Request) {
 	var req grouppb.QuitGroupReq
 	if err := decode(w, r, &req); err != nil {

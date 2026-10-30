@@ -17,9 +17,19 @@ type JoinedGroup struct {
 	Super bool
 }
 
-// Groups lists the groups a user has joined. A nil directory skips group conversations.
+// GroupSpeaker is one member's place in a group, used when a group message is sent.
+type GroupSpeaker struct {
+	Found     bool
+	InGroup   bool
+	Status    int32
+	Role      int32
+	MuteEndMs int64
+}
+
+// Groups lists joined groups and reads one member for the mute check.
 type Groups interface {
 	Joined(ctx context.Context, userID string) ([]JoinedGroup, error)
+	Speaker(ctx context.Context, groupID, userID string) (GroupSpeaker, error)
 }
 
 // Relations checks friendship and blocks before a single chat is accepted.

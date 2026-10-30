@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 
+	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	"github.com/lisuhang11/SuIM/services/msg/internal/logic"
@@ -66,4 +67,24 @@ func (c *GroupClient) Joined(ctx context.Context, userID string) ([]logic.Joined
 		}
 	}
 	return out, nil
+}
+
+func (c *GroupClient) Speaker(ctx context.Context, groupID, userID string) (logic.GroupSpeaker, error) {
+	resp, err := c.client.GetGroupMember(ctx, &grouppb.GetGroupMemberReq{GroupId: groupID, UserId: userID})
+	if err != nil {
+		if code, ok := errorcode.CodeOf(err); ok && code == errorcode.GroupNotFound {
+			return logic.GroupSpeaker{}, nil
+		}
+		return logic.GroupSpeaker{}, err
+	}
+	speaker := logic.GroupSpeaker{
+		Found:  resp.GetGroup().GetGroupId() != "",
+		Status: resp.GetGroup().GetStatus(),
+	}
+	if member := resp.GetMember(); member.GetUserId() != "" {
+		speaker.InGroup = true
+		speaker.Role = member.GetRoleLevel()
+		speaker.MuteEndMs = member.GetMuteEndTime()
+	}
+	return speaker, nil
 }

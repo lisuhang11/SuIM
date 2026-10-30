@@ -27,6 +27,16 @@ const (
 	GroupService_InviteUserToGroup_FullMethodName               = "/group.GroupService/InviteUserToGroup"
 	GroupService_KickGroupMember_FullMethodName                 = "/group.GroupService/KickGroupMember"
 	GroupService_QuitGroup_FullMethodName                       = "/group.GroupService/QuitGroup"
+	GroupService_JoinGroup_FullMethodName                       = "/group.GroupService/JoinGroup"
+	GroupService_GroupApplicationResponse_FullMethodName        = "/group.GroupService/GroupApplicationResponse"
+	GroupService_GetGroupApplicationList_FullMethodName         = "/group.GroupService/GetGroupApplicationList"
+	GroupService_GetUserReqApplicationList_FullMethodName       = "/group.GroupService/GetUserReqApplicationList"
+	GroupService_SetGroupMemberInfo_FullMethodName              = "/group.GroupService/SetGroupMemberInfo"
+	GroupService_MuteGroupMember_FullMethodName                 = "/group.GroupService/MuteGroupMember"
+	GroupService_CancelMuteGroupMember_FullMethodName           = "/group.GroupService/CancelMuteGroupMember"
+	GroupService_MuteGroup_FullMethodName                       = "/group.GroupService/MuteGroup"
+	GroupService_CancelMuteGroup_FullMethodName                 = "/group.GroupService/CancelMuteGroup"
+	GroupService_GetGroupMember_FullMethodName                  = "/group.GroupService/GetGroupMember"
 	GroupService_GetGroupMembers_FullMethodName                 = "/group.GroupService/GetGroupMembers"
 	GroupService_GetGroupMemberUserIDs_FullMethodName           = "/group.GroupService/GetGroupMemberUserIDs"
 	GroupService_GetJoinedGroups_FullMethodName                 = "/group.GroupService/GetJoinedGroups"
@@ -51,6 +61,17 @@ type GroupServiceClient interface {
 	InviteUserToGroup(ctx context.Context, in *InviteUserToGroupReq, opts ...grpc.CallOption) (*InviteUserToGroupResp, error)
 	KickGroupMember(ctx context.Context, in *KickGroupMemberReq, opts ...grpc.CallOption) (*KickGroupMemberResp, error)
 	QuitGroup(ctx context.Context, in *QuitGroupReq, opts ...grpc.CallOption) (*QuitGroupResp, error)
+	JoinGroup(ctx context.Context, in *JoinGroupReq, opts ...grpc.CallOption) (*JoinGroupResp, error)
+	GroupApplicationResponse(ctx context.Context, in *GroupApplicationResponseReq, opts ...grpc.CallOption) (*GroupApplicationResponseResp, error)
+	GetGroupApplicationList(ctx context.Context, in *GetGroupApplicationListReq, opts ...grpc.CallOption) (*GetGroupApplicationListResp, error)
+	GetUserReqApplicationList(ctx context.Context, in *GetUserReqApplicationListReq, opts ...grpc.CallOption) (*GetUserReqApplicationListResp, error)
+	SetGroupMemberInfo(ctx context.Context, in *SetGroupMemberInfoReq, opts ...grpc.CallOption) (*SetGroupMemberInfoResp, error)
+	MuteGroupMember(ctx context.Context, in *MuteGroupMemberReq, opts ...grpc.CallOption) (*MuteGroupMemberResp, error)
+	CancelMuteGroupMember(ctx context.Context, in *CancelMuteGroupMemberReq, opts ...grpc.CallOption) (*CancelMuteGroupMemberResp, error)
+	MuteGroup(ctx context.Context, in *MuteGroupReq, opts ...grpc.CallOption) (*MuteGroupResp, error)
+	CancelMuteGroup(ctx context.Context, in *CancelMuteGroupReq, opts ...grpc.CallOption) (*CancelMuteGroupResp, error)
+	// 消息服务发群消息前读取群状态和这一名成员，用来判断禁言。
+	GetGroupMember(ctx context.Context, in *GetGroupMemberReq, opts ...grpc.CallOption) (*GetGroupMemberResp, error)
 	GetGroupMembers(ctx context.Context, in *GetGroupMembersReq, opts ...grpc.CallOption) (*GetGroupMembersResp, error)
 	GetGroupMemberUserIDs(ctx context.Context, in *GetGroupMemberUserIDsReq, opts ...grpc.CallOption) (*GetGroupMemberUserIDsResp, error)
 	GetJoinedGroups(ctx context.Context, in *GetJoinedGroupsReq, opts ...grpc.CallOption) (*GetJoinedGroupsResp, error)
@@ -144,6 +165,106 @@ func (c *groupServiceClient) QuitGroup(ctx context.Context, in *QuitGroupReq, op
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QuitGroupResp)
 	err := c.cc.Invoke(ctx, GroupService_QuitGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) JoinGroup(ctx context.Context, in *JoinGroupReq, opts ...grpc.CallOption) (*JoinGroupResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinGroupResp)
+	err := c.cc.Invoke(ctx, GroupService_JoinGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) GroupApplicationResponse(ctx context.Context, in *GroupApplicationResponseReq, opts ...grpc.CallOption) (*GroupApplicationResponseResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GroupApplicationResponseResp)
+	err := c.cc.Invoke(ctx, GroupService_GroupApplicationResponse_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) GetGroupApplicationList(ctx context.Context, in *GetGroupApplicationListReq, opts ...grpc.CallOption) (*GetGroupApplicationListResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGroupApplicationListResp)
+	err := c.cc.Invoke(ctx, GroupService_GetGroupApplicationList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) GetUserReqApplicationList(ctx context.Context, in *GetUserReqApplicationListReq, opts ...grpc.CallOption) (*GetUserReqApplicationListResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserReqApplicationListResp)
+	err := c.cc.Invoke(ctx, GroupService_GetUserReqApplicationList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) SetGroupMemberInfo(ctx context.Context, in *SetGroupMemberInfoReq, opts ...grpc.CallOption) (*SetGroupMemberInfoResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetGroupMemberInfoResp)
+	err := c.cc.Invoke(ctx, GroupService_SetGroupMemberInfo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) MuteGroupMember(ctx context.Context, in *MuteGroupMemberReq, opts ...grpc.CallOption) (*MuteGroupMemberResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MuteGroupMemberResp)
+	err := c.cc.Invoke(ctx, GroupService_MuteGroupMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) CancelMuteGroupMember(ctx context.Context, in *CancelMuteGroupMemberReq, opts ...grpc.CallOption) (*CancelMuteGroupMemberResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelMuteGroupMemberResp)
+	err := c.cc.Invoke(ctx, GroupService_CancelMuteGroupMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) MuteGroup(ctx context.Context, in *MuteGroupReq, opts ...grpc.CallOption) (*MuteGroupResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MuteGroupResp)
+	err := c.cc.Invoke(ctx, GroupService_MuteGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) CancelMuteGroup(ctx context.Context, in *CancelMuteGroupReq, opts ...grpc.CallOption) (*CancelMuteGroupResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelMuteGroupResp)
+	err := c.cc.Invoke(ctx, GroupService_CancelMuteGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *groupServiceClient) GetGroupMember(ctx context.Context, in *GetGroupMemberReq, opts ...grpc.CallOption) (*GetGroupMemberResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGroupMemberResp)
+	err := c.cc.Invoke(ctx, GroupService_GetGroupMember_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -244,6 +365,17 @@ type GroupServiceServer interface {
 	InviteUserToGroup(context.Context, *InviteUserToGroupReq) (*InviteUserToGroupResp, error)
 	KickGroupMember(context.Context, *KickGroupMemberReq) (*KickGroupMemberResp, error)
 	QuitGroup(context.Context, *QuitGroupReq) (*QuitGroupResp, error)
+	JoinGroup(context.Context, *JoinGroupReq) (*JoinGroupResp, error)
+	GroupApplicationResponse(context.Context, *GroupApplicationResponseReq) (*GroupApplicationResponseResp, error)
+	GetGroupApplicationList(context.Context, *GetGroupApplicationListReq) (*GetGroupApplicationListResp, error)
+	GetUserReqApplicationList(context.Context, *GetUserReqApplicationListReq) (*GetUserReqApplicationListResp, error)
+	SetGroupMemberInfo(context.Context, *SetGroupMemberInfoReq) (*SetGroupMemberInfoResp, error)
+	MuteGroupMember(context.Context, *MuteGroupMemberReq) (*MuteGroupMemberResp, error)
+	CancelMuteGroupMember(context.Context, *CancelMuteGroupMemberReq) (*CancelMuteGroupMemberResp, error)
+	MuteGroup(context.Context, *MuteGroupReq) (*MuteGroupResp, error)
+	CancelMuteGroup(context.Context, *CancelMuteGroupReq) (*CancelMuteGroupResp, error)
+	// 消息服务发群消息前读取群状态和这一名成员，用来判断禁言。
+	GetGroupMember(context.Context, *GetGroupMemberReq) (*GetGroupMemberResp, error)
 	GetGroupMembers(context.Context, *GetGroupMembersReq) (*GetGroupMembersResp, error)
 	GetGroupMemberUserIDs(context.Context, *GetGroupMemberUserIDsReq) (*GetGroupMemberUserIDsResp, error)
 	GetJoinedGroups(context.Context, *GetJoinedGroupsReq) (*GetJoinedGroupsResp, error)
@@ -286,6 +418,36 @@ func (UnimplementedGroupServiceServer) KickGroupMember(context.Context, *KickGro
 }
 func (UnimplementedGroupServiceServer) QuitGroup(context.Context, *QuitGroupReq) (*QuitGroupResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method QuitGroup not implemented")
+}
+func (UnimplementedGroupServiceServer) JoinGroup(context.Context, *JoinGroupReq) (*JoinGroupResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method JoinGroup not implemented")
+}
+func (UnimplementedGroupServiceServer) GroupApplicationResponse(context.Context, *GroupApplicationResponseReq) (*GroupApplicationResponseResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GroupApplicationResponse not implemented")
+}
+func (UnimplementedGroupServiceServer) GetGroupApplicationList(context.Context, *GetGroupApplicationListReq) (*GetGroupApplicationListResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGroupApplicationList not implemented")
+}
+func (UnimplementedGroupServiceServer) GetUserReqApplicationList(context.Context, *GetUserReqApplicationListReq) (*GetUserReqApplicationListResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUserReqApplicationList not implemented")
+}
+func (UnimplementedGroupServiceServer) SetGroupMemberInfo(context.Context, *SetGroupMemberInfoReq) (*SetGroupMemberInfoResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetGroupMemberInfo not implemented")
+}
+func (UnimplementedGroupServiceServer) MuteGroupMember(context.Context, *MuteGroupMemberReq) (*MuteGroupMemberResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method MuteGroupMember not implemented")
+}
+func (UnimplementedGroupServiceServer) CancelMuteGroupMember(context.Context, *CancelMuteGroupMemberReq) (*CancelMuteGroupMemberResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelMuteGroupMember not implemented")
+}
+func (UnimplementedGroupServiceServer) MuteGroup(context.Context, *MuteGroupReq) (*MuteGroupResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method MuteGroup not implemented")
+}
+func (UnimplementedGroupServiceServer) CancelMuteGroup(context.Context, *CancelMuteGroupReq) (*CancelMuteGroupResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelMuteGroup not implemented")
+}
+func (UnimplementedGroupServiceServer) GetGroupMember(context.Context, *GetGroupMemberReq) (*GetGroupMemberResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGroupMember not implemented")
 }
 func (UnimplementedGroupServiceServer) GetGroupMembers(context.Context, *GetGroupMembersReq) (*GetGroupMembersResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGroupMembers not implemented")
@@ -476,6 +638,186 @@ func _GroupService_QuitGroup_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GroupService_JoinGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinGroupReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).JoinGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_JoinGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).JoinGroup(ctx, req.(*JoinGroupReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_GroupApplicationResponse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GroupApplicationResponseReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).GroupApplicationResponse(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_GroupApplicationResponse_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).GroupApplicationResponse(ctx, req.(*GroupApplicationResponseReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_GetGroupApplicationList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGroupApplicationListReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).GetGroupApplicationList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_GetGroupApplicationList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).GetGroupApplicationList(ctx, req.(*GetGroupApplicationListReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_GetUserReqApplicationList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserReqApplicationListReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).GetUserReqApplicationList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_GetUserReqApplicationList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).GetUserReqApplicationList(ctx, req.(*GetUserReqApplicationListReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_SetGroupMemberInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetGroupMemberInfoReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).SetGroupMemberInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_SetGroupMemberInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).SetGroupMemberInfo(ctx, req.(*SetGroupMemberInfoReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_MuteGroupMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MuteGroupMemberReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).MuteGroupMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_MuteGroupMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).MuteGroupMember(ctx, req.(*MuteGroupMemberReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_CancelMuteGroupMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelMuteGroupMemberReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).CancelMuteGroupMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_CancelMuteGroupMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).CancelMuteGroupMember(ctx, req.(*CancelMuteGroupMemberReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_MuteGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MuteGroupReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).MuteGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_MuteGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).MuteGroup(ctx, req.(*MuteGroupReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_CancelMuteGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelMuteGroupReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).CancelMuteGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_CancelMuteGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).CancelMuteGroup(ctx, req.(*CancelMuteGroupReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GroupService_GetGroupMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGroupMemberReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).GetGroupMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_GetGroupMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).GetGroupMember(ctx, req.(*GetGroupMemberReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GroupService_GetGroupMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetGroupMembersReq)
 	if err := dec(in); err != nil {
@@ -658,6 +1000,46 @@ var GroupService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QuitGroup",
 			Handler:    _GroupService_QuitGroup_Handler,
+		},
+		{
+			MethodName: "JoinGroup",
+			Handler:    _GroupService_JoinGroup_Handler,
+		},
+		{
+			MethodName: "GroupApplicationResponse",
+			Handler:    _GroupService_GroupApplicationResponse_Handler,
+		},
+		{
+			MethodName: "GetGroupApplicationList",
+			Handler:    _GroupService_GetGroupApplicationList_Handler,
+		},
+		{
+			MethodName: "GetUserReqApplicationList",
+			Handler:    _GroupService_GetUserReqApplicationList_Handler,
+		},
+		{
+			MethodName: "SetGroupMemberInfo",
+			Handler:    _GroupService_SetGroupMemberInfo_Handler,
+		},
+		{
+			MethodName: "MuteGroupMember",
+			Handler:    _GroupService_MuteGroupMember_Handler,
+		},
+		{
+			MethodName: "CancelMuteGroupMember",
+			Handler:    _GroupService_CancelMuteGroupMember_Handler,
+		},
+		{
+			MethodName: "MuteGroup",
+			Handler:    _GroupService_MuteGroup_Handler,
+		},
+		{
+			MethodName: "CancelMuteGroup",
+			Handler:    _GroupService_CancelMuteGroup_Handler,
+		},
+		{
+			MethodName: "GetGroupMember",
+			Handler:    _GroupService_GetGroupMember_Handler,
 		},
 		{
 			MethodName: "GetGroupMembers",

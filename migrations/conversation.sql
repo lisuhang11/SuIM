@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `conversation` (
   `burn_duration`            INT          NOT NULL DEFAULT 0 COMMENT '阅后即焚时长，单位秒',
   `group_at_type`            INT          NOT NULL DEFAULT 0 COMMENT '群@类型',
   `attached_info`            TEXT         NULL COMMENT '附加信息',
+  `ex`                       VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '扩展字段',
   `max_seq`                  BIGINT       NOT NULL DEFAULT 0 COMMENT '最大消息序号',
   `min_seq`                  BIGINT       NOT NULL DEFAULT 0 COMMENT '最小消息序号',
   `create_time`              DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',

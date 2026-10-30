@@ -22,6 +22,8 @@ const (
 	GroupNothingToUpdate Code = 4016
 	GroupRequestRepeated Code = 4017
 	GroupIDGenFailed     Code = 4018
+	GroupRequestNotFound Code = 4019
+	GroupRequestHandled  Code = 4020
 )
 
 var (
@@ -43,4 +45,6 @@ var (
 	ErrGroupNothingToUpdate = Define(GroupNothingToUpdate, codes.InvalidArgument, "no group field to update")
 	ErrGroupRequestRepeated = Define(GroupRequestRepeated, codes.AlreadyExists, "group request already pending")
 	ErrGroupIDGenFailed     = Define(GroupIDGenFailed, codes.Internal, "group id generation failed")
+	ErrGroupRequestNotFound = Define(GroupRequestNotFound, codes.NotFound, "group request not found")
+	ErrGroupRequestHandled  = Define(GroupRequestHandled, codes.FailedPrecondition, "group request already handled")
 )

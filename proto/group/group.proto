@@ -16,6 +16,17 @@ service GroupService {
   rpc InviteUserToGroup(InviteUserToGroupReq) returns (InviteUserToGroupResp);
   rpc KickGroupMember(KickGroupMemberReq) returns (KickGroupMemberResp);
   rpc QuitGroup(QuitGroupReq) returns (QuitGroupResp);
+  rpc JoinGroup(JoinGroupReq) returns (JoinGroupResp);
+  rpc GroupApplicationResponse(GroupApplicationResponseReq) returns (GroupApplicationResponseResp);
+  rpc GetGroupApplicationList(GetGroupApplicationListReq) returns (GetGroupApplicationListResp);
+  rpc GetUserReqApplicationList(GetUserReqApplicationListReq) returns (GetUserReqApplicationListResp);
+  rpc SetGroupMemberInfo(SetGroupMemberInfoReq) returns (SetGroupMemberInfoResp);
+  rpc MuteGroupMember(MuteGroupMemberReq) returns (MuteGroupMemberResp);
+  rpc CancelMuteGroupMember(CancelMuteGroupMemberReq) returns (CancelMuteGroupMemberResp);
+  rpc MuteGroup(MuteGroupReq) returns (MuteGroupResp);
+  rpc CancelMuteGroup(CancelMuteGroupReq) returns (CancelMuteGroupResp);
+  // 消息服务发群消息前读取群状态和这一名成员，用来判断禁言。
+  rpc GetGroupMember(GetGroupMemberReq) returns (GetGroupMemberResp);
   rpc GetGroupMembers(GetGroupMembersReq) returns (GetGroupMembersResp);
   rpc GetGroupMemberUserIDs(GetGroupMemberUserIDsReq) returns (GetGroupMemberUserIDsResp);
   rpc GetJoinedGroups(GetJoinedGroupsReq) returns (GetJoinedGroupsResp);
@@ -38,7 +49,7 @@ message GroupInfo {
   string face_url = 5;
   int64  create_time = 6;
   string ex = 7;
-  int32  status = 8;             // 0正常 2已解散
+  int32  status = 8;             // 0正常 2已解散 3全员禁言
   string creator_user_id = 9;
   int32  group_type = 10;       // 1普通群 2超级群
   int32  need_verification = 11; // 加群是否需要验证
@@ -164,6 +175,113 @@ message QuitGroupReq {
   string user_id = 2;             // 退群者(不能是群主)
 }
 message QuitGroupResp {}
+
+// --------------- JoinGroup ---------------
+// user_id 是申请人。need_verification 为 2 时直接入群，0 和 1 只写入申请。
+message JoinGroupReq {
+  string group_id = 1;
+  string user_id = 2;
+  string req_msg = 3;
+  int32 join_source = 4;          // 1管理员 2邀请 3搜索 4二维码
+  string ex = 5;
+}
+message JoinGroupResp {}
+
+// --------------- GroupApplicationResponse ---------------
+// op_user_id 必须是群主或管理员。from_user_id 是申请人。handle_result 为 1 同意、-1 拒绝。
+message GroupApplicationResponseReq {
+  string group_id = 1;
+  string op_user_id = 2;
+  string from_user_id = 3;
+  string handled_msg = 4;
+  int32 handle_result = 5;
+}
+message GroupApplicationResponseResp {}
+
+// --------------- GetGroupApplicationList ---------------
+// 群主或管理员查看自己管理的群的入群申请。group_ids 为空时查全部管理中的群。
+message GetGroupApplicationListReq {
+  string from_user_id = 1;
+  repeated string group_ids = 2;
+  repeated int32 handle_results = 3; // 空表示全部，0未处理 1同意 -1拒绝
+  int32 offset = 4;
+  int32 limit = 5;
+}
+message GetGroupApplicationListResp {
+  repeated GroupRequestInfo requests = 1;
+  int32 total = 2;
+}
+
+// --------------- GetUserReqApplicationList ---------------
+message GetUserReqApplicationListReq {
+  string user_id = 1;
+  repeated string group_ids = 2;
+  repeated int32 handle_results = 3;
+  int32 offset = 4;
+  int32 limit = 5;
+}
+message GetUserReqApplicationListResp {
+  repeated GroupRequestInfo requests = 1;
+  int32 total = 2;
+}
+
+// --------------- SetGroupMemberInfo ---------------
+// 未传的字段不修改。role_level 只能是 60 管理员或 20 普通成员。
+message SetGroupMemberInfo {
+  string group_id = 1;
+  string user_id = 2;
+  optional string nickname = 3;
+  optional string face_url = 4;
+  optional int32 role_level = 5;
+  optional string ex = 6;
+}
+message SetGroupMemberInfoReq {
+  string op_user_id = 1;
+  repeated SetGroupMemberInfo members = 2;
+}
+message SetGroupMemberInfoResp {}
+
+// --------------- Mute ---------------
+message MuteGroupMemberReq {
+  string group_id = 1;
+  string op_user_id = 2;
+  string user_id = 3;
+  uint32 muted_seconds = 4;
+}
+
+message MuteGroupMemberResp {}
+
+message CancelMuteGroupMemberReq {
+  string group_id = 1;
+  string op_user_id = 2;
+  string user_id = 3;
+}
+
+message CancelMuteGroupMemberResp {}
+
+message MuteGroupReq {
+  string group_id = 1;
+  string op_user_id = 2;
+}
+
+message MuteGroupResp {}
+
+message CancelMuteGroupReq {
+  string group_id = 1;
+  string op_user_id = 2;
+}
+
+message CancelMuteGroupResp {}
+
+message GetGroupMemberReq {
+  string group_id = 1;
+  string user_id = 2;
+}
+
+message GetGroupMemberResp {
+  GroupInfo group = 1;
+  GroupMemberFullInfo member = 2;
+}
 
 // --------------- GetGroupMembers ---------------
 message GetGroupMembersReq {

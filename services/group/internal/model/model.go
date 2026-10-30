@@ -8,17 +8,23 @@ const (
 
 	GroupStatusOK        = 0
 	GroupStatusDismissed = 2
+	GroupStatusMuted     = 3
 
 	RoleOwner    = 100
 	RoleAdmin    = 60
 	RoleOrdinary = 20
 
+	JoinByAdmin      = 1
 	JoinByInvitation = 2
+	JoinBySearch     = 3
+	JoinByQRCode     = 4
 
 	// NeedVerifyInviteDirect means an application needs approval and an invitation joins directly.
 	NeedVerifyInviteDirect = 0
 	// NeedVerifyAll means both applications and invitations from ordinary members need approval.
 	NeedVerifyAll = 1
+	// NeedDirectly means anyone can join without approval.
+	NeedDirectly = 2
 
 	VersionInsert = 1
 	VersionDelete = 2
@@ -28,6 +34,8 @@ const (
 	SortElemID = "____S_O_R_T_I_D____"
 
 	HandlePending = 0
+	HandleAgree   = 1
+	HandleRefuse  = -1
 )
 
 type Group struct {
@@ -69,9 +77,13 @@ type Request struct {
 	UserID        string
 	HandleResult  int32
 	ReqMsg        string
+	HandledMsg    string
 	JoinSource    int32
 	InviterUserID string
+	HandleUserID  string
 	ReqTime       time.Time
+	HandledTime   time.Time
+	Ex            string
 }
 
 type UserProfile struct {
@@ -89,6 +101,21 @@ type VersionLog struct {
 	ElemID  string
 	State   int32
 	Version uint64
+}
+
+type MemberPatch struct {
+	Nickname  *string
+	FaceURL   *string
+	RoleLevel *int32
+	Ex        *string
+}
+
+func (p MemberPatch) Empty() bool {
+	return p.Nickname == nil && p.FaceURL == nil && p.RoleLevel == nil && p.Ex == nil
+}
+
+func (p MemberPatch) ProfileChanged() bool {
+	return p.Nickname != nil || p.FaceURL != nil || p.Ex != nil
 }
 
 type GroupPatch struct {

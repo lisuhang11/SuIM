@@ -16,6 +16,8 @@ var (
 	ErrNotMember       = errors.New("not a group member")
 	ErrAlreadyMember   = errors.New("already in group")
 	ErrRequestRepeated = errors.New("group request already pending")
+	ErrRequestNotFound = errors.New("group request not found")
+	ErrRequestHandled  = errors.New("group request already handled")
 	ErrDismissed       = errors.New("group dismissed")
 )
 

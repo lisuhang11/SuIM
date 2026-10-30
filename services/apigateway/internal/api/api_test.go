@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
@@ -101,6 +102,16 @@ func (s *groupStub) CreateGroup(_ context.Context, req *grouppb.CreateGroupReq) 
 	return &grouppb.CreateGroupResp{GroupId: "g1"}, nil
 }
 
+type conversationStub struct {
+	conversationpb.UnimplementedConversationServiceServer
+	userIDs []string
+}
+
+func (s *conversationStub) SetConversations(_ context.Context, req *conversationpb.SetConversationsReq) (*conversationpb.SetConversationsResp, error) {
+	s.userIDs = append([]string(nil), req.GetUserIds()...)
+	return &conversationpb.SetConversationsResp{}, nil
+}
+
 type thirdStub struct {
 	thirdpb.UnimplementedThirdServiceServer
 	userID     string
@@ -121,19 +132,23 @@ func TestGateway(t *testing.T) {
 	users := &userStub{}
 	friends := &relationStub{}
 	groups := &groupStub{}
+	conversations := &conversationStub{}
 	uploads := &thirdStub{}
 	userLis := serve(t, func(gs *grpc.Server) { userpb.RegisterUserServiceServer(gs, users) })
 	relLis := serve(t, func(gs *grpc.Server) { relationpb.RegisterRelationServiceServer(gs, friends) })
 	groupLis := serve(t, func(gs *grpc.Server) { grouppb.RegisterGroupServiceServer(gs, groups) })
+	conversationLis := serve(t, func(gs *grpc.Server) { conversationpb.RegisterConversationServiceServer(gs, conversations) })
 	thirdLis := serve(t, func(gs *grpc.Server) { thirdpb.RegisterThirdServiceServer(gs, uploads) })
 	userConn := dial(t, userLis)
 	relConn := dial(t, relLis)
 	groupConn := dial(t, groupLis)
+	conversationConn := dial(t, conversationLis)
 	thirdConn := dial(t, thirdLis)
 	httpSrv := httptest.NewServer(New(
 		userpb.NewUserServiceClient(userConn),
 		relationpb.NewRelationServiceClient(relConn),
 		grouppb.NewGroupServiceClient(groupConn),
+		conversationpb.NewConversationServiceClient(conversationConn),
 		thirdpb.NewThirdServiceClient(thirdConn),
 	).Handler())
 	t.Cleanup(httpSrv.Close)
@@ -239,6 +254,22 @@ func TestGateway(t *testing.T) {
 	res = post(t, httpSrv.URL+"/object/initiate_form_data", "good", `{"name":"u1/a.bin","size":1}`)
 	if res.Status != http.StatusOK || uploads.formUserID != "u1" || !bytes.Contains(res.Data, []byte(`"file":"file"`)) {
 		t.Fatalf("form %+v user=%s", res, uploads.formUserID)
+	}
+	res = post(t, httpSrv.URL+"/conversation/set", "good", `{"user_ids":["u2"],"conversation":{"conversation_id":"si_u1_u2","conversation_type":1,"user_id":"u2"}}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("set conversation as other %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/conversation/set", "good", `{"user_ids":["u1"],"conversation":{"conversation_id":"si_u1_u2","conversation_type":1,"user_id":"u2","is_pinned":true}}`)
+	if res.Status != http.StatusOK || len(conversations.userIDs) != 1 || conversations.userIDs[0] != "u1" {
+		t.Fatalf("set conversation %+v ids=%v", res, conversations.userIDs)
+	}
+	res = post(t, httpSrv.URL+"/conversation/full_ids", "good", `{"user_id":"u2"}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("full conversation ids as other %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/conversation/incremental", "good", `{"user_id":"u2"}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("incremental conversation as other %+v", res)
 	}
 	res = post(t, httpSrv.URL+"/user/login", "", `{`)
 	if res.Status != http.StatusBadRequest || res.Code != int32(errorcode.InvalidJSON) {

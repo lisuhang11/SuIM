@@ -17,6 +17,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relationpb"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
@@ -68,6 +69,11 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial group service: %w", err)
 	}
 	defer groupConn.Close()
+	conversationConn, err := reg.Dial(ctx, "conversation", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dial conversation service: %w", err)
+	}
+	defer conversationConn.Close()
 	thirdConn, err := reg.Dial(ctx, "third", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dial third service: %w", err)
@@ -83,6 +89,7 @@ func run(cfgPath string) error {
 			userpb.NewUserServiceClient(userConn),
 			relationpb.NewRelationServiceClient(relationConn),
 			grouppb.NewGroupServiceClient(groupConn),
+			conversationpb.NewConversationServiceClient(conversationConn),
 			thirdpb.NewThirdServiceClient(thirdConn),
 		).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,

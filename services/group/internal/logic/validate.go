@@ -85,9 +85,68 @@ func normalizeFlag(v int32) error {
 	return nil
 }
 
+func normalizeGroupIDs(ids []string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, raw := range ids {
+		id, err := normalizeGroupID(raw)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out, nil
+}
+
+func normalizeHandleResult(v int32) error {
+	switch v {
+	case model.HandleAgree, model.HandleRefuse:
+		return nil
+	default:
+		return errorcode.ErrGroupInvalidArgs.WithMsg("handle_result is invalid")
+	}
+}
+
+func normalizeHandleResults(values []int32) ([]int32, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	out := make([]int32, 0, len(values))
+	seen := make(map[int32]struct{}, len(values))
+	for _, v := range values {
+		switch v {
+		case model.HandlePending, model.HandleAgree, model.HandleRefuse:
+		default:
+			return nil, errorcode.ErrGroupInvalidArgs.WithMsg("handle_result is invalid")
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+func normalizeJoinSource(v int32) error {
+	switch v {
+	case model.JoinByAdmin, model.JoinByInvitation, model.JoinBySearch, model.JoinByQRCode:
+		return nil
+	default:
+		return errorcode.ErrGroupInvalidArgs.WithMsg("join_source is invalid")
+	}
+}
+
 func normalizeVerification(v int32) error {
 	switch v {
-	case model.NeedVerifyInviteDirect, model.NeedVerifyAll, 2:
+	case model.NeedVerifyInviteDirect, model.NeedVerifyAll, model.NeedDirectly:
 		return nil
 	default:
 		return errorcode.ErrGroupInvalidArgs.WithMsg("need_verification is invalid")

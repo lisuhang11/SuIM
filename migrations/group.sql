@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS `group` (
     `introduction`             VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '群简介',
     `face_url`                 VARCHAR(512)  NOT NULL DEFAULT '' COMMENT '群头像',
     `create_time`              DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-    `status`                   INT           NOT NULL DEFAULT 0 COMMENT '0正常 2已解散',
+    `status`                   INT           NOT NULL DEFAULT 0 COMMENT '0正常 2已解散 3全员禁言',
     `creator_user_id`          VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '创建者用户ID',
     `group_type`               INT           NOT NULL DEFAULT 1 COMMENT '群类型，1为普通群，2为超级群',
     `need_verification`        INT           NOT NULL DEFAULT 0 COMMENT '0邀请直接加入 1都需验证 2直接加入',

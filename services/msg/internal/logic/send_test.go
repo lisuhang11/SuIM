@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -36,6 +37,21 @@ func TestSingleSendRejectsBlock(t *testing.T) {
 	}
 }
 
+func TestNotificationSkipsRelationCheck(t *testing.T) {
+	prod := &fakeProducer{}
+	srv := New(nil, prod, &fakeRelations{}, nil)
+	resp, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", RecvId: "a", SessionType: 1, Content: []byte("hi"), ClientMsgId: "c1",
+		Options: map[string]bool{"isNotNotification": false},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.ClientMsgId != "c1" || prod.n != 1 || prod.key != "n_a_a" {
+		t.Fatalf("publish n=%d key=%s resp=%+v", prod.n, prod.key, resp)
+	}
+}
+
 func TestSingleSendPublishes(t *testing.T) {
 	prod := &fakeProducer{}
 	srv := New(nil, prod, &fakeRelations{friend1: true, friend2: true}, nil)
@@ -50,6 +66,56 @@ func TestSingleSendPublishes(t *testing.T) {
 	}
 	if prod.n != 1 || prod.key != "si_a_b" {
 		t.Fatalf("publish n=%d key=%s", prod.n, prod.key)
+	}
+}
+
+func TestGroupSendHonorsMute(t *testing.T) {
+	future := time.Now().Add(time.Hour).UnixMilli()
+	prod := &fakeProducer{}
+	groups := &fakeGroups{speakers: map[string]GroupSpeaker{
+		"g:e": {Found: true, InGroup: true, Role: 20, MuteEndMs: future},
+		"g:a": {Found: true, InGroup: true, Role: 100, MuteEndMs: future},
+		"g:b": {Found: true, InGroup: true, Status: 3, Role: 60},
+		"g:d": {Found: true, InGroup: true, Status: 3, Role: 20},
+		"g:x": {Found: true},
+	}}
+	srv := New(nil, prod, nil, groups)
+	send := func(user string, notice bool) error {
+		msg := &msgpb.MsgData{SendId: user, GroupId: "g", SessionType: 2, Content: []byte("hi"), ClientMsgId: user}
+		if notice {
+			msg.Options = map[string]bool{"isNotNotification": false}
+		}
+		_, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: msg})
+		return err
+	}
+	if code, _ := errorcode.CodeOf(send("e", false)); code != errorcode.MsgMutedInGroup {
+		t.Fatalf("member mute code %d", code)
+	}
+	if code, _ := errorcode.CodeOf(send("d", false)); code != errorcode.MsgMutedGroup {
+		t.Fatalf("group mute code %d", code)
+	}
+	if code, _ := errorcode.CodeOf(send("x", false)); code != errorcode.MsgNotInGroup {
+		t.Fatalf("outsider code %d", code)
+	}
+	if err := send("a", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := send("b", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := send("e", true); err != nil {
+		t.Fatal(err)
+	}
+	if prod.n != 3 || prod.key != "n_g" {
+		t.Fatalf("publish n=%d key=%s", prod.n, prod.key)
+	}
+
+	bare := New(nil, &fakeProducer{}, nil, nil)
+	_, err := bare.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", GroupId: "g", SessionType: 3, Content: []byte("hi"),
+	}})
+	if code, _ := errorcode.CodeOf(err); code != errorcode.Internal {
+		t.Fatalf("missing group service code %d err %v", code, err)
 	}
 }
 
@@ -111,6 +177,19 @@ func (f *fakeRelations) IsFriend(context.Context, string, string) (bool, bool, e
 
 func (f *fakeRelations) IsBlack(context.Context, string, string) (bool, bool, error) {
 	return f.black1, f.black2, nil
+}
+
+type fakeGroups struct {
+	speakers map[string]GroupSpeaker
+}
+
+func (f *fakeGroups) Joined(context.Context, string) ([]JoinedGroup, error) { return nil, nil }
+
+func (f *fakeGroups) Speaker(_ context.Context, groupID, userID string) (GroupSpeaker, error) {
+	if f.speakers == nil {
+		return GroupSpeaker{}, nil
+	}
+	return f.speakers[groupID+":"+userID], nil
 }
 
 type fakeProducer struct {

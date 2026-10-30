@@ -143,6 +143,24 @@ func (s *Store) memberUserIDs(ctx context.Context, groupID string) ([]string, er
 	return ids, rows.Err()
 }
 
+// Managers returns the owner and admins of a group.
+func (s *Store) Managers(ctx context.Context, groupID string) ([]*model.Member, error) {
+	rows, err := s.db.QueryContext(ctx, memberSelect+" WHERE group_id = ? AND role_level >= ? ORDER BY role_level DESC, user_id ASC", groupID, model.RoleAdmin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var members []*model.Member
+	for rows.Next() {
+		member, err := scanMember(rows)
+		if err != nil {
+			return nil, err
+		}
+		members = append(members, member)
+	}
+	return members, rows.Err()
+}
+
 func (s *Store) CreateRequests(ctx context.Context, requests []*model.Request) error {
 	if len(requests) == 0 {
 		return nil
@@ -166,8 +184,8 @@ func (s *Store) CreateRequests(ctx context.Context, requests []*model.Request) e
 		if err == sql.ErrNoRows {
 			if _, err := tx.ExecContext(ctx, `
 				INSERT INTO group_request (group_id, user_id, handle_result, req_msg, handled_msg, req_time, handle_user_id, handled_time, join_source, inviter_user_id, ex)
-				VALUES (?, ?, 0, ?, '', ?, '', NULL, ?, ?, '')`,
-				req.GroupID, req.UserID, req.ReqMsg, req.ReqTime.UTC(), req.JoinSource, req.InviterUserID); err != nil {
+				VALUES (?, ?, 0, ?, '', ?, '', NULL, ?, ?, ?)`,
+				req.GroupID, req.UserID, req.ReqMsg, req.ReqTime.UTC(), req.JoinSource, req.InviterUserID, req.Ex); err != nil {
 				if isDuplicate(err) {
 					return ErrRequestRepeated
 				}
@@ -183,9 +201,9 @@ func (s *Store) CreateRequests(ctx context.Context, requests []*model.Request) e
 		}
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE group_request
-			SET handle_result = 0, req_msg = ?, handled_msg = '', req_time = ?, handle_user_id = '', handled_time = NULL, join_source = ?, inviter_user_id = ?
+			SET handle_result = 0, req_msg = ?, handled_msg = '', req_time = ?, handle_user_id = '', handled_time = NULL, join_source = ?, inviter_user_id = ?, ex = ?
 			WHERE group_id = ? AND user_id = ?`,
-			req.ReqMsg, req.ReqTime.UTC(), req.JoinSource, req.InviterUserID, req.GroupID, req.UserID); err != nil {
+			req.ReqMsg, req.ReqTime.UTC(), req.JoinSource, req.InviterUserID, req.Ex, req.GroupID, req.UserID); err != nil {
 			return err
 		}
 	}

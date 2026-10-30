@@ -66,9 +66,10 @@ func TestGroup(t *testing.T) {
 	b := "gb-" + suffix
 	c := "gc-" + suffix
 	d := "gd-" + suffix
-	t.Cleanup(func() { cleanupGroup(t, mysqlCfg, a, b, c, d) })
+	e := "ge-" + suffix
+	t.Cleanup(func() { cleanupGroup(t, mysqlCfg, a, b, c, d, e) })
 
-	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}, d: {}}, nil)
+	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}, d: {}, e: {}}, nil)
 
 	if _, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{CreatorUserId: a, GroupName: "n", GroupType: 3}); !isCode(err, codes.InvalidArgument, errorcode.GroupTypeUnsupported) {
 		t.Fatalf("type code=%v err=%v", status.Code(err), err)
@@ -160,6 +161,261 @@ func TestGroup(t *testing.T) {
 	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: vgid, OpUserId: a, UserIds: []string{d}}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: vgid, UserId: "missing", JoinSource: model.JoinBySearch}); !isCode(err, codes.NotFound, errorcode.GroupUserNotFound) {
+		t.Fatalf("join missing user code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: vgid, UserId: a, JoinSource: model.JoinBySearch}); !isCode(err, codes.AlreadyExists, errorcode.GroupAlreadyMember) {
+		t.Fatalf("join member code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: vgid, UserId: e, JoinSource: 9}); !isCode(err, codes.InvalidArgument, errorcode.GroupInvalidArgs) {
+		t.Fatalf("join source code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: vgid, UserId: e, ReqMsg: "let me in", JoinSource: model.JoinBySearch, Ex: "from-search"}); err != nil {
+		t.Fatal(err)
+	}
+	afterJoin, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: vgid})
+	if err != nil || len(afterJoin.GetUserIds()) != 3 {
+		t.Fatalf("join request stays out %+v err=%v", afterJoin, err)
+	}
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: vgid, UserId: e, JoinSource: model.JoinBySearch}); !isCode(err, codes.AlreadyExists, errorcode.GroupRequestRepeated) {
+		t.Fatalf("join pending code=%v err=%v", status.Code(err), err)
+	}
+	reqMsg, reqEx, err := requestState(t, mysqlCfg, vgid, e)
+	if err != nil || reqMsg != "let me in" || reqEx != "from-search" {
+		t.Fatalf("request msg=%q ex=%q err=%v", reqMsg, reqEx, err)
+	}
+
+	open, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{
+		CreatorUserId:    a,
+		GroupName:        "open",
+		GroupType:        model.GroupTypeNormal,
+		NeedVerification: model.NeedDirectly,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ogid := open.GetGroupId()
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: ogid, UserId: c, JoinSource: model.JoinByQRCode}); err != nil {
+		t.Fatal(err)
+	}
+	joinedMembers, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: ogid, Limit: 20})
+	if err != nil || joinedMembers.GetTotal() != 2 {
+		t.Fatalf("direct join %+v err=%v", joinedMembers, err)
+	}
+	var entrant *grouppb.GroupMemberFullInfo
+	for _, member := range joinedMembers.GetMembers() {
+		if member.GetUserId() == c {
+			entrant = member
+		}
+	}
+	if entrant == nil || entrant.GetJoinSource() != model.JoinByQRCode || entrant.GetRoleLevel() != model.RoleOrdinary || entrant.GetInviterUserId() != "" {
+		t.Fatalf("entrant %+v", entrant)
+	}
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: ogid, UserId: c, JoinSource: model.JoinByQRCode}); !isCode(err, codes.AlreadyExists, errorcode.GroupAlreadyMember) {
+		t.Fatalf("join again code=%v err=%v", status.Code(err), err)
+	}
+
+	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{GroupId: vgid, OpUserId: b, FromUserId: e, HandleResult: model.HandleAgree}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("ordinary response code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{GroupId: vgid, OpUserId: a, FromUserId: b, HandleResult: model.HandleRefuse}); !isCode(err, codes.NotFound, errorcode.GroupRequestNotFound) {
+		t.Fatalf("missing request code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.GetGroupApplicationList(ctx, &grouppb.GetGroupApplicationListReq{FromUserId: e, GroupIds: []string{vgid}}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("outsider applications code=%v err=%v", status.Code(err), err)
+	}
+	recv, err := srv.GetGroupApplicationList(ctx, &grouppb.GetGroupApplicationListReq{FromUserId: a, GroupIds: []string{vgid}, HandleResults: []int32{model.HandlePending}})
+	if err != nil || recv.GetTotal() < 2 || !hasRequest(recv.GetRequests(), e) {
+		t.Fatalf("recv applications %+v err=%v", recv, err)
+	}
+	sent, err := srv.GetUserReqApplicationList(ctx, &grouppb.GetUserReqApplicationListReq{UserId: e})
+	if err != nil || sent.GetTotal() != 1 || sent.GetRequests()[0].GetHandleResult() != model.HandlePending || sent.GetRequests()[0].GetReqMsg() != "let me in" {
+		t.Fatalf("sent applications %+v err=%v", sent, err)
+	}
+	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{GroupId: vgid, OpUserId: a, FromUserId: e, HandleResult: model.HandleRefuse, HandledMsg: "no"}); err != nil {
+		t.Fatal(err)
+	}
+	stillOut, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: vgid})
+	if err != nil || len(stillOut.GetUserIds()) != 3 {
+		t.Fatalf("refused user stays out %+v err=%v", stillOut, err)
+	}
+	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{GroupId: vgid, OpUserId: a, FromUserId: e, HandleResult: model.HandleAgree}); !isCode(err, codes.FailedPrecondition, errorcode.GroupRequestHandled) {
+		t.Fatalf("handled again code=%v err=%v", status.Code(err), err)
+	}
+	refused, err := srv.GetUserReqApplicationList(ctx, &grouppb.GetUserReqApplicationListReq{UserId: e, HandleResults: []int32{model.HandleRefuse}})
+	if err != nil || refused.GetTotal() != 1 || refused.GetRequests()[0].GetHandleUserId() != a || refused.GetRequests()[0].GetHandledMsg() != "no" || refused.GetRequests()[0].GetHandledTime() == 0 {
+		t.Fatalf("refused %+v err=%v", refused, err)
+	}
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: vgid, UserId: e, ReqMsg: "again", JoinSource: model.JoinBySearch, Ex: "from-search"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{GroupId: vgid, OpUserId: a, FromUserId: e, HandleResult: model.HandleAgree, HandledMsg: "ok"}); err != nil {
+		t.Fatal(err)
+	}
+	approved, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: vgid, Limit: 20})
+	if err != nil || approved.GetTotal() != 4 {
+		t.Fatalf("approved members %+v err=%v", approved, err)
+	}
+	var approvedUser *grouppb.GroupMemberFullInfo
+	for _, member := range approved.GetMembers() {
+		if member.GetUserId() == e {
+			approvedUser = member
+		}
+	}
+	if approvedUser == nil || approvedUser.GetJoinSource() != model.JoinBySearch || approvedUser.GetInviterUserId() != "" || approvedUser.GetOperatorUserId() != a || approvedUser.GetEx() != "from-search" {
+		t.Fatalf("approved user %+v", approvedUser)
+	}
+	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{GroupId: vgid, OpUserId: a, FromUserId: e, HandleResult: model.HandleAgree}); !isCode(err, codes.FailedPrecondition, errorcode.GroupRequestHandled) {
+		t.Fatalf("agree twice code=%v err=%v", status.Code(err), err)
+	}
+
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: a}); !isCode(err, codes.InvalidArgument, errorcode.GroupInvalidArgs) {
+		t.Fatalf("empty members code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: a, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: b}}}); !isCode(err, codes.InvalidArgument, errorcode.GroupNothingToUpdate) {
+		t.Fatalf("empty patch code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: a, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: b, RoleLevel: i32Ptr(model.RoleOwner)}}}); !isCode(err, codes.InvalidArgument, errorcode.GroupInvalidArgs) {
+		t.Fatalf("set owner code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: a, Members: []*grouppb.SetGroupMemberInfo{
+		{GroupId: vgid, UserId: e, Nickname: strPtr("one")},
+		{GroupId: vgid, UserId: e, FaceUrl: strPtr("two")},
+	}}); !isCode(err, codes.InvalidArgument, errorcode.GroupMemberRepeated) {
+		t.Fatalf("repeat member code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: a, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: a, RoleLevel: i32Ptr(model.RoleAdmin)}}}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("owner own role code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: b, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: e, RoleLevel: i32Ptr(model.RoleAdmin)}}}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("ordinary promote code=%v err=%v", status.Code(err), err)
+	}
+	before, err := srv.GetIncrementalGroupMembers(ctx, &grouppb.GetIncrementalGroupMembersReq{GroupId: vgid, UserId: a})
+	if err != nil || !before.GetFull() {
+		t.Fatalf("member baseline %+v err=%v", before, err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: e, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: e, Nickname: strPtr("nick-e")}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: a, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: b, RoleLevel: i32Ptr(model.RoleAdmin)}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: b, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: a, Nickname: strPtr("nope")}}}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("admin edit owner code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: b, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: e, Nickname: strPtr("by-admin"), Ex: strPtr("x")}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: b, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: b, RoleLevel: i32Ptr(model.RoleOrdinary)}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: a, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: b, RoleLevel: i32Ptr(model.RoleAdmin)}}}); err != nil {
+		t.Fatal(err)
+	}
+	roleDelta, err := srv.GetIncrementalGroupMembers(ctx, &grouppb.GetIncrementalGroupMembersReq{GroupId: vgid, UserId: a, VersionId: before.GetVersionId(), Version: before.GetVersion()})
+	if err != nil || roleDelta.GetFull() || roleDelta.GetSortVersion() == 0 {
+		t.Fatalf("role delta %+v err=%v", roleDelta, err)
+	}
+	var editedB, editedE *grouppb.GroupMemberFullInfo
+	for _, member := range roleDelta.GetUpdate() {
+		switch member.GetUserId() {
+		case b:
+			editedB = member
+		case e:
+			editedE = member
+		}
+	}
+	if editedB == nil || editedB.GetRoleLevel() != model.RoleAdmin || editedE == nil || editedE.GetNickname() != "by-admin" || editedE.GetEx() != "x" {
+		t.Fatalf("b=%+v e=%+v", editedB, editedE)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: a, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: "missing", Nickname: strPtr("n")}}}); !isCode(err, codes.NotFound, errorcode.GroupNotMember) {
+		t.Fatalf("missing member code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: c, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: e, Nickname: strPtr("n")}}}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("outsider edit code=%v err=%v", status.Code(err), err)
+	}
+
+	if _, err := srv.MuteGroupMember(ctx, &grouppb.MuteGroupMemberReq{GroupId: vgid, OpUserId: d, UserId: e, MutedSeconds: 60}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("ordinary mute code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.MuteGroupMember(ctx, &grouppb.MuteGroupMemberReq{GroupId: vgid, OpUserId: b, UserId: a, MutedSeconds: 60}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("mute owner code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.MuteGroupMember(ctx, &grouppb.MuteGroupMemberReq{GroupId: vgid, OpUserId: b, UserId: b, MutedSeconds: 60}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("admin mute admin code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.MuteGroupMember(ctx, &grouppb.MuteGroupMemberReq{GroupId: vgid, OpUserId: c, UserId: e, MutedSeconds: 60}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("outsider mute code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.MuteGroupMember(ctx, &grouppb.MuteGroupMemberReq{GroupId: vgid, OpUserId: a, UserId: e}); !isCode(err, codes.InvalidArgument, errorcode.GroupInvalidArgs) {
+		t.Fatalf("zero mute code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.MuteGroupMember(ctx, &grouppb.MuteGroupMemberReq{GroupId: vgid, OpUserId: b, UserId: "missing", MutedSeconds: 60}); !isCode(err, codes.NotFound, errorcode.GroupNotMember) {
+		t.Fatalf("mute missing code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.MuteGroupMember(ctx, &grouppb.MuteGroupMemberReq{GroupId: vgid, OpUserId: b, UserId: e, MutedSeconds: 3600}); err != nil {
+		t.Fatal(err)
+	}
+	mutedE, err := srv.GetGroupMember(ctx, &grouppb.GetGroupMemberReq{GroupId: vgid, UserId: e})
+	if err != nil || mutedE.GetMember().GetMuteEndTime() <= time.Now().UnixMilli() {
+		t.Fatalf("muted member %+v err=%v", mutedE, err)
+	}
+	absent, err := srv.GetGroupMember(ctx, &grouppb.GetGroupMemberReq{GroupId: vgid, UserId: c})
+	if err != nil || absent.GetGroup().GetGroupId() != vgid || absent.GetMember().GetUserId() != "" {
+		t.Fatalf("absent member %+v err=%v", absent, err)
+	}
+	muteDelta, err := srv.GetIncrementalGroupMembers(ctx, &grouppb.GetIncrementalGroupMembersReq{GroupId: vgid, UserId: a, VersionId: roleDelta.GetVersionId(), Version: roleDelta.GetVersion()})
+	if err != nil || muteDelta.GetFull() {
+		t.Fatalf("mute delta %+v err=%v", muteDelta, err)
+	}
+	var mutedUpdate *grouppb.GroupMemberFullInfo
+	for _, member := range muteDelta.GetUpdate() {
+		if member.GetUserId() == e {
+			mutedUpdate = member
+		}
+	}
+	if mutedUpdate == nil || mutedUpdate.GetMuteEndTime() == 0 {
+		t.Fatalf("mute update %+v", muteDelta.GetUpdate())
+	}
+	if _, err := srv.MuteGroupMember(ctx, &grouppb.MuteGroupMemberReq{GroupId: vgid, OpUserId: a, UserId: b, MutedSeconds: 120}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.CancelMuteGroupMember(ctx, &grouppb.CancelMuteGroupMemberReq{GroupId: vgid, OpUserId: b, UserId: b}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("admin unmute admin code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.CancelMuteGroupMember(ctx, &grouppb.CancelMuteGroupMemberReq{GroupId: vgid, OpUserId: b, UserId: e}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.CancelMuteGroupMember(ctx, &grouppb.CancelMuteGroupMemberReq{GroupId: vgid, OpUserId: a, UserId: b}); err != nil {
+		t.Fatal(err)
+	}
+	cleared, err := srv.GetGroupMember(ctx, &grouppb.GetGroupMemberReq{GroupId: vgid, UserId: e})
+	if err != nil || cleared.GetMember().GetMuteEndTime() != 0 {
+		t.Fatalf("cleared member %+v err=%v", cleared, err)
+	}
+	if _, err := srv.MuteGroup(ctx, &grouppb.MuteGroupReq{GroupId: vgid, OpUserId: d}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("ordinary mute group code=%v err=%v", status.Code(err), err)
+	}
+	groupBase, err := srv.GetIncrementalGroupMembers(ctx, &grouppb.GetIncrementalGroupMembersReq{GroupId: vgid, UserId: a})
+	if err != nil || !groupBase.GetFull() {
+		t.Fatalf("group mute baseline %+v err=%v", groupBase, err)
+	}
+	if _, err := srv.MuteGroup(ctx, &grouppb.MuteGroupReq{GroupId: vgid, OpUserId: b}); err != nil {
+		t.Fatal(err)
+	}
+	if got := oneGroup(t, srv, ctx, vgid); got.GetStatus() != model.GroupStatusMuted {
+		t.Fatalf("muted group %+v", got)
+	}
+	groupDelta, err := srv.GetIncrementalGroupMembers(ctx, &grouppb.GetIncrementalGroupMembersReq{GroupId: vgid, UserId: a, VersionId: groupBase.GetVersionId(), Version: groupBase.GetVersion()})
+	if err != nil || groupDelta.GetFull() || groupDelta.GetGroup().GetStatus() != model.GroupStatusMuted {
+		t.Fatalf("group mute delta %+v err=%v", groupDelta, err)
+	}
+	if _, err := srv.CancelMuteGroup(ctx, &grouppb.CancelMuteGroupReq{GroupId: vgid, OpUserId: a}); err != nil {
+		t.Fatal(err)
+	}
+	if got := oneGroup(t, srv, ctx, vgid); got.GetStatus() != model.GroupStatusOK {
+		t.Fatalf("unmuted group %+v", got)
+	}
 
 	if _, err := srv.KickGroupMember(ctx, &grouppb.KickGroupMemberReq{GroupId: gid, OpUserId: b, UserId: c}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
 		t.Fatalf("ordinary kick code=%v err=%v", status.Code(err), err)
@@ -247,6 +503,12 @@ func TestGroup(t *testing.T) {
 	}
 	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: gid, OpUserId: c, UserIds: []string{b}}); !isCode(err, codes.FailedPrecondition, errorcode.GroupDismissed) {
 		t.Fatalf("invite dismissed code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.MuteGroup(ctx, &grouppb.MuteGroupReq{GroupId: gid, OpUserId: c}); !isCode(err, codes.FailedPrecondition, errorcode.GroupDismissed) {
+		t.Fatalf("mute dismissed code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.CancelMuteGroup(ctx, &grouppb.CancelMuteGroupReq{GroupId: gid, OpUserId: c}); !isCode(err, codes.FailedPrecondition, errorcode.GroupDismissed) {
+		t.Fatalf("unmute dismissed code=%v err=%v", status.Code(err), err)
 	}
 }
 
@@ -360,6 +622,15 @@ func TestGroupSync(t *testing.T) {
 	}
 }
 
+func hasRequest(requests []*grouppb.GroupRequestInfo, userID string) bool {
+	for _, request := range requests {
+		if request.GetUserId() == userID {
+			return true
+		}
+	}
+	return false
+}
+
 func oneGroup(t *testing.T, srv *logic.Server, ctx context.Context, groupID string) *grouppb.GroupInfo {
 	t.Helper()
 	resp, err := srv.GetGroupsInfo(ctx, &grouppb.GetGroupsInfoReq{GroupIds: []string{groupID}})
@@ -370,6 +641,8 @@ func oneGroup(t *testing.T, srv *logic.Server, ctx context.Context, groupID stri
 }
 
 func strPtr(v string) *string { return &v }
+
+func i32Ptr(v int32) *int32 { return &v }
 
 func setRole(t *testing.T, cfg config.MySQL, groupID, userID string, role int32) error {
 	t.Helper()
@@ -391,6 +664,18 @@ func setMute(t *testing.T, cfg config.MySQL, groupID, userID string) error {
 	defer db.Close()
 	_, err = db.ExecContext(context.Background(), "UPDATE group_member SET mute_end_time = ? WHERE group_id = ? AND user_id = ?", time.Now().Add(time.Hour).UTC(), groupID, userID)
 	return err
+}
+
+func requestState(t *testing.T, cfg config.MySQL, groupID, userID string) (string, string, error) {
+	t.Helper()
+	db, err := sql.Open("mysql", mysqlDSN(cfg))
+	if err != nil {
+		return "", "", err
+	}
+	defer db.Close()
+	var msg, ex string
+	err = db.QueryRowContext(context.Background(), "SELECT req_msg, ex FROM group_request WHERE group_id = ? AND user_id = ?", groupID, userID).Scan(&msg, &ex)
+	return msg, ex, err
 }
 
 func memberState(t *testing.T, cfg config.MySQL, groupID, oldOwner, newOwner string) (int32, bool, error) {

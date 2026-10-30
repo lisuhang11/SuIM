@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/lisuhang11/SuIM/pkg/mq"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/services/msg/internal/store"
 )
@@ -50,6 +51,29 @@ type History interface {
 	Last(ctx context.Context, conversationID string) (*msgpb.MsgData, error)
 }
 
+// MsgBefore is a synchronous message callback plus content types that skip it.
+type MsgBefore struct {
+	webhook.BeforeConfig `yaml:",inline"`
+	DeniedTypes          []int32 `yaml:"deniedTypes"`
+}
+
+// MsgAfter is an asynchronous message callback. AttentionIds limits who it fires for.
+type MsgAfter struct {
+	webhook.AfterConfig `yaml:",inline"`
+	AttentionIds        []string `yaml:"attentionIds"`
+	DeniedTypes         []int32  `yaml:"deniedTypes"`
+}
+
+// Hooks carries the message webhook client and callback switches.
+type Hooks struct {
+	Client           *webhook.Client
+	BeforeSendSingle MsgBefore
+	AfterSendSingle  MsgAfter
+	BeforeSendGroup  MsgBefore
+	AfterSendGroup   MsgAfter
+	BeforeMsgModify  MsgBefore
+}
+
 // Server is the msg gRPC service. It publishes sends and reads history.
 type Server struct {
 	msgpb.UnimplementedMsgServiceServer
@@ -57,10 +81,18 @@ type Server struct {
 	publish   mq.Producer
 	relations Relations
 	groups    Groups
+	hooks     Hooks
 }
 
 func New(st History, publish mq.Producer, relations Relations, groups Groups) *Server {
 	return &Server{store: st, publish: publish, relations: relations, groups: groups}
+}
+
+// UseHooks attaches webhook switches. A nil client leaves every callback disabled.
+func (s *Server) UseHooks(hooks Hooks) {
+	if s != nil {
+		s.hooks = hooks
+	}
 }
 
 func (s *Server) conversationIDs(ctx context.Context, userID string) ([]string, error) {

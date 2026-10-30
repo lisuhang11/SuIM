@@ -6,6 +6,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 )
 
 type Config struct {
@@ -18,6 +19,14 @@ type Config struct {
 	Redis               config.Redis    `yaml:"redis"`
 	Queue               Queue           `yaml:"queue"`
 	Registry            register.Config `yaml:"registry"`
+	Webhooks            Webhooks        `yaml:"webhooks"`
+}
+
+type Webhooks struct {
+	URL          string              `yaml:"url"`
+	AfterOnline  webhook.AfterConfig `yaml:"afterUserOnline"`
+	AfterOffline webhook.AfterConfig `yaml:"afterUserOffline"`
+	AfterKickOff webhook.AfterConfig `yaml:"afterUserKickOff"`
 }
 
 type Queue struct {
@@ -56,7 +65,8 @@ func (c *Config) Validate() error {
 	if c.Registry.Type == "" {
 		return fmt.Errorf("registry type is required")
 	}
-	return nil
+	w := c.Webhooks
+	return webhook.RequireURL(w.URL, w.AfterOnline.Enable, w.AfterOffline.Enable, w.AfterKickOff.Enable)
 }
 
 func ConsumerGroup() string {

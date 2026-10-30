@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/lisuhang11/SuIM/proto/relationpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
 )
 
 func (s *Server) sendFriendRequest(w http.ResponseWriter, r *http.Request) {
@@ -243,4 +243,3 @@ func (s *Server) blackList(w http.ResponseWriter, r *http.Request) {
 	}
 	writeOK(w, resp)
 }
-

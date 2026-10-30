@@ -2,6 +2,10 @@ package logic
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -9,6 +13,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/mq"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/services/msg/internal/store"
 )
@@ -66,6 +71,54 @@ func TestSingleSendPublishes(t *testing.T) {
 	}
 	if prod.n != 1 || prod.key != "si_a_b" {
 		t.Fatalf("publish n=%d key=%s", prod.n, prod.key)
+	}
+}
+
+func TestBeforeSendRejectsAndModifyRewrites(t *testing.T) {
+	reject := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(webhook.CommonCallbackResp{ActionCode: webhook.ActionForbidden, ErrMsg: "no"})
+	}))
+	defer reject.Close()
+	client := webhook.NewWebhookClient(reject.URL)
+	defer client.Close()
+	prod := &fakeProducer{}
+	srv := New(nil, prod, &fakeRelations{friend1: true, friend2: true}, nil)
+	srv.UseHooks(Hooks{Client: client, BeforeSendSingle: MsgBefore{BeforeConfig: webhook.BeforeConfig{Enable: true, Timeout: 2}}})
+	_, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", RecvId: "b", SessionType: 1, Content: []byte("hi"), ClientMsgId: "c1",
+	}})
+	if !errors.Is(err, errorcode.ErrWebhookRejected) || prod.n != 0 {
+		t.Fatalf("err=%v published=%d", err, prod.n)
+	}
+
+	modify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/callbackBeforeMsgModifyCommand" {
+			_, _ = w.Write([]byte(`{"actionCode":0,"content":"edited"}`))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(webhook.CommonCallbackResp{})
+	}))
+	defer modify.Close()
+	client = webhook.NewWebhookClient(modify.URL)
+	defer client.Close()
+	prod = &fakeProducer{}
+	srv = New(nil, prod, &fakeRelations{friend1: true, friend2: true}, nil)
+	srv.UseHooks(Hooks{
+		Client:           client,
+		BeforeSendSingle: MsgBefore{BeforeConfig: webhook.BeforeConfig{Enable: true, Timeout: 2}},
+		BeforeMsgModify:  MsgBefore{BeforeConfig: webhook.BeforeConfig{Enable: true, Timeout: 2}},
+	})
+	if _, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", RecvId: "b", SessionType: 1, Content: []byte("hi"), ClientMsgId: "c1",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	stored := &msgpb.MsgData{}
+	if err := proto.Unmarshal(prod.body, stored); err != nil {
+		t.Fatal(err)
+	}
+	if string(stored.Content) != "edited" {
+		t.Fatalf("content %q", stored.Content)
 	}
 }
 

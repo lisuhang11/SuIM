@@ -5,17 +5,30 @@ import (
 	"time"
 
 	"github.com/lisuhang11/SuIM/pkg/localcache"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
+	"github.com/lisuhang11/SuIM/proto/user"
 	"github.com/lisuhang11/SuIM/services/user/internal/model"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 	"github.com/lisuhang11/SuIM/services/user/internal/token"
 )
+
+// Hooks carries the user webhook client and callback switches.
+type Hooks struct {
+	Client                 *webhook.Client
+	BeforeUserRegister     webhook.BeforeConfig
+	AfterUserRegister      webhook.AfterConfig
+	BeforeUpdateUserInfo   webhook.BeforeConfig
+	AfterUpdateUserInfo    webhook.AfterConfig
+	BeforeUpdateUserInfoEx webhook.BeforeConfig
+	AfterUpdateUserInfoEx  webhook.AfterConfig
+}
 
 type Server struct {
 	userpb.UnimplementedUserServiceServer
 	store  *store.Store
 	issuer *token.Issuer
 	tokens localcache.Cache[*model.Token]
+	hooks  Hooks
 	now    func() time.Time
 	newID  func() (string, error)
 }
@@ -27,6 +40,13 @@ func New(st *store.Store, issuer *token.Issuer, tokens localcache.Cache[*model.T
 		tokens: tokens,
 		now:    time.Now,
 		newID:  NewID,
+	}
+}
+
+// UseHooks attaches webhook switches. A nil client leaves every callback disabled.
+func (s *Server) UseHooks(hooks Hooks) {
+	if s != nil {
+		s.hooks = hooks
 	}
 }
 

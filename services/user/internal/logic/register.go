@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/user"
 	"github.com/lisuhang11/SuIM/services/user/internal/model"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
@@ -32,7 +32,7 @@ func (s *Server) Register(ctx context.Context, req *userpb.RegisterReq) (*userpb
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("create user id")
 	}
-	// 3. 写入用户。邮箱重复返回已注册。
+	// 3. 注册前 webhook。回调拒绝则中断。
 	user := &model.User{
 		UserID:       id,
 		Email:        email,
@@ -40,12 +40,16 @@ func (s *Server) Register(ctx context.Context, req *userpb.RegisterReq) (*userpb
 		Nickname:     nickname,
 		IsActive:     true,
 	}
+	if err := s.beforeRegister(ctx, user); err != nil {
+		return nil, err
+	}
 	if err := s.store.CreateUser(ctx, user); err != nil {
 		if errors.Is(err, store.ErrEmailTaken) {
 			return nil, errorcode.ErrUserEmailTaken
 		}
 		return nil, errorcode.ErrInternal.WithMsg("create user")
 	}
+	s.afterRegister(ctx, user)
 	return &userpb.RegisterResp{User: toPB(user)}, nil
 }
 

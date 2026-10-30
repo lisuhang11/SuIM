@@ -6,7 +6,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
 

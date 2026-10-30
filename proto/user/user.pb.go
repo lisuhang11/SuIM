@@ -1409,7 +1409,7 @@ const file_user_proto_rawDesc = "" +
 	"DeleteUser\x12\x13.user.DeleteUserReq\x1a\x14.user.DeleteUserResp\x12C\n" +
 	"\x0eChangePassword\x12\x17.user.ChangePasswordReq\x1a\x18.user.ChangePasswordResp\x12@\n" +
 	"\rValidateToken\x12\x16.user.ValidateTokenReq\x1a\x17.user.ValidateTokenResp\x12+\n" +
-	"\x06Logout\x12\x0f.user.LogoutReq\x1a\x10.user.LogoutRespB)Z'github.com/lisuhang11/SuIM/proto/userpbb\x06proto3"
+	"\x06Logout\x12\x0f.user.LogoutReq\x1a\x10.user.LogoutRespB.Z,github.com/lisuhang11/SuIM/proto/user;userpbb\x06proto3"
 
 var (
 	file_user_proto_rawDescOnce sync.Once

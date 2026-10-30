@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/user"
 )
 
 type stubUsers struct {

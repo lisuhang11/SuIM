@@ -18,8 +18,8 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
+	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/relation/internal/config"
 	"github.com/lisuhang11/SuIM/services/relation/internal/logic"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
@@ -87,10 +87,18 @@ func run(cfgPath, migratePath string) error {
 	}
 
 	srv := grpc.NewServer()
+	w := cfg.Webhooks
 	relationpb.RegisterRelationServiceServer(srv, logic.New(st, userclient.New(userpb.NewUserServiceClient(userConn)), logic.Hooks{
-		Client:           hooks,
-		BeforeAddBlack:   cfg.Webhooks.BeforeAddBlack,
-		AfterRemoveBlack: cfg.Webhooks.AfterRemoveBlack,
+		Client:                hooks,
+		BeforeAddFriend:       w.BeforeAddFriend,
+		AfterAddFriend:        w.AfterAddFriend,
+		BeforeAddFriendAgree:  w.BeforeAddFriendAgree,
+		AfterAddFriendAgree:   w.AfterAddFriendAgree,
+		BeforeSetFriendRemark: w.BeforeSetFriendRemark,
+		AfterSetFriendRemark:  w.AfterSetFriendRemark,
+		AfterDeleteFriend:     w.AfterDeleteFriend,
+		BeforeAddBlack:        w.BeforeAddBlack,
+		AfterRemoveBlack:      w.AfterRemoveBlack,
 	}))
 
 	id, err := newID()

@@ -32,11 +32,13 @@ func (s *Server) DismissGroup(ctx context.Context, req *grouppb.DismissGroupReq)
 	if err := s.store.DismissGroup(ctx, groupID, s.now()); err != nil {
 		return nil, mapStore(err)
 	}
-	// webhook 尚未接入。解散通知让在线成员刷新已加入的群。
+	// 解散通知让在线成员刷新已加入的群。
 	opMember, _ := s.store.TakeMember(ctx, groupID, op)
 	if latest, err := s.store.TakeGroup(ctx, groupID); err == nil {
 		group = latest
 	}
 	s.notifyDismissed(ctx, op, group, opMember)
+	members, _ := s.store.MemberUserIDs(ctx, groupID)
+	s.afterDismiss(ctx, group, members)
 	return &grouppb.DismissGroupResp{}, nil
 }

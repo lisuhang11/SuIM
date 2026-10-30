@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
@@ -26,12 +26,16 @@ func (s *Server) RespondFriendApply(ctx context.Context, req *relationpb.Respond
 	}
 	switch req.GetHandleResult() {
 	case model.HandleAgree:
-		// 2. 同意前 webhook。尚未接入。
+		// 2. 同意前 webhook。回调拒绝则中断。
+		if err := s.beforeAddFriendAgree(ctx, from, to, handleMsg, model.HandleAgree); err != nil {
+			return nil, err
+		}
 		// 3. 把申请标为同意，并写入双方好友关系。
 		if err := s.store.AgreeFriendRequest(ctx, from, to, handleMsg, s.now()); err != nil {
 			return nil, friendRequestErr(err)
 		}
-		// 4. 同意后 webhook，并通知申请人。尚未接入。
+		// 4. 同意后 webhook。通知申请人尚未接入。
+		s.afterAddFriendAgree(ctx, from, to, handleMsg, model.HandleAgree)
 		return &relationpb.RespondFriendApplyResp{}, nil
 	case model.HandleRefuse:
 		// 5. 把申请标为拒绝。

@@ -79,9 +79,9 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/proto/group"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/user"
 )
 
 const maxBody = 1 << 20

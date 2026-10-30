@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package relation;
 
-option go_package = "github.com/lisuhang11/SuIM/proto/relationpb";
+option go_package = "github.com/lisuhang11/SuIM/proto/relation;relationpb";
 
 // RelationService manages friend relationships and blocks between users.
 service RelationService {

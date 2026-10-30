@@ -5,7 +5,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/idhash"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
 )
 
 func (s *Server) GetFriendList(ctx context.Context, req *relationpb.GetFriendListReq) (*relationpb.GetFriendListResp, error) {

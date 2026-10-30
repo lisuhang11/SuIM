@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/user"
 )
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {

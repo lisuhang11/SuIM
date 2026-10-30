@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/lisuhang11/SuIM/pkg/webhook"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
@@ -16,11 +16,18 @@ type Users interface {
 	GetUsers(ctx context.Context, ids []string) (map[string]model.UserProfile, error)
 }
 
-// Hooks carries the webhook client and the black-list callback switches.
+// Hooks carries the webhook client and the callback switches.
 type Hooks struct {
-	Client           *webhook.Client
-	BeforeAddBlack   webhook.BeforeConfig
-	AfterRemoveBlack webhook.AfterConfig
+	Client                *webhook.Client
+	BeforeAddFriend       webhook.BeforeConfig
+	AfterAddFriend        webhook.AfterConfig
+	BeforeAddFriendAgree  webhook.BeforeConfig
+	AfterAddFriendAgree   webhook.AfterConfig
+	BeforeSetFriendRemark webhook.BeforeConfig
+	AfterSetFriendRemark  webhook.AfterConfig
+	AfterDeleteFriend     webhook.AfterConfig
+	BeforeAddBlack        webhook.BeforeConfig
+	AfterRemoveBlack      webhook.AfterConfig
 }
 
 type Server struct {

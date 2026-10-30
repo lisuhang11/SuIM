@@ -5,6 +5,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 )
 
 type Config struct {
@@ -15,6 +16,27 @@ type Config struct {
 	Redis      config.Redis    `yaml:"redis"`
 	LocalCache LocalCache      `yaml:"localCache"`
 	Registry   register.Config `yaml:"registry"`
+	Webhooks   Webhooks        `yaml:"webhooks"`
+}
+
+type Webhooks struct {
+	URL                      string               `yaml:"url"`
+	BeforeCreateGroup        webhook.BeforeConfig `yaml:"beforeCreateGroup"`
+	AfterCreateGroup         webhook.AfterConfig  `yaml:"afterCreateGroup"`
+	BeforeInviteJoinGroup    webhook.BeforeConfig `yaml:"beforeInviteJoinGroup"`
+	BeforeJoinGroup          webhook.BeforeConfig `yaml:"beforeJoinGroup"`
+	BeforeMembersJoinGroup   webhook.BeforeConfig `yaml:"beforeMembersJoinGroup"`
+	AfterJoinGroup           webhook.AfterConfig  `yaml:"afterJoinGroup"`
+	AfterQuitGroup           webhook.AfterConfig  `yaml:"afterQuitGroup"`
+	AfterKickGroup           webhook.AfterConfig  `yaml:"afterKickGroup"`
+	AfterDismissGroup        webhook.AfterConfig  `yaml:"afterDismissGroup"`
+	AfterTransferGroupOwner  webhook.AfterConfig  `yaml:"afterTransferGroupOwner"`
+	BeforeSetGroupInfo       webhook.BeforeConfig `yaml:"beforeSetGroupInfo"`
+	AfterSetGroupInfo        webhook.AfterConfig  `yaml:"afterSetGroupInfo"`
+	BeforeSetGroupInfoEx     webhook.BeforeConfig `yaml:"beforeSetGroupInfoEx"`
+	AfterSetGroupInfoEx      webhook.AfterConfig  `yaml:"afterSetGroupInfoEx"`
+	BeforeSetGroupMemberInfo webhook.BeforeConfig `yaml:"beforeSetGroupMemberInfo"`
+	AfterSetGroupMemberInfo  webhook.AfterConfig  `yaml:"afterSetGroupMemberInfo"`
 }
 
 type LocalCache struct {
@@ -54,5 +76,14 @@ func (c *Config) Validate() error {
 	if c.Registry.Type == "" {
 		return fmt.Errorf("registry type is required")
 	}
-	return nil
+	w := c.Webhooks
+	return webhook.RequireURL(w.URL,
+		w.BeforeCreateGroup.Enable, w.AfterCreateGroup.Enable,
+		w.BeforeInviteJoinGroup.Enable, w.BeforeJoinGroup.Enable, w.BeforeMembersJoinGroup.Enable,
+		w.AfterJoinGroup.Enable, w.AfterQuitGroup.Enable, w.AfterKickGroup.Enable,
+		w.AfterDismissGroup.Enable, w.AfterTransferGroupOwner.Enable,
+		w.BeforeSetGroupInfo.Enable, w.AfterSetGroupInfo.Enable,
+		w.BeforeSetGroupInfoEx.Enable, w.AfterSetGroupInfoEx.Enable,
+		w.BeforeSetGroupMemberInfo.Enable, w.AfterSetGroupMemberInfo.Enable,
+	)
 }

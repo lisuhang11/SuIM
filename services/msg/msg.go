@@ -19,9 +19,10 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
 	svcconfig "github.com/lisuhang11/SuIM/services/msg/internal/config"
 	"github.com/lisuhang11/SuIM/services/msg/internal/logic"
 	"github.com/lisuhang11/SuIM/services/msg/internal/redisclient"
@@ -91,12 +92,26 @@ func run(cfgPath, migratePath string) error {
 	defer groupConn.Close()
 
 	publisher := mq.NewRedisProducer(rdb, cfg.Queue.StreamPrefix, mq.TopicToRedis, cfg.Queue.MaxLen)
+	var hooks *webhook.Client
+	if cfg.Webhooks.URL != "" {
+		hooks = webhook.NewWebhookClient(cfg.Webhooks.URL)
+		defer hooks.Close()
+	}
+	w := cfg.Webhooks
 	srv := logic.New(
 		st,
 		publisher,
 		rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)),
 		rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn)),
 	)
+	srv.UseHooks(logic.Hooks{
+		Client:           hooks,
+		BeforeSendSingle: msgBefore(w.BeforeSendSingle),
+		AfterSendSingle:  msgAfter(w.AfterSendSingle),
+		BeforeSendGroup:  msgBefore(w.BeforeSendGroup),
+		AfterSendGroup:   msgAfter(w.AfterSendGroup),
+		BeforeMsgModify:  msgBefore(w.BeforeMsgModify),
+	})
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
@@ -137,6 +152,21 @@ func run(cfgPath, migratePath string) error {
 		defer offCancel()
 		_ = reg.Deregister(offCtx)
 		return err
+	}
+}
+
+func msgBefore(cfg svcconfig.MsgBefore) logic.MsgBefore {
+	return logic.MsgBefore{
+		BeforeConfig: webhook.BeforeConfig{Enable: cfg.Enable, Timeout: cfg.Timeout, FailedContinue: cfg.FailedContinue},
+		DeniedTypes:  cfg.DeniedTypes,
+	}
+}
+
+func msgAfter(cfg svcconfig.MsgAfter) logic.MsgAfter {
+	return logic.MsgAfter{
+		AfterConfig:  webhook.AfterConfig{Enable: cfg.Enable, Timeout: cfg.Timeout},
+		AttentionIds: cfg.AttentionIds,
+		DeniedTypes:  cfg.DeniedTypes,
 	}
 }
 

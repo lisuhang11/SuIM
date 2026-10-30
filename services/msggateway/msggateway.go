@@ -20,10 +20,11 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/msggateway/internal/config"
 	"github.com/lisuhang11/SuIM/services/msggateway/internal/redisclient"
 	"github.com/lisuhang11/SuIM/services/msggateway/internal/rpc"
@@ -83,6 +84,12 @@ func run(cfgPath string) error {
 	defer groupConn.Close()
 	groupClient := groups{rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn))}
 
+	var hooks *webhook.Client
+	if cfg.Webhooks.URL != "" {
+		hooks = webhook.NewWebhookClient(cfg.Webhooks.URL)
+		defer hooks.Close()
+	}
+	w := cfg.Webhooks
 	server := ws.New(ws.Options{
 		Tokens:           rpc.NewUserClient(userpb.NewUserServiceClient(userConn)),
 		Groups:           groupClient,
@@ -91,6 +98,12 @@ func run(cfgPath string) error {
 		Messages:         rpc.NewMsgClient(msgpb.NewMsgServiceClient(msgConn)),
 		MaxConn:          cfg.MaxConn,
 		HandshakeTimeout: time.Duration(cfg.HandshakeTimeoutSec) * time.Second,
+		Hooks: ws.Hooks{
+			Client:       hooks,
+			AfterOnline:  w.AfterOnline,
+			AfterOffline: w.AfterOffline,
+			AfterKickOff: w.AfterKickOff,
+		},
 	})
 
 	wsLis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.WSPort))

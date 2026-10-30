@@ -60,6 +60,9 @@ func (s *Server) GroupApplicationResponse(ctx context.Context, req *grouppb.Grou
 			member.JoinSource = request.JoinSource
 			member.InviterUserID = request.InviterUserID
 			member.Ex = request.Ex
+			if err := s.beforeMembersJoin(ctx, groupID, group.Ex, []*model.Member{member}); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if err := s.store.HandleRequest(ctx, groupID, from, handledMsg, req.GetHandleResult(), op, now, member); err != nil {
@@ -75,6 +78,7 @@ func (s *Server) GroupApplicationResponse(ctx context.Context, req *grouppb.Grou
 			group = latest
 		}
 		s.notifyAgreedEnter(ctx, op, group, opMember, member)
+		s.afterJoin(ctx, groupID, request.ReqMsg, member.InviterUserID, member.JoinSource)
 	}
 	return &grouppb.GroupApplicationResponseResp{}, nil
 }

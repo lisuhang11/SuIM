@@ -46,21 +46,28 @@ func (s *Server) JoinGroup(ctx context.Context, req *grouppb.JoinGroupReq) (*gro
 		return nil, mapStore(err)
 	}
 
-	// 入群前 webhook 尚未接入。
+	// 入群前 webhook。回调拒绝则中断。
+	if err := s.beforeJoin(ctx, group, userID, reqMsg, ex); err != nil {
+		return nil, err
+	}
 	now := s.now()
 	if group.NeedVerification == model.NeedDirectly {
 		member := newMember(groupID, userID, profiles[userID], model.RoleOrdinary, userID, now)
 		member.JoinSource = req.GetJoinSource()
 		member.InviterUserID = ""
 		member.Ex = ex
+		if err := s.beforeMembersJoin(ctx, groupID, group.Ex, []*model.Member{member}); err != nil {
+			return nil, err
+		}
 		if err := s.store.AddMembers(ctx, groupID, []*model.Member{member}, now); err != nil {
 			return nil, mapStore(err)
 		}
-		// 会话 seq 和入群后 webhook 尚未接入。进入通知带上新的成员版本。
+		// 会话 seq 尚未接入。进入通知带上新的成员版本。
 		if latest, err := s.store.TakeGroup(ctx, groupID); err == nil {
 			group = latest
 		}
 		s.notifyEntered(ctx, userID, group, member)
+		s.afterJoin(ctx, groupID, reqMsg, "", member.JoinSource)
 		return &grouppb.JoinGroupResp{}, nil
 	}
 

@@ -21,7 +21,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/register"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/user/internal/config"
 	"github.com/lisuhang11/SuIM/services/user/internal/logic"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"

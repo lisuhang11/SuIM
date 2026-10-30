@@ -26,6 +26,7 @@ type Client struct {
 	conn       socket
 	server     *Server
 	closed     atomic.Bool
+	kicked     atomic.Bool
 	subs       map[string]struct{}
 }
 
@@ -114,6 +115,7 @@ func (c *Client) write(resp Resp) error {
 
 // Kick tells the SDK this login was replaced, then closes the socket.
 func (c *Client) Kick() {
+	c.kicked.Store(true)
 	_ = c.write(Resp{ReqIdentifier: reqKickOnlineMsg})
 	c.close()
 }
@@ -125,6 +127,11 @@ func (c *Client) close() {
 	c.server.hub.Remove(c)
 	_ = c.conn.Close()
 	c.server.notifyOnline(c.userID)
+	if c.kicked.Load() {
+		c.server.afterUserKickOff(c)
+		return
+	}
+	c.server.afterUserOffline(c)
 }
 
 func newConnID() string {

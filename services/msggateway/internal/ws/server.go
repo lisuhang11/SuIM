@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/msgconv"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
@@ -61,7 +62,16 @@ type Server struct {
 	syncLog  GroupSyncCache
 	messages Messages
 	maxConn  int64
+	hooks    Hooks
 	upgrader websocket.Upgrader
+}
+
+// Hooks carries the gateway webhook client and the online status callbacks.
+type Hooks struct {
+	Client       *webhook.Client
+	AfterOnline  webhook.AfterConfig
+	AfterOffline webhook.AfterConfig
+	AfterKickOff webhook.AfterConfig
 }
 
 type Options struct {
@@ -72,6 +82,7 @@ type Options struct {
 	Messages         Messages
 	MaxConn          int64
 	HandshakeTimeout time.Duration
+	Hooks            Hooks
 }
 
 func New(opts Options) *Server {
@@ -89,6 +100,7 @@ func New(opts Options) *Server {
 		syncLog:  opts.GroupSync,
 		messages: opts.Messages,
 		maxConn:  opts.MaxConn,
+		hooks:    opts.Hooks,
 		upgrader: websocket.Upgrader{
 			HandshakeTimeout: opts.HandshakeTimeout,
 			CheckOrigin:      func(*http.Request) bool { return true },
@@ -147,6 +159,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	go client.readLoop()
 	s.notifyOnline(client.userID)
+	s.afterUserOnline(client)
 }
 
 // Deliver pushes one sequenced message to the online members of its conversation.

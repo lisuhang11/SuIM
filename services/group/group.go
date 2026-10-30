@@ -17,9 +17,10 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/group/internal/config"
 	"github.com/lisuhang11/SuIM/services/group/internal/logic"
 	"github.com/lisuhang11/SuIM/services/group/internal/msgclient"
@@ -102,12 +103,39 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	srv := grpc.NewServer()
-	grouppb.RegisterGroupServiceServer(srv, logic.New(
+	var hooks *webhook.Client
+	if cfg.Webhooks.URL != "" {
+		hooks = webhook.NewWebhookClient(cfg.Webhooks.URL)
+		defer hooks.Close()
+	}
+	w := cfg.Webhooks
+	groupServer := logic.New(
 		st,
 		userclient.New(userpb.NewUserServiceClient(userConn)),
 		msgclient.New(msgpb.NewMsgServiceClient(msgConn)),
-	))
+	)
+	groupServer.UseHooks(logic.Hooks{
+		Client:                   hooks,
+		BeforeCreateGroup:        w.BeforeCreateGroup,
+		AfterCreateGroup:         w.AfterCreateGroup,
+		BeforeInviteJoinGroup:    w.BeforeInviteJoinGroup,
+		BeforeJoinGroup:          w.BeforeJoinGroup,
+		BeforeMembersJoinGroup:   w.BeforeMembersJoinGroup,
+		AfterJoinGroup:           w.AfterJoinGroup,
+		AfterQuitGroup:           w.AfterQuitGroup,
+		AfterKickGroup:           w.AfterKickGroup,
+		AfterDismissGroup:        w.AfterDismissGroup,
+		AfterTransferGroupOwner:  w.AfterTransferGroupOwner,
+		BeforeSetGroupInfo:       w.BeforeSetGroupInfo,
+		AfterSetGroupInfo:        w.AfterSetGroupInfo,
+		BeforeSetGroupInfoEx:     w.BeforeSetGroupInfoEx,
+		AfterSetGroupInfoEx:      w.AfterSetGroupInfoEx,
+		BeforeSetGroupMemberInfo: w.BeforeSetGroupMemberInfo,
+		AfterSetGroupMemberInfo:  w.AfterSetGroupMemberInfo,
+	})
+
+	srv := grpc.NewServer()
+	grouppb.RegisterGroupServiceServer(srv, groupServer)
 
 	id, err := newID()
 	if err != nil {

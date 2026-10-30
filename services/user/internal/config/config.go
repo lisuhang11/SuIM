@@ -5,6 +5,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 )
 
 type Config struct {
@@ -16,6 +17,17 @@ type Config struct {
 	JWT        config.JWT      `yaml:"jwt"`
 	LocalCache LocalCache      `yaml:"localCache"`
 	Registry   register.Config `yaml:"registry"`
+	Webhooks   Webhooks        `yaml:"webhooks"`
+}
+
+type Webhooks struct {
+	URL                    string               `yaml:"url"`
+	BeforeUserRegister     webhook.BeforeConfig `yaml:"beforeUserRegister"`
+	AfterUserRegister      webhook.AfterConfig  `yaml:"afterUserRegister"`
+	BeforeUpdateUserInfo   webhook.BeforeConfig `yaml:"beforeUpdateUserInfo"`
+	AfterUpdateUserInfo    webhook.AfterConfig  `yaml:"afterUpdateUserInfo"`
+	BeforeUpdateUserInfoEx webhook.BeforeConfig `yaml:"beforeUpdateUserInfoEx"`
+	AfterUpdateUserInfoEx  webhook.AfterConfig  `yaml:"afterUpdateUserInfoEx"`
 }
 
 type LocalCache struct {
@@ -55,5 +67,10 @@ func (c *Config) Validate() error {
 	if c.Registry.Type == "" {
 		return fmt.Errorf("registry type is required")
 	}
-	return nil
+	w := c.Webhooks
+	return webhook.RequireURL(w.URL,
+		w.BeforeUserRegister.Enable, w.AfterUserRegister.Enable,
+		w.BeforeUpdateUserInfo.Enable, w.AfterUpdateUserInfo.Enable,
+		w.BeforeUpdateUserInfoEx.Enable, w.AfterUpdateUserInfoEx.Enable,
+	)
 }

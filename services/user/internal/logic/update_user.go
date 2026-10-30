@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/user"
 	"github.com/lisuhang11/SuIM/services/user/internal/model"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
@@ -34,7 +34,13 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserReq) (*us
 		}
 		return nil, errorcode.ErrInternal.WithMsg("query user")
 	}
-	// 3. 只更新提交的列。
+	// 3. 修改资料前 webhook。回调可以改昵称、头像和扩展字段，拒绝则中断。
+	if err := s.beforeUpdateUser(ctx, id, old, &patch); err != nil {
+		return nil, err
+	}
+	if patchEmpty(patch) {
+		return nil, errorcode.ErrUserNothingToUpdate
+	}
 	if err := s.store.UpdateProfile(ctx, id, patch); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return nil, errorcode.ErrUserNotFound
@@ -53,7 +59,8 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserReq) (*us
 			return nil, errorcode.ErrInternal.WithMsg("revoke session")
 		}
 	}
-	// 5. 昵称或头像变化时同步资料。尚未接入。
+	// 5. 修改后 webhook。昵称或头像变化时同步好友和群成员资料尚未接入。
+	s.afterUpdateUser(ctx, id, old, patch)
 	//    relation rpc: NotificationUserInfoUpdate，刷新好友侧资料。
 	//    group rpc: NotificationUserInfoUpdate，刷新群成员侧资料。
 	//    kafka: 投递用户资料变更，供 msggateway 推送给在线端。

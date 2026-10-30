@@ -52,7 +52,7 @@ func (s *Server) TransferGroupOwner(ctx context.Context, req *grouppb.TransferGr
 	if err := s.store.TransferOwner(ctx, groupID, op, next, s.now()); err != nil {
 		return nil, mapStore(err)
 	}
-	// webhook 尚未接入。转让会连跳多个成员版本，通知里带上新版本，客户端对不上就拉增量。
+	// 转让会连跳多个成员版本，通知里带上新版本，客户端对不上就拉增量。
 	if latest, err := s.store.TakeGroup(ctx, groupID); err == nil {
 		group = latest
 	}
@@ -67,5 +67,6 @@ func (s *Server) TransferGroupOwner(ctx context.Context, req *grouppb.TransferGr
 		}
 	}
 	s.notifyTransferred(ctx, op, group, oldOwner, newOwner)
+	s.afterTransfer(ctx, groupID, op, next)
 	return &grouppb.TransferGroupOwnerResp{}, nil
 }

@@ -18,9 +18,16 @@ type Config struct {
 }
 
 type Webhooks struct {
-	URL              string               `yaml:"url"`
-	BeforeAddBlack   webhook.BeforeConfig `yaml:"beforeAddBlack"`
-	AfterRemoveBlack webhook.AfterConfig  `yaml:"afterRemoveBlack"`
+	URL                   string               `yaml:"url"`
+	BeforeAddFriend       webhook.BeforeConfig `yaml:"beforeAddFriend"`
+	AfterAddFriend        webhook.AfterConfig  `yaml:"afterAddFriend"`
+	BeforeAddFriendAgree  webhook.BeforeConfig `yaml:"beforeAddFriendAgree"`
+	AfterAddFriendAgree   webhook.AfterConfig  `yaml:"afterAddFriendAgree"`
+	BeforeSetFriendRemark webhook.BeforeConfig `yaml:"beforeSetFriendRemark"`
+	AfterSetFriendRemark  webhook.AfterConfig  `yaml:"afterSetFriendRemark"`
+	AfterDeleteFriend     webhook.AfterConfig  `yaml:"afterDeleteFriend"`
+	BeforeAddBlack        webhook.BeforeConfig `yaml:"beforeAddBlack"`
+	AfterRemoveBlack      webhook.AfterConfig  `yaml:"afterRemoveBlack"`
 }
 
 func (c *Config) Validate() error {
@@ -39,8 +46,14 @@ func (c *Config) Validate() error {
 	if c.Registry.Type == "" {
 		return fmt.Errorf("registry type is required")
 	}
-	if c.Webhooks.URL == "" && (c.Webhooks.BeforeAddBlack.Enable || c.Webhooks.AfterRemoveBlack.Enable) {
-		return fmt.Errorf("webhook url is required when a webhook is enabled")
+	w := c.Webhooks
+	if err := webhook.RequireURL(w.URL,
+		w.BeforeAddFriend.Enable, w.AfterAddFriend.Enable,
+		w.BeforeAddFriendAgree.Enable, w.AfterAddFriendAgree.Enable,
+		w.BeforeSetFriendRemark.Enable, w.AfterSetFriendRemark.Enable,
+		w.AfterDeleteFriend.Enable, w.BeforeAddBlack.Enable, w.AfterRemoveBlack.Enable,
+	); err != nil {
+		return err
 	}
 	return nil
 }

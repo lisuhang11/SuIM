@@ -35,3 +35,31 @@ registry:
     password: ""
     dialTimeout: 5
     ttl: 10
+
+webhooks:
+  url: ""
+  beforeSendSingleMsg:
+    enable: false
+    timeout: 5
+    failedContinue: false
+    deniedTypes: []
+  afterSendSingleMsg:
+    enable: false
+    timeout: 5
+    attentionIds: []
+    deniedTypes: []
+  beforeSendGroupMsg:
+    enable: false
+    timeout: 5
+    failedContinue: false
+    deniedTypes: []
+  afterSendGroupMsg:
+    enable: false
+    timeout: 5
+    attentionIds: []
+    deniedTypes: []
+  beforeMsgModify:
+    enable: false
+    timeout: 5
+    failedContinue: false
+    deniedTypes: []

@@ -47,7 +47,14 @@ func (s *Server) SendMsg(ctx context.Context, req *msgpb.SendMsgReq) (*msgpb.Sen
 	if codeErr := s.authorizeSend(ctx, msg); codeErr != nil {
 		return nil, codeErr
 	}
-	// 3. 补齐 id 和时间，投递到 toRedis。
+	// 3. 发送前 webhook。回调拒绝则中断，beforeMsgModify 可以改正文。
+	if err := s.beforeSend(ctx, msg); err != nil {
+		return nil, err
+	}
+	if err := s.beforeModify(ctx, msg); err != nil {
+		return nil, err
+	}
+	// 4. 补齐 id 和时间，投递到 toRedis。
 	key := msgconv.QueueKey(msg)
 	if key == "" {
 		return nil, errorcode.ErrMsgInvalidArgs.WithMsg("conversation id is empty")
@@ -78,6 +85,7 @@ func (s *Server) SendMsg(ctx context.Context, req *msgpb.SendMsgReq) (*msgpb.Sen
 	if err := s.publish.Send(ctx, key, body); err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("queue send failed")
 	}
+	s.afterSend(ctx, msg)
 	return &msgpb.SendMsgResp{
 		ServerMsgId: msg.ServerMsgId,
 		ClientMsgId: msg.ClientMsgId,

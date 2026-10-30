@@ -15,7 +15,8 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
+	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/user/internal/config"
 	"github.com/lisuhang11/SuIM/services/user/internal/logic"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
@@ -76,8 +77,25 @@ func run(cfgPath, migratePath string) error {
 	tokenCache, stopCache := logic.NewTokenCache(ctx, rdb, cfg.LocalCache)
 	defer stopCache()
 
+	var hooks *webhook.Client
+	if cfg.Webhooks.URL != "" {
+		hooks = webhook.NewWebhookClient(cfg.Webhooks.URL)
+		defer hooks.Close()
+	}
+	w := cfg.Webhooks
+	userServer := logic.New(st, token.NewIssuer(cfg.JWT), tokenCache)
+	userServer.UseHooks(logic.Hooks{
+		Client:                 hooks,
+		BeforeUserRegister:     w.BeforeUserRegister,
+		AfterUserRegister:      w.AfterUserRegister,
+		BeforeUpdateUserInfo:   w.BeforeUpdateUserInfo,
+		AfterUpdateUserInfo:    w.AfterUpdateUserInfo,
+		BeforeUpdateUserInfoEx: w.BeforeUpdateUserInfoEx,
+		AfterUpdateUserInfoEx:  w.AfterUpdateUserInfoEx,
+	})
+
 	srv := grpc.NewServer()
-	userpb.RegisterUserServiceServer(srv, logic.New(st, token.NewIssuer(cfg.JWT), tokenCache))
+	userpb.RegisterUserServiceServer(srv, userServer)
 
 	id, err := logic.NewID()
 	if err != nil {

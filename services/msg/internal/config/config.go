@@ -5,6 +5,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 )
 
 type Config struct {
@@ -15,6 +16,30 @@ type Config struct {
 	Redis      config.Redis    `yaml:"redis"`
 	Queue      Queue           `yaml:"queue"`
 	Registry   register.Config `yaml:"registry"`
+	Webhooks   Webhooks        `yaml:"webhooks"`
+}
+
+type Webhooks struct {
+	URL              string    `yaml:"url"`
+	BeforeSendSingle MsgBefore `yaml:"beforeSendSingleMsg"`
+	AfterSendSingle  MsgAfter  `yaml:"afterSendSingleMsg"`
+	BeforeSendGroup  MsgBefore `yaml:"beforeSendGroupMsg"`
+	AfterSendGroup   MsgAfter  `yaml:"afterSendGroupMsg"`
+	BeforeMsgModify  MsgBefore `yaml:"beforeMsgModify"`
+}
+
+type MsgBefore struct {
+	Enable         bool    `yaml:"enable"`
+	Timeout        int     `yaml:"timeout"`
+	FailedContinue bool    `yaml:"failedContinue"`
+	DeniedTypes    []int32 `yaml:"deniedTypes"`
+}
+
+type MsgAfter struct {
+	Enable       bool     `yaml:"enable"`
+	Timeout      int      `yaml:"timeout"`
+	AttentionIds []string `yaml:"attentionIds"`
+	DeniedTypes  []int32  `yaml:"deniedTypes"`
 }
 
 type Queue struct {
@@ -50,5 +75,10 @@ func (c *Config) Validate() error {
 	if c.Registry.Type == "" {
 		return fmt.Errorf("registry type is required")
 	}
-	return nil
+	w := c.Webhooks
+	return webhook.RequireURL(w.URL,
+		w.BeforeSendSingle.Enable, w.AfterSendSingle.Enable,
+		w.BeforeSendGroup.Enable, w.AfterSendGroup.Enable,
+		w.BeforeMsgModify.Enable,
+	)
 }

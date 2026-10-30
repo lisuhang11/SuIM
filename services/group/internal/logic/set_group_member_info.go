@@ -56,7 +56,7 @@ func (s *Server) SetGroupMemberInfo(ctx context.Context, req *grouppb.SetGroupMe
 		})
 	}
 
-	// 修改成员前的 webhook 尚未接入。
+	// 修改成员前 webhook。回调可以改昵称、头像、角色和扩展字段，拒绝则中断。
 	updates := make(map[string][]store.MemberUpdate, len(grouped))
 	for groupID, edits := range grouped {
 		if _, err := s.activeGroup(ctx, groupID); err != nil {
@@ -66,8 +66,11 @@ func (s *Server) SetGroupMemberInfo(ctx context.Context, req *grouppb.SetGroupMe
 			return nil, err
 		}
 		groupUpdates := make([]store.MemberUpdate, 0, len(edits))
-		for _, edit := range edits {
-			groupUpdates = append(groupUpdates, store.MemberUpdate{UserID: edit.userID, Patch: edit.patch})
+		for i := range edits {
+			if err := s.beforeSetMember(ctx, groupID, edits[i].userID, &edits[i].patch); err != nil {
+				return nil, err
+			}
+			groupUpdates = append(groupUpdates, store.MemberUpdate{UserID: edits[i].userID, Patch: edits[i].patch})
 		}
 		updates[groupID] = groupUpdates
 	}
@@ -76,7 +79,7 @@ func (s *Server) SetGroupMemberInfo(ctx context.Context, req *grouppb.SetGroupMe
 		return nil, mapStore(err)
 	}
 
-	// 修改后 webhook 尚未接入。角色和资料变更分开通知。
+	// 角色和资料变更分开通知。
 	for groupID, edits := range grouped {
 		group, err := s.store.TakeGroup(ctx, groupID)
 		if err != nil {
@@ -92,6 +95,7 @@ func (s *Server) SetGroupMemberInfo(ctx context.Context, req *grouppb.SetGroupMe
 				return nil, err
 			}
 			s.notifyMemberInfo(ctx, op, group, opMember, changed, edit.role, edit.profile)
+			s.afterSetMember(ctx, changed)
 		}
 	}
 	return &grouppb.SetGroupMemberInfoResp{}, nil

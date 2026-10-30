@@ -52,7 +52,15 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 		return nil, errorcode.ErrGroupAlreadyMember
 	}
 
-	// 2. 邀请前 webhook 尚未接入。
+	// 2. 邀请前 webhook。回调可以拒绝其中一部分用户。
+	refused, err := s.beforeInvite(ctx, groupID, reason, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	userIDs = dropIDs(userIDs, refused)
+	if len(userIDs) == 0 {
+		return &grouppb.InviteUserToGroupResp{}, nil
+	}
 	// 全员需要验证时，普通成员只能写入申请，不能直接拉人。
 	if group.NeedVerification == model.NeedVerifyAll && opMember.RoleLevel != model.RoleOwner && opMember.RoleLevel != model.RoleAdmin {
 		now := s.now()
@@ -81,14 +89,20 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 	for _, id := range userIDs {
 		members = append(members, newMember(groupID, id, profiles[id], model.RoleOrdinary, op, now))
 	}
-	// 3. 成员入群前 webhook 尚未接入。会话 seq 尚未接入。
+	// 3. 成员入群前 webhook。会话 seq 尚未接入。
+	if err := s.beforeMembersJoin(ctx, groupID, group.Ex, members); err != nil {
+		return nil, err
+	}
 	if err := s.store.AddMembers(ctx, groupID, members, now); err != nil {
 		return nil, mapStore(err)
 	}
-	// 4. 入群后 webhook 尚未接入。邀请通知带上新的成员版本。
+	// 4. 邀请通知带上新的成员版本。
 	if latest, err := s.store.TakeGroup(ctx, groupID); err == nil {
 		group = latest
 	}
 	s.notifyInvited(ctx, op, group, opMember, members)
+	if len(members) > 0 {
+		s.afterJoin(ctx, groupID, reason, members[0].InviterUserID, members[0].JoinSource)
+	}
 	return &grouppb.InviteUserToGroupResp{}, nil
 }

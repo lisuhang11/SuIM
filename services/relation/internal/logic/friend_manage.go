@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
 
@@ -37,16 +37,15 @@ func (s *Server) DeleteFriend(ctx context.Context, req *relationpb.DeleteFriendR
 	if err != nil {
 		return nil, err
 	}
-	// 2. 删除前 webhook。尚未接入。
-	// 3. 只删除这一侧的好友关系。
+	// 2. 只删除这一侧的好友关系。
 	if err := s.store.DeleteFriend(ctx, owner, friend, s.now()); err != nil {
 		if errors.Is(err, store.ErrNotFriend) {
 			return nil, errorcode.ErrRelationNotFriend
 		}
 		return nil, errorcode.ErrInternal.WithMsg("delete friend")
 	}
-	// 4. 通知对方好友已删除。尚未接入。
-	// 5. 删除后 webhook。尚未接入。
+	// 3. 通知对方好友已删除。尚未接入。
+	s.afterDeleteFriend(ctx, owner, friend)
 	return &relationpb.DeleteFriendResp{}, nil
 }
 
@@ -69,6 +68,14 @@ func (s *Server) UpdateFriend(ctx context.Context, req *relationpb.UpdateFriendR
 		if err != nil {
 			return nil, err
 		}
+		value, err = s.beforeSetFriendRemark(ctx, owner, friend, value)
+		if err != nil {
+			return nil, err
+		}
+		value, err = normalizeRemark(value)
+		if err != nil {
+			return nil, err
+		}
 		remark = &value
 	}
 	// 2. 更新这一侧的备注或置顶。不是好友则拒绝。
@@ -79,5 +86,8 @@ func (s *Server) UpdateFriend(ctx context.Context, req *relationpb.UpdateFriendR
 		return nil, errorcode.ErrInternal.WithMsg("update friend")
 	}
 	// 3. 通知好友资料变更。尚未接入。
+	if remark != nil {
+		s.afterSetFriendRemark(ctx, owner, friend, *remark)
+	}
 	return &relationpb.UpdateFriendResp{}, nil
 }

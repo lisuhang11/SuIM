@@ -2073,7 +2073,7 @@ const file_relation_proto_rawDesc = "" +
 	"\x15GetIncrementalFriends\x12\".relation.GetIncrementalFriendsReq\x1a#.relation.GetIncrementalFriendsResp\x12H\n" +
 	"\rGetFriendList\x12\x1a.relation.GetFriendListReq\x1a\x1b.relation.GetFriendListResp\x12]\n" +
 	"\x14GetFullFriendUserIDs\x12!.relation.GetFullFriendUserIDsReq\x1a\".relation.GetFullFriendUserIDsResp\x12E\n" +
-	"\fGetBlackList\x12\x19.relation.GetBlackListReq\x1a\x1a.relation.GetBlackListRespB-Z+github.com/lisuhang11/SuIM/proto/relationpbb\x06proto3"
+	"\fGetBlackList\x12\x19.relation.GetBlackListReq\x1a\x1a.relation.GetBlackListRespB6Z4github.com/lisuhang11/SuIM/proto/relation;relationpbb\x06proto3"
 
 var (
 	file_relation_proto_rawDescOnce sync.Once

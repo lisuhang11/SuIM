@@ -61,7 +61,7 @@ func (s *Server) CreateGroup(ctx context.Context, req *grouppb.CreateGroupReq) (
 		return nil, err
 	}
 
-	// 3. 创建群和成员入群前的 webhook 尚未接入。
+	// 3. 创建群和成员入群前 webhook。回调可以改群资料，拒绝则中断。
 	groupID, err := s.newGroupID(ctx)
 	if err != nil {
 		return nil, err
@@ -76,6 +76,7 @@ func (s *Server) CreateGroup(ctx context.Context, req *grouppb.CreateGroupReq) (
 		CreateTime:        now,
 		Status:            model.GroupStatusOK,
 		CreatorUserID:     owner,
+		OwnerUserID:       owner,
 		GroupType:         groupType,
 		NeedVerification:  req.GetNeedVerification(),
 		LookMemberInfo:    req.GetLookMemberInfo(),
@@ -90,17 +91,24 @@ func (s *Server) CreateGroup(ctx context.Context, req *grouppb.CreateGroupReq) (
 	for _, id := range memberIDs {
 		members = append(members, newMember(groupID, id, profiles[id], model.RoleOrdinary, owner, now))
 	}
+	if err := s.beforeCreateGroup(ctx, group, members); err != nil {
+		return nil, err
+	}
+	if err := s.beforeMembersJoin(ctx, group.GroupID, group.Ex, members); err != nil {
+		return nil, err
+	}
 	if err := s.store.CreateGroup(ctx, group, members, now); err != nil {
 		return nil, mapStore(err)
 	}
 
-	// 4. 公告通知和创建后 webhook 尚未接入。建群通知带上成员版本，由 msggateway 推给在线成员。
+	// 4. 建群通知带上成员版本，由 msggateway 推给在线成员。公告通知尚未接入。
 	created, err := s.store.TakeGroup(ctx, groupID)
 	if err != nil {
 		return nil, mapStore(err)
 	}
 	s.notifyCreated(ctx, owner, created, members)
-	return &grouppb.CreateGroupResp{GroupId: groupID, Group: groupPB(created)}, nil
+	s.afterCreateGroup(ctx, created, members)
+	return &grouppb.CreateGroupResp{GroupId: group.GroupID, Group: groupPB(created)}, nil
 }
 
 func (s *Server) newGroupID(ctx context.Context) (string, error) {

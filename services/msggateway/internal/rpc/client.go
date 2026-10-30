@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/lisuhang11/SuIM/proto/group"
-	"github.com/lisuhang11/SuIM/proto/userpb"
+	"github.com/lisuhang11/SuIM/proto/user"
 )
 
 const pageLimit = 200

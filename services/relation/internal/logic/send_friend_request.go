@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/relationpb"
+	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
 
@@ -27,9 +27,23 @@ func (s *Server) SendFriendRequest(ctx context.Context, req *relationpb.SendFrie
 	if from == to {
 		return nil, errorcode.ErrRelationCanNotAddYourself
 	}
-	// 3. 添加前 webhook。尚未接入。
-	// 4. 确认双方用户存在。
+	// 3. 确认双方用户存在。
 	if err := s.users.CheckUsers(ctx, []string{to, from}); err != nil {
+		return nil, err
+	}
+	fromInfo, toInfo := callbackUser{UserID: from}, callbackUser{UserID: to}
+	if profiles, err := s.users.GetUsers(ctx, []string{from, to}); err == nil {
+		if profile, ok := profiles[from]; ok {
+			fromInfo.Nickname = profile.Nickname
+			fromInfo.FaceURL = profile.AvatarURL
+		}
+		if profile, ok := profiles[to]; ok {
+			toInfo.Nickname = profile.Nickname
+			toInfo.FaceURL = profile.AvatarURL
+		}
+	}
+	// 4. 添加前 webhook。回调拒绝则中断。
+	if err := s.beforeAddFriend(ctx, from, to, msg, fromInfo, toInfo); err != nil {
 		return nil, err
 	}
 	// 5. 已经互为好友则拒绝。单方面关系仍允许再次申请。
@@ -48,6 +62,6 @@ func (s *Server) SendFriendRequest(ctx context.Context, req *relationpb.SendFrie
 		return nil, errorcode.ErrInternal.WithMsg("add friend request")
 	}
 	// 7. 通知对方收到好友申请。尚未接入。
-	// 8. 添加后 webhook。尚未接入。
+	s.afterAddFriend(ctx, from, to, msg, fromInfo, toInfo)
 	return &relationpb.SendFriendRequestResp{}, nil
 }

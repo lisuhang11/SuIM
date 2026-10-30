@@ -43,7 +43,21 @@ func (s *Server) UpdateGroupInfo(ctx context.Context, req *grouppb.UpdateGroupIn
 		return nil, errorcode.ErrGroupNoPermission
 	}
 
-	// 2. 修改群资料前的 webhook 尚未接入。
+	// 2. 修改群资料前 webhook。回调可以改本次提交的字段，拒绝则中断。
+	current, err := s.store.TakeGroup(ctx, groupID)
+	if err != nil {
+		return nil, mapStore(err)
+	}
+	if err := s.beforeSetGroupInfo(ctx, current, &patch); err != nil {
+		return nil, err
+	}
+	exChanged := patch.Ex != nil
+	if err := s.beforeSetGroupInfoEx(ctx, current, &patch); err != nil {
+		return nil, err
+	}
+	if patchEmpty(patch) {
+		return nil, errorcode.ErrGroupNothingToUpdate
+	}
 	now := s.now()
 	if patch.Notification != nil {
 		patch.NotificationUserID = op
@@ -53,10 +67,14 @@ func (s *Server) UpdateGroupInfo(ctx context.Context, req *grouppb.UpdateGroupIn
 		return nil, mapStore(err)
 	}
 
-	// 3. 群名、公告和资料变更通知，以及修改后 webhook 尚未接入。
+	// 3. 修改后 webhook。群名、公告和资料变更通知尚未接入。
 	group, err := s.store.TakeGroup(ctx, groupID)
 	if err != nil {
 		return nil, mapStore(err)
+	}
+	s.afterSetGroupInfo(ctx, group)
+	if exChanged || (patch.Ex != nil) {
+		s.afterSetGroupInfoEx(ctx, group)
 	}
 	return &grouppb.UpdateGroupInfoResp{Group: groupPB(group)}, nil
 }

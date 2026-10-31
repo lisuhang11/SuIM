@@ -26,6 +26,8 @@ type Webhooks struct {
 	BeforeSendGroup  MsgBefore `yaml:"beforeSendGroupMsg"`
 	AfterSendGroup   MsgAfter  `yaml:"afterSendGroupMsg"`
 	BeforeMsgModify  MsgBefore `yaml:"beforeMsgModify"`
+	AfterSingleRead  MsgAfter  `yaml:"afterSingleMsgRead"`
+	AfterGroupRead   MsgAfter  `yaml:"afterGroupMsgRead"`
 }
 
 type MsgBefore struct {
@@ -79,6 +81,6 @@ func (c *Config) Validate() error {
 	return webhook.RequireURL(w.URL,
 		w.BeforeSendSingle.Enable, w.AfterSendSingle.Enable,
 		w.BeforeSendGroup.Enable, w.AfterSendGroup.Enable,
-		w.BeforeMsgModify.Enable,
+		w.BeforeMsgModify.Enable, w.AfterSingleRead.Enable, w.AfterGroupRead.Enable,
 	)
 }

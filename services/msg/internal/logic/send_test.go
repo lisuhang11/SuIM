@@ -268,11 +268,20 @@ type fakeHistory struct {
 	seqTime    int64
 	pinned     []string
 	begin, end int64
+	readUser   string
+	readConv   string
+	marked     []int64
+	markConv   string
+	markUser   string
 }
 
 func (f *fakeHistory) ConversationIDs(context.Context, string) ([]string, error) { return nil, nil }
-func (f *fakeHistory) MaxSeqs(context.Context, []string) (map[string]int64, error) {
-	return map[string]int64{"si_a_b": f.max}, nil
+func (f *fakeHistory) MaxSeqs(_ context.Context, ids []string) (map[string]int64, error) {
+	out := map[string]int64{}
+	for _, id := range ids {
+		out[id] = f.max
+	}
+	return out, nil
 }
 func (f *fakeHistory) SeqState(_ context.Context, _ string, ids []string) (map[string]store.SeqState, error) {
 	if f.seqTime == 0 && f.read == 0 {
@@ -315,6 +324,18 @@ func (f *fakeHistory) BySeqs(_ context.Context, _ string, seqs []int64) ([]*msgp
 	return out, nil
 }
 func (f *fakeHistory) Last(context.Context, string) (*msgpb.MsgData, error) { return nil, nil }
+func (f *fakeHistory) SetReadSeq(_ context.Context, userID, conversationID string, seq int64) error {
+	f.read = seq
+	f.readUser = userID
+	f.readConv = conversationID
+	return nil
+}
+func (f *fakeHistory) MarkRead(_ context.Context, conversationID, readerID string, seqs []int64) error {
+	f.marked = append([]int64(nil), seqs...)
+	f.markConv = conversationID
+	f.markUser = readerID
+	return nil
+}
 
 var _ mq.Producer = (*fakeProducer)(nil)
 var _ History = (*fakeHistory)(nil)

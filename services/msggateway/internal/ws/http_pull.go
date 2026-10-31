@@ -25,6 +25,7 @@ type pullHTTPMsg struct {
 	Text           string `json:"text"`
 	SendTime       int64  `json:"send_time"`
 	Status         int32  `json:"status"`
+	IsRead         bool   `json:"is_read"`
 	SenderNickname string `json:"sender_nickname"`
 	SenderFaceURL  string `json:"sender_face_url"`
 }
@@ -93,6 +94,7 @@ func (s *Server) HandlePull(w http.ResponseWriter, r *http.Request) {
 				Text:           textOf(msg.Content),
 				SendTime:       msg.SendTime,
 				Status:         msg.Status,
+				IsRead:         msg.IsRead,
 				SenderNickname: msg.SenderNickname,
 				SenderFaceURL:  msg.SenderFaceUrl,
 			})

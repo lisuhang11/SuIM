@@ -12,6 +12,12 @@ service MsgService {
   rpc GetSeqMessage(GetSeqMessageReq) returns (PushMessages);
   rpc GetConversationsHasReadAndMaxSeq(GetConversationsHasReadAndMaxSeqReq) returns (GetConversationsHasReadAndMaxSeqResp);
   rpc GetLastMessage(GetLastMessageReq) returns (GetLastMessageResp);
+  // MarkMsgsAsRead marks the given sequences and notifies the peer.
+  rpc MarkMsgsAsRead(MarkMsgsAsReadReq) returns (MarkMsgsAsReadResp);
+  // MarkConversationAsRead advances one user's read cursor to has_read_seq.
+  rpc MarkConversationAsRead(MarkConversationAsReadReq) returns (MarkConversationAsReadResp);
+  // SetConversationHasReadSeq stores a read cursor without marking individual messages.
+  rpc SetConversationHasReadSeq(SetConversationHasReadSeqReq) returns (SetConversationHasReadSeqResp);
 }
 
 // OfflinePushInfo is the notification payload on MsgData field 20.
@@ -161,6 +167,31 @@ message GetLastMessageReq {
 message GetLastMessageResp {
   map<string, MsgData> msgs = 1;
 }
+
+message MarkMsgsAsReadReq {
+  string user_id = 1;
+  string conversation_id = 2;
+  repeated int64 seqs = 3;
+}
+
+message MarkMsgsAsReadResp {}
+
+message MarkConversationAsReadReq {
+  string user_id = 1;
+  string conversation_id = 2;
+  int64 has_read_seq = 3;
+  repeated int64 seqs = 4;
+}
+
+message MarkConversationAsReadResp {}
+
+message SetConversationHasReadSeqReq {
+  string user_id = 1;
+  string conversation_id = 2;
+  int64 has_read_seq = 3;
+}
+
+message SetConversationHasReadSeqResp {}
 
 message SetAppBackgroundStatusReq {
   string user_id = 1;

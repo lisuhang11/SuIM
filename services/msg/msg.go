@@ -111,6 +111,8 @@ func run(cfgPath, migratePath string) error {
 		BeforeSendGroup:  msgBefore(w.BeforeSendGroup),
 		AfterSendGroup:   msgAfter(w.AfterSendGroup),
 		BeforeMsgModify:  msgBefore(w.BeforeMsgModify),
+		AfterSingleRead:  msgAfter(w.AfterSingleRead),
+		AfterGroupRead:   msgAfter(w.AfterGroupRead),
 	})
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))

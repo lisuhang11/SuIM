@@ -38,3 +38,15 @@ func (c *MsgClient) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *m
 func (c *MsgClient) GetLastMessage(ctx context.Context, req *msgpb.GetLastMessageReq) (*msgpb.GetLastMessageResp, error) {
 	return c.client.GetLastMessage(ctx, req)
 }
+
+func (c *MsgClient) MarkMsgsAsRead(ctx context.Context, req *msgpb.MarkMsgsAsReadReq) (*msgpb.MarkMsgsAsReadResp, error) {
+	return c.client.MarkMsgsAsRead(ctx, req)
+}
+
+func (c *MsgClient) MarkConversationAsRead(ctx context.Context, req *msgpb.MarkConversationAsReadReq) (*msgpb.MarkConversationAsReadResp, error) {
+	return c.client.MarkConversationAsRead(ctx, req)
+}
+
+func (c *MsgClient) SetConversationHasReadSeq(ctx context.Context, req *msgpb.SetConversationHasReadSeqReq) (*msgpb.SetConversationHasReadSeqResp, error) {
+	return c.client.SetConversationHasReadSeq(ctx, req)
+}

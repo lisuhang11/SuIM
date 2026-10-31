@@ -141,6 +141,22 @@ func TestHTTPPullText(t *testing.T) {
 	}
 }
 
+func TestHTTPMarkConversationUsesTokenUser(t *testing.T) {
+	messages := &fakeMessages{}
+	srv := New(Options{Tokens: fakeTokens{}, Messages: messages})
+	req := httptest.NewRequest(http.MethodPost, "/msg/mark_conversation_as_read", strings.NewReader(
+		`{"user_id":"a","conversation_id":"si_a_b","has_read_seq":4,"seqs":[3]}`))
+	req.Header.Set("token", "t")
+	rr := httptest.NewRecorder()
+	srv.HandleMarkConversationAsRead(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
+	if messages.readReq == nil || messages.readReq.UserId != "a" || messages.readReq.HasReadSeq != 4 || messages.readReq.ConversationId != "si_a_b" {
+		t.Fatalf("req %+v", messages.readReq)
+	}
+}
+
 func TestHTTPSendRejectsStranger(t *testing.T) {
 	srv := New(Options{Tokens: fakeTokens{}, Messages: &fakeMessages{sendErr: errorcode.ErrMsgNotFriend}})
 	req := httptest.NewRequest(http.MethodPost, "/msg/send", strings.NewReader(
@@ -158,6 +174,7 @@ type fakeMessages struct {
 	sent    *msgpb.MsgData
 	pull    *msgpb.PushMessages
 	pullReq *msgpb.PullMessageBySeqsReq
+	readReq *msgpb.MarkConversationAsReadReq
 }
 
 func (f *fakeMessages) SendMsg(_ context.Context, msg *msgpb.MsgData) (*msgpb.SendMsgResp, error) {
@@ -194,6 +211,19 @@ func (f *fakeMessages) GetConversationsHasReadAndMaxSeq(context.Context, *msgpb.
 
 func (f *fakeMessages) GetLastMessage(context.Context, *msgpb.GetLastMessageReq) (*msgpb.GetLastMessageResp, error) {
 	return &msgpb.GetLastMessageResp{}, nil
+}
+
+func (f *fakeMessages) MarkMsgsAsRead(context.Context, *msgpb.MarkMsgsAsReadReq) (*msgpb.MarkMsgsAsReadResp, error) {
+	return &msgpb.MarkMsgsAsReadResp{}, nil
+}
+
+func (f *fakeMessages) MarkConversationAsRead(_ context.Context, req *msgpb.MarkConversationAsReadReq) (*msgpb.MarkConversationAsReadResp, error) {
+	f.readReq = req
+	return &msgpb.MarkConversationAsReadResp{}, nil
+}
+
+func (f *fakeMessages) SetConversationHasReadSeq(context.Context, *msgpb.SetConversationHasReadSeqReq) (*msgpb.SetConversationHasReadSeqResp, error) {
+	return &msgpb.SetConversationHasReadSeqResp{}, nil
 }
 
 type fakeTokens struct{}

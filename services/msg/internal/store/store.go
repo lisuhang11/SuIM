@@ -252,6 +252,46 @@ func (s *Store) BySeqs(ctx context.Context, conversationID string, seqs []int64)
 	return scanMsgs(rows)
 }
 
+// SetReadSeq raises this user's read cursor. A smaller value leaves the stored cursor in place.
+func (s *Store) SetReadSeq(ctx context.Context, userID, conversationID string, seq int64) error {
+	if userID == "" || conversationID == "" || seq < 0 {
+		return fmt.Errorf("read seq is invalid")
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO seq_user (user_id, conversation_id, read_seq) VALUES (?, ?, ?) AS new
+ON DUPLICATE KEY UPDATE read_seq = GREATEST(seq_user.read_seq, new.read_seq)`,
+		userID, conversationID, seq)
+	return err
+}
+
+// MarkRead marks messages sent by someone else. The reader's own messages stay unread.
+func (s *Store) MarkRead(ctx context.Context, conversationID, readerID string, seqs []int64) error {
+	const chunk = 200
+	clean := make([]int64, 0, len(seqs))
+	for _, seq := range seqs {
+		if seq > 0 {
+			clean = append(clean, seq)
+		}
+	}
+	for start := 0; start < len(clean); start += chunk {
+		end := start + chunk
+		if end > len(clean) {
+			end = len(clean)
+		}
+		part := clean[start:end]
+		query := `UPDATE msg SET is_read = 1 WHERE conversation_id = ? AND send_id <> ? AND seq IN (` + placeholders(len(part)) + `)`
+		params := make([]any, 0, len(part)+2)
+		params = append(params, conversationID, readerID)
+		for _, seq := range part {
+			params = append(params, seq)
+		}
+		if _, err := s.db.ExecContext(ctx, query, params...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Store) Last(ctx context.Context, conversationID string) (*msgpb.MsgData, error) {
 	rows, err := s.db.QueryContext(ctx, selectMsg+`
 WHERE conversation_id = ? ORDER BY seq DESC LIMIT 1`, conversationID)

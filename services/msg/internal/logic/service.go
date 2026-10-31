@@ -49,6 +49,8 @@ type History interface {
 	Range(ctx context.Context, conversationID string, begin, end, limit int64) ([]*msgpb.MsgData, error)
 	BySeqs(ctx context.Context, conversationID string, seqs []int64) ([]*msgpb.MsgData, error)
 	Last(ctx context.Context, conversationID string) (*msgpb.MsgData, error)
+	SetReadSeq(ctx context.Context, userID, conversationID string, seq int64) error
+	MarkRead(ctx context.Context, conversationID, readerID string, seqs []int64) error
 }
 
 // MsgBefore is a synchronous message callback plus content types that skip it.
@@ -72,6 +74,8 @@ type Hooks struct {
 	BeforeSendGroup  MsgBefore
 	AfterSendGroup   MsgAfter
 	BeforeMsgModify  MsgBefore
+	AfterSingleRead  MsgAfter
+	AfterGroupRead   MsgAfter
 }
 
 // Server is the msg gRPC service. It publishes sends and reads history.

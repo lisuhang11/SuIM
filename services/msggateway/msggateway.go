@@ -114,6 +114,10 @@ func run(cfgPath string) error {
 	mux.HandleFunc("POST /msg/send", server.HandleSend)
 	mux.HandleFunc("POST /msg/pull", server.HandlePull)
 	mux.HandleFunc("POST /msg/sync_groups", server.HandleSyncGroups)
+	mux.HandleFunc("POST /msg/mark_msgs_as_read", server.HandleMarkMsgsAsRead)
+	mux.HandleFunc("POST /msg/mark_conversation_as_read", server.HandleMarkConversationAsRead)
+	mux.HandleFunc("POST /msg/read_seqs", server.HandleReadSeqs)
+	mux.HandleFunc("POST /msg/set_conversation_has_read_seq", server.HandleSetConversationHasReadSeq)
 	mux.Handle("/", server)
 	wsSrv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	rpcLis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.RPCPort))

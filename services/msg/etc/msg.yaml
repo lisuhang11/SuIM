@@ -63,3 +63,13 @@ webhooks:
     timeout: 5
     failedContinue: false
     deniedTypes: []
+  afterSingleMsgRead:
+    enable: false
+    timeout: 5
+    attentionIds: []
+    deniedTypes: []
+  afterGroupMsgRead:
+    enable: false
+    timeout: 5
+    attentionIds: []
+    deniedTypes: []

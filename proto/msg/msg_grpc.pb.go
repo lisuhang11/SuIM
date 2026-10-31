@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v3.21.12
-// source: msg.proto
+// source: msg/msg.proto
 
 package msgpb
 
@@ -25,6 +25,9 @@ const (
 	MsgService_GetSeqMessage_FullMethodName                    = "/msg.MsgService/GetSeqMessage"
 	MsgService_GetConversationsHasReadAndMaxSeq_FullMethodName = "/msg.MsgService/GetConversationsHasReadAndMaxSeq"
 	MsgService_GetLastMessage_FullMethodName                   = "/msg.MsgService/GetLastMessage"
+	MsgService_MarkMsgsAsRead_FullMethodName                   = "/msg.MsgService/MarkMsgsAsRead"
+	MsgService_MarkConversationAsRead_FullMethodName           = "/msg.MsgService/MarkConversationAsRead"
+	MsgService_SetConversationHasReadSeq_FullMethodName        = "/msg.MsgService/SetConversationHasReadSeq"
 )
 
 // MsgServiceClient is the client API for MsgService service.
@@ -39,6 +42,12 @@ type MsgServiceClient interface {
 	GetSeqMessage(ctx context.Context, in *GetSeqMessageReq, opts ...grpc.CallOption) (*PushMessages, error)
 	GetConversationsHasReadAndMaxSeq(ctx context.Context, in *GetConversationsHasReadAndMaxSeqReq, opts ...grpc.CallOption) (*GetConversationsHasReadAndMaxSeqResp, error)
 	GetLastMessage(ctx context.Context, in *GetLastMessageReq, opts ...grpc.CallOption) (*GetLastMessageResp, error)
+	// MarkMsgsAsRead marks the given sequences and notifies the peer.
+	MarkMsgsAsRead(ctx context.Context, in *MarkMsgsAsReadReq, opts ...grpc.CallOption) (*MarkMsgsAsReadResp, error)
+	// MarkConversationAsRead advances one user's read cursor to has_read_seq.
+	MarkConversationAsRead(ctx context.Context, in *MarkConversationAsReadReq, opts ...grpc.CallOption) (*MarkConversationAsReadResp, error)
+	// SetConversationHasReadSeq stores a read cursor without marking individual messages.
+	SetConversationHasReadSeq(ctx context.Context, in *SetConversationHasReadSeqReq, opts ...grpc.CallOption) (*SetConversationHasReadSeqResp, error)
 }
 
 type msgServiceClient struct {
@@ -109,6 +118,36 @@ func (c *msgServiceClient) GetLastMessage(ctx context.Context, in *GetLastMessag
 	return out, nil
 }
 
+func (c *msgServiceClient) MarkMsgsAsRead(ctx context.Context, in *MarkMsgsAsReadReq, opts ...grpc.CallOption) (*MarkMsgsAsReadResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkMsgsAsReadResp)
+	err := c.cc.Invoke(ctx, MsgService_MarkMsgsAsRead_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgServiceClient) MarkConversationAsRead(ctx context.Context, in *MarkConversationAsReadReq, opts ...grpc.CallOption) (*MarkConversationAsReadResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkConversationAsReadResp)
+	err := c.cc.Invoke(ctx, MsgService_MarkConversationAsRead_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgServiceClient) SetConversationHasReadSeq(ctx context.Context, in *SetConversationHasReadSeqReq, opts ...grpc.CallOption) (*SetConversationHasReadSeqResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetConversationHasReadSeqResp)
+	err := c.cc.Invoke(ctx, MsgService_SetConversationHasReadSeq_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServiceServer is the server API for MsgService service.
 // All implementations must embed UnimplementedMsgServiceServer
 // for forward compatibility.
@@ -121,6 +160,12 @@ type MsgServiceServer interface {
 	GetSeqMessage(context.Context, *GetSeqMessageReq) (*PushMessages, error)
 	GetConversationsHasReadAndMaxSeq(context.Context, *GetConversationsHasReadAndMaxSeqReq) (*GetConversationsHasReadAndMaxSeqResp, error)
 	GetLastMessage(context.Context, *GetLastMessageReq) (*GetLastMessageResp, error)
+	// MarkMsgsAsRead marks the given sequences and notifies the peer.
+	MarkMsgsAsRead(context.Context, *MarkMsgsAsReadReq) (*MarkMsgsAsReadResp, error)
+	// MarkConversationAsRead advances one user's read cursor to has_read_seq.
+	MarkConversationAsRead(context.Context, *MarkConversationAsReadReq) (*MarkConversationAsReadResp, error)
+	// SetConversationHasReadSeq stores a read cursor without marking individual messages.
+	SetConversationHasReadSeq(context.Context, *SetConversationHasReadSeqReq) (*SetConversationHasReadSeqResp, error)
 	mustEmbedUnimplementedMsgServiceServer()
 }
 
@@ -148,6 +193,15 @@ func (UnimplementedMsgServiceServer) GetConversationsHasReadAndMaxSeq(context.Co
 }
 func (UnimplementedMsgServiceServer) GetLastMessage(context.Context, *GetLastMessageReq) (*GetLastMessageResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLastMessage not implemented")
+}
+func (UnimplementedMsgServiceServer) MarkMsgsAsRead(context.Context, *MarkMsgsAsReadReq) (*MarkMsgsAsReadResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkMsgsAsRead not implemented")
+}
+func (UnimplementedMsgServiceServer) MarkConversationAsRead(context.Context, *MarkConversationAsReadReq) (*MarkConversationAsReadResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkConversationAsRead not implemented")
+}
+func (UnimplementedMsgServiceServer) SetConversationHasReadSeq(context.Context, *SetConversationHasReadSeqReq) (*SetConversationHasReadSeqResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetConversationHasReadSeq not implemented")
 }
 func (UnimplementedMsgServiceServer) mustEmbedUnimplementedMsgServiceServer() {}
 func (UnimplementedMsgServiceServer) testEmbeddedByValue()                    {}
@@ -278,6 +332,60 @@ func _MsgService_GetLastMessage_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MsgService_MarkMsgsAsRead_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkMsgsAsReadReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServiceServer).MarkMsgsAsRead(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MsgService_MarkMsgsAsRead_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServiceServer).MarkMsgsAsRead(ctx, req.(*MarkMsgsAsReadReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MsgService_MarkConversationAsRead_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkConversationAsReadReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServiceServer).MarkConversationAsRead(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MsgService_MarkConversationAsRead_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServiceServer).MarkConversationAsRead(ctx, req.(*MarkConversationAsReadReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MsgService_SetConversationHasReadSeq_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetConversationHasReadSeqReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServiceServer).SetConversationHasReadSeq(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MsgService_SetConversationHasReadSeq_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServiceServer).SetConversationHasReadSeq(ctx, req.(*SetConversationHasReadSeqReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MsgService_ServiceDesc is the grpc.ServiceDesc for MsgService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -309,7 +417,19 @@ var MsgService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetLastMessage",
 			Handler:    _MsgService_GetLastMessage_Handler,
 		},
+		{
+			MethodName: "MarkMsgsAsRead",
+			Handler:    _MsgService_MarkMsgsAsRead_Handler,
+		},
+		{
+			MethodName: "MarkConversationAsRead",
+			Handler:    _MsgService_MarkConversationAsRead_Handler,
+		},
+		{
+			MethodName: "SetConversationHasReadSeq",
+			Handler:    _MsgService_SetConversationHasReadSeq_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "msg.proto",
+	Metadata: "msg/msg.proto",
 }

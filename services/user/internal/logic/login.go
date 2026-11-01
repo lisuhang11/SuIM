@@ -9,17 +9,31 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/proto/user"
+	"github.com/lisuhang11/SuIM/services/user/internal/model"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
 func (s *Server) Login(ctx context.Context, req *userpb.LoginReq) (*userpb.LoginResp, error) {
-	// 1. 校验邮箱、密码和平台号。
+	// 1. 校验手机号或邮箱、密码和平台号。两者只能填一个。
 	email := strings.ToLower(strings.TrimSpace(req.GetEmail()))
-	if email == "" || req.GetPassword() == "" || req.GetPlatformId() <= 0 {
+	phone := strings.TrimSpace(req.GetPhone())
+	if req.GetPassword() == "" || req.GetPlatformId() <= 0 || (email == "" && phone == "") || (email != "" && phone != "") {
 		return nil, errorcode.ErrUserInvalidLogin
 	}
-	// 2. 按邮箱查用户。不存在时与密码错误返回同一错误。
-	user, err := s.store.GetUserByEmail(ctx, email)
+	// 2. 按手机号或邮箱查用户。不存在、格式不对时与密码错误返回同一错误。
+	var (
+		user *model.User
+		err  error
+	)
+	if phone != "" {
+		area, national, nerr := NormalizePhone(phone)
+		if nerr != nil {
+			return nil, errorcode.ErrUserBadCredential
+		}
+		user, err = s.store.GetUserByPhone(ctx, area, national)
+	} else {
+		user, err = s.store.GetUserByEmail(ctx, email)
+	}
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return nil, errorcode.ErrUserBadCredential

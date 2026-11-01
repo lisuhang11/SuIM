@@ -18,6 +18,9 @@ var (
 	ErrNotFound     = errors.New("not found")
 	ErrEmailTaken   = errors.New("email already registered")
 	ErrAccountTaken = errors.New("phone or account already registered")
+	ErrPhoneTaken   = errors.New("phone already registered")
+	ErrSMSCode      = errors.New("sms code rejected")
+	ErrSMSLimited   = errors.New("sms limited")
 )
 
 type Store struct {
@@ -83,6 +86,11 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 		"ALTER TABLE `user` ADD COLUMN allow_add_friend INT NOT NULL DEFAULT 1 COMMENT '是否允许加好友：1允许 2不允许'",
 		"ALTER TABLE `user` ADD COLUMN register_type INT NOT NULL DEFAULT 0 COMMENT '注册方式'",
 		"ALTER TABLE `user` ADD COLUMN ex VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '扩展字段'",
+		"ALTER TABLE `user` ADD COLUMN protocol_version VARCHAR(32) NOT NULL DEFAULT '' COMMENT '已同意的协议版本'",
+		"ALTER TABLE `user` ADD COLUMN protocol_agreed_at DATETIME(3) NULL COMMENT '同意协议时间'",
+		"ALTER TABLE `user` ADD COLUMN register_ip VARCHAR(64) NOT NULL DEFAULT '' COMMENT '注册 IP'",
+		"ALTER TABLE `user` ADD COLUMN register_receipt VARCHAR(64) NULL COMMENT '手机号注册核销回执'",
+		"ALTER TABLE `user` MODIFY email VARCHAR(255) NULL COMMENT '邮箱'",
 		"ALTER TABLE `user` ADD UNIQUE INDEX uk_account (account)",
 		"ALTER TABLE `user` ADD UNIQUE INDEX uk_phone (area_code, phone_number)",
 	} {
@@ -130,7 +138,8 @@ func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 const userColumns = `user_id, email, password_hash, nickname, avatar_url,
 	app_manger_level, global_recv_msg_opt, is_active, create_time,
 	area_code, phone_number, account, gender, birth_time, level,
-	allow_vibration, allow_beep, allow_add_friend, register_type, ex`
+	allow_vibration, allow_beep, allow_add_friend, register_type, ex,
+	protocol_version, protocol_agreed_at, register_ip, register_receipt`
 
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE email = ?`, email)
@@ -140,8 +149,8 @@ func (s *Store) GetUserByID(ctx context.Context, userID string) (*model.User, er
 	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE user_id = ?`, userID)
 }
 
-func (s *Store) getUser(ctx context.Context, query, arg string) (*model.User, error) {
-	u, err := scanUser(s.db.QueryRowContext(ctx, query, arg))
+func (s *Store) getUser(ctx context.Context, query string, args ...any) (*model.User, error) {
+	u, err := scanUser(s.db.QueryRowContext(ctx, query, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -154,24 +163,34 @@ func (s *Store) getUser(ctx context.Context, query, arg string) (*model.User, er
 func scanUser(sc scanner) (*model.User, error) {
 	var u model.User
 	var active int
-	var phone, account sql.NullString
-	var birth sql.NullTime
+	var email, phone, account, receipt sql.NullString
+	var birth, agreed sql.NullTime
 	err := sc.Scan(
-		&u.UserID, &u.Email, &u.PasswordHash, &u.Nickname, &u.AvatarURL,
+		&u.UserID, &email, &u.PasswordHash, &u.Nickname, &u.AvatarURL,
 		&u.AppMangerLevel, &u.GlobalRecvMsgOpt, &active, &u.CreateTime,
 		&u.AreaCode, &phone, &account, &u.Gender, &birth, &u.Level,
 		&u.AllowVibration, &u.AllowBeep, &u.AllowAddFriend, &u.RegisterType, &u.Ex,
+		&u.ProtocolVersion, &agreed, &u.RegisterIP, &receipt,
 	)
 	if err != nil {
 		return nil, err
 	}
 	u.IsActive = active == 1
+	u.Email = email.String
 	u.PhoneNumber = phone.String
 	u.Account = account.String
+	u.RegisterReceipt = receipt.String
 	if birth.Valid {
 		u.BirthTime = birth.Time
 	}
+	if agreed.Valid {
+		u.ProtocolAgreedAt = agreed.Time
+	}
 	return &u, nil
+}
+
+func (s *Store) GetUserByPhone(ctx context.Context, area, national string) (*model.User, error) {
+	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE area_code = ? AND phone_number = ?`, area, national)
 }
 
 // StartSession revokes every live token of this user on this platform, then stores the new token.

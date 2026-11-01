@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net"
 	"net/http"
 
 	"github.com/lisuhang11/SuIM/proto/user"
@@ -18,6 +19,44 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, resp)
+}
+
+func (s *Server) sendSmsCode(w http.ResponseWriter, r *http.Request) {
+	var req userpb.SendSmsCodeReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	req.ClientIp = clientIP(r)
+	resp, err := s.users.SendSmsCode(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func (s *Server) registerPhone(w http.ResponseWriter, r *http.Request) {
+	var req userpb.RegisterPhoneReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	req.ClientIp = clientIP(r)
+	resp, err := s.users.RegisterPhone(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {

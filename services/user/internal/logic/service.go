@@ -25,12 +25,16 @@ type Hooks struct {
 
 type Server struct {
 	userpb.UnimplementedUserServiceServer
-	store  *store.Store
-	issuer *token.Issuer
-	tokens localcache.Cache[*model.Token]
-	hooks  Hooks
-	now    func() time.Time
-	newID  func() (string, error)
+	store     *store.Store
+	issuer    *token.Issuer
+	tokens    localcache.Cache[*model.Token]
+	hooks     Hooks
+	now       func() time.Time
+	newID     func() (string, error)
+	smsSender SMSSender
+	captcha   CaptchaChecker
+	policy    SMSPolicy
+	pepper    string
 }
 
 func New(st *store.Store, issuer *token.Issuer, tokens localcache.Cache[*model.Token]) *Server {

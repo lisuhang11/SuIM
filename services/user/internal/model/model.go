@@ -26,8 +26,14 @@ type User struct {
 	AllowAddFriend   int32
 	RegisterType     int32
 	Ex               string
+	ProtocolVersion  string
+	ProtocolAgreedAt time.Time
+	RegisterIP       string
+	RegisterReceipt  string
 	CreateTime       time.Time
 }
+
+const RegisterTypePhone int32 = 1
 
 // UserPatch 只包含本次要改的列。nil 表示保持原值。
 type UserPatch struct {

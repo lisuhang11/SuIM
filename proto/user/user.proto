@@ -17,6 +17,12 @@ service UserService {
   rpc ChangePassword(ChangePasswordReq) returns (ChangePasswordResp);
   rpc ValidateToken(ValidateTokenReq) returns (ValidateTokenResp);
   rpc Logout(LogoutReq) returns (LogoutResp);
+  // SendSmsCode delivers a one-time code. The code is never returned to the caller.
+  // register, login, bind, and resetpwd codes are stored apart and cannot be exchanged.
+  rpc SendSmsCode(SendSmsCodeReq) returns (SendSmsCodeResp);
+  // RegisterPhone creates an account whose unique identity is the mobile number.
+  // It consumes a register-scene code and issues a session.
+  rpc RegisterPhone(RegisterPhoneReq) returns (RegisterPhoneResp);
 }
 
 // UserInfo is the public profile. RegisterReq.username is stored as nickname.
@@ -57,6 +63,8 @@ message LoginReq {
   string email = 1;
   string password = 2;
   int32 platform_id = 3;
+  // phone is an alternative to email. Send only one of them.
+  string phone = 4;
 }
 
 message LoginResp {
@@ -146,3 +154,38 @@ message LogoutReq {
 }
 
 message LogoutResp {}
+
+// SendSmsCodeReq.scene is register, login, bind, or resetpwd.
+// client_ip is set by the gateway. captcha_ticket is checked when captcha is required.
+message SendSmsCodeReq {
+  string phone = 1;
+  string scene = 2;
+  string device_id = 3;
+  string captcha_ticket = 4;
+  string client_ip = 5;
+}
+
+message SendSmsCodeResp {
+  int64 expire_seconds = 1;
+}
+
+// RegisterPhoneReq.scene must be register. password may be empty for a code-only account.
+// protocol_version is the policy version the user accepted.
+message RegisterPhoneReq {
+  string phone = 1;
+  string code = 2;
+  string scene = 3;
+  string password = 4;
+  string nickname = 5;
+  bool agree_protocol = 6;
+  string protocol_version = 7;
+  int32 platform_id = 8;
+  string client_ip = 9;
+  string device_id = 10;
+}
+
+message RegisterPhoneResp {
+  UserInfo user = 1;
+  string token = 2;
+  int64 expire_time_seconds = 3;
+}

@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v3.21.12
-// source: user.proto
+// source: user/user.proto
 
 package userpb
 
@@ -29,6 +29,8 @@ const (
 	UserService_ChangePassword_FullMethodName = "/user.UserService/ChangePassword"
 	UserService_ValidateToken_FullMethodName  = "/user.UserService/ValidateToken"
 	UserService_Logout_FullMethodName         = "/user.UserService/Logout"
+	UserService_SendSmsCode_FullMethodName    = "/user.UserService/SendSmsCode"
+	UserService_RegisterPhone_FullMethodName  = "/user.UserService/RegisterPhone"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -48,6 +50,12 @@ type UserServiceClient interface {
 	ChangePassword(ctx context.Context, in *ChangePasswordReq, opts ...grpc.CallOption) (*ChangePasswordResp, error)
 	ValidateToken(ctx context.Context, in *ValidateTokenReq, opts ...grpc.CallOption) (*ValidateTokenResp, error)
 	Logout(ctx context.Context, in *LogoutReq, opts ...grpc.CallOption) (*LogoutResp, error)
+	// SendSmsCode delivers a one-time code. The code is never returned to the caller.
+	// register, login, bind, and resetpwd codes are stored apart and cannot be exchanged.
+	SendSmsCode(ctx context.Context, in *SendSmsCodeReq, opts ...grpc.CallOption) (*SendSmsCodeResp, error)
+	// RegisterPhone creates an account whose unique identity is the mobile number.
+	// It consumes a register-scene code and issues a session.
+	RegisterPhone(ctx context.Context, in *RegisterPhoneReq, opts ...grpc.CallOption) (*RegisterPhoneResp, error)
 }
 
 type userServiceClient struct {
@@ -158,6 +166,26 @@ func (c *userServiceClient) Logout(ctx context.Context, in *LogoutReq, opts ...g
 	return out, nil
 }
 
+func (c *userServiceClient) SendSmsCode(ctx context.Context, in *SendSmsCodeReq, opts ...grpc.CallOption) (*SendSmsCodeResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SendSmsCodeResp)
+	err := c.cc.Invoke(ctx, UserService_SendSmsCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) RegisterPhone(ctx context.Context, in *RegisterPhoneReq, opts ...grpc.CallOption) (*RegisterPhoneResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterPhoneResp)
+	err := c.cc.Invoke(ctx, UserService_RegisterPhone_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -175,6 +203,12 @@ type UserServiceServer interface {
 	ChangePassword(context.Context, *ChangePasswordReq) (*ChangePasswordResp, error)
 	ValidateToken(context.Context, *ValidateTokenReq) (*ValidateTokenResp, error)
 	Logout(context.Context, *LogoutReq) (*LogoutResp, error)
+	// SendSmsCode delivers a one-time code. The code is never returned to the caller.
+	// register, login, bind, and resetpwd codes are stored apart and cannot be exchanged.
+	SendSmsCode(context.Context, *SendSmsCodeReq) (*SendSmsCodeResp, error)
+	// RegisterPhone creates an account whose unique identity is the mobile number.
+	// It consumes a register-scene code and issues a session.
+	RegisterPhone(context.Context, *RegisterPhoneReq) (*RegisterPhoneResp, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -214,6 +248,12 @@ func (UnimplementedUserServiceServer) ValidateToken(context.Context, *ValidateTo
 }
 func (UnimplementedUserServiceServer) Logout(context.Context, *LogoutReq) (*LogoutResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method Logout not implemented")
+}
+func (UnimplementedUserServiceServer) SendSmsCode(context.Context, *SendSmsCodeReq) (*SendSmsCodeResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendSmsCode not implemented")
+}
+func (UnimplementedUserServiceServer) RegisterPhone(context.Context, *RegisterPhoneReq) (*RegisterPhoneResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterPhone not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -416,6 +456,42 @@ func _UserService_Logout_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_SendSmsCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendSmsCodeReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).SendSmsCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_SendSmsCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).SendSmsCode(ctx, req.(*SendSmsCodeReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_RegisterPhone_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterPhoneReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).RegisterPhone(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_RegisterPhone_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).RegisterPhone(ctx, req.(*RegisterPhoneReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -463,7 +539,15 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Logout",
 			Handler:    _UserService_Logout_Handler,
 		},
+		{
+			MethodName: "SendSmsCode",
+			Handler:    _UserService_SendSmsCode_Handler,
+		},
+		{
+			MethodName: "RegisterPhone",
+			Handler:    _UserService_RegisterPhone_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "user.proto",
+	Metadata: "user/user.proto",
 }

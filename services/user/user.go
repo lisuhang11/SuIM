@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/user/internal/config"
 	"github.com/lisuhang11/SuIM/services/user/internal/logic"
+	"github.com/lisuhang11/SuIM/services/user/internal/sms"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 	"github.com/lisuhang11/SuIM/services/user/internal/token"
 )
@@ -93,6 +95,19 @@ func run(cfgPath, migratePath string) error {
 		BeforeUpdateUserInfoEx: w.BeforeUpdateUserInfoEx,
 		AfterUpdateUserInfoEx:  w.AfterUpdateUserInfoEx,
 	})
+	sender, err := newSMSSender(cfg.SMS)
+	if err != nil {
+		return err
+	}
+	policy, err := smsPolicy(cfg.SMS)
+	if err != nil {
+		return err
+	}
+	var captcha logic.CaptchaChecker
+	if cfg.SMS.CaptchaRequired {
+		captcha = sms.HTTPCaptcha{URL: cfg.SMS.CaptchaURL}
+	}
+	userServer.UseSMS(sender, captcha, policy, cfg.JWT.Secret)
 
 	srv := grpc.NewServer()
 	userpb.RegisterUserServiceServer(srv, userServer)
@@ -133,6 +148,56 @@ func run(cfgPath, migratePath string) error {
 		_ = reg.Deregister(offCtx)
 		return err
 	}
+}
+
+func newSMSSender(cfg svcconfig.SMS) (logic.SMSSender, error) {
+	switch cfg.Provider {
+	case "log":
+		return sms.LogSender{DebugCode: cfg.DebugLogCode}, nil
+	case "http":
+		return sms.HTTPSender{URL: cfg.URL}, nil
+	default:
+		return nil, fmt.Errorf("sms provider is invalid")
+	}
+}
+
+func smsPolicy(cfg svcconfig.SMS) (logic.SMSPolicy, error) {
+	phones := make(map[string]struct{}, len(cfg.BlacklistPhones))
+	for _, raw := range cfg.BlacklistPhones {
+		area, national, err := logic.NormalizePhone(raw)
+		if err != nil {
+			return logic.SMSPolicy{}, fmt.Errorf("sms blacklist phone: %w", err)
+		}
+		phones[area+national] = struct{}{}
+	}
+	return logic.SMSPolicy{
+		CodeTTL:          time.Duration(cfg.CodeTTLSeconds) * time.Second,
+		RetryTTL:         time.Duration(cfg.RetryTTLSeconds) * time.Second,
+		PhonePerMinute:   int64(cfg.PhonePerMinute),
+		PhonePerHour:     int64(cfg.PhonePerHour),
+		PhonePerDay:      int64(cfg.PhonePerDay),
+		IPPerMinute:      int64(cfg.IPPerMinute),
+		DevicePerMinute:  int64(cfg.DevicePerMinute),
+		MaxAttempts:      cfg.MaxAttempts,
+		CaptchaRequired:  cfg.CaptchaRequired,
+		BlacklistPhones:  phones,
+		BlacklistIPs:     stringSet(cfg.BlacklistIPs),
+		BlacklistDevices: stringSet(cfg.BlacklistDevices),
+	}, nil
+}
+
+func stringSet(items []string) map[string]struct{} {
+	if len(items) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			set[item] = struct{}{}
+		}
+	}
+	return set
 }
 
 func mysqlDSN(cfg config.MySQL) string {

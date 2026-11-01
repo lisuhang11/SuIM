@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
@@ -18,6 +19,26 @@ type Config struct {
 	LocalCache LocalCache      `yaml:"localCache"`
 	Registry   register.Config `yaml:"registry"`
 	Webhooks   Webhooks        `yaml:"webhooks"`
+	SMS        SMS             `yaml:"sms"`
+}
+
+type SMS struct {
+	Provider         string   `yaml:"provider"`
+	URL              string   `yaml:"url"`
+	CodeTTLSeconds   int      `yaml:"codeTTLSeconds"`
+	RetryTTLSeconds  int      `yaml:"retryTTLSeconds"`
+	PhonePerMinute   int      `yaml:"phonePerMinute"`
+	PhonePerHour     int      `yaml:"phonePerHour"`
+	PhonePerDay      int      `yaml:"phonePerDay"`
+	IPPerMinute      int      `yaml:"ipPerMinute"`
+	DevicePerMinute  int      `yaml:"devicePerMinute"`
+	MaxAttempts      int      `yaml:"maxAttempts"`
+	CaptchaRequired  bool     `yaml:"captchaRequired"`
+	CaptchaURL       string   `yaml:"captchaURL"`
+	DebugLogCode     bool     `yaml:"debugLogCode"`
+	BlacklistPhones  []string `yaml:"blacklistPhones"`
+	BlacklistIPs     []string `yaml:"blacklistIPs"`
+	BlacklistDevices []string `yaml:"blacklistDevices"`
 }
 
 type Webhooks struct {
@@ -67,10 +88,57 @@ func (c *Config) Validate() error {
 	if c.Registry.Type == "" {
 		return fmt.Errorf("registry type is required")
 	}
+	if err := c.normalizeSMS(); err != nil {
+		return err
+	}
 	w := c.Webhooks
 	return webhook.RequireURL(w.URL,
 		w.BeforeUserRegister.Enable, w.AfterUserRegister.Enable,
 		w.BeforeUpdateUserInfo.Enable, w.AfterUpdateUserInfo.Enable,
 		w.BeforeUpdateUserInfoEx.Enable, w.AfterUpdateUserInfoEx.Enable,
 	)
+}
+
+func (c *Config) normalizeSMS() error {
+	s := &c.SMS
+	if s.Provider == "" {
+		s.Provider = "log"
+	}
+	switch s.Provider {
+	case "log":
+	case "http":
+		if strings.TrimSpace(s.URL) == "" {
+			return fmt.Errorf("sms url is required")
+		}
+	default:
+		return fmt.Errorf("sms provider is invalid")
+	}
+	if s.CodeTTLSeconds <= 0 {
+		s.CodeTTLSeconds = 300
+	}
+	if s.RetryTTLSeconds <= 0 {
+		s.RetryTTLSeconds = 120
+	}
+	if s.PhonePerMinute <= 0 {
+		s.PhonePerMinute = 1
+	}
+	if s.PhonePerHour <= 0 {
+		s.PhonePerHour = 5
+	}
+	if s.PhonePerDay <= 0 {
+		s.PhonePerDay = 10
+	}
+	if s.IPPerMinute <= 0 {
+		s.IPPerMinute = 20
+	}
+	if s.DevicePerMinute <= 0 {
+		s.DevicePerMinute = 10
+	}
+	if s.MaxAttempts <= 0 {
+		s.MaxAttempts = 5
+	}
+	if s.CaptchaRequired && strings.TrimSpace(s.CaptchaURL) == "" {
+		return fmt.Errorf("sms captchaURL is required")
+	}
+	return nil
 }

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS `user` (
     `user_id`             VARCHAR(64)   NOT NULL                COMMENT '用户ID',
-    `email`               VARCHAR(255)  NOT NULL                COMMENT '邮箱',
+    `email`               VARCHAR(255)  NULL                    COMMENT '邮箱',
     `password_hash`       VARCHAR(255)  NOT NULL                COMMENT '密码哈希',
     `nickname`            VARCHAR(255)  NOT NULL DEFAULT ''     COMMENT '昵称',
     `avatar_url`          VARCHAR(1024) NOT NULL DEFAULT ''     COMMENT '头像URL',
@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS `user` (
     `allow_add_friend`    INT           NOT NULL DEFAULT 1      COMMENT '是否允许加好友：1允许 2不允许',
     `register_type`       INT           NOT NULL DEFAULT 0      COMMENT '注册方式',
     `ex`                  VARCHAR(1024) NOT NULL DEFAULT ''     COMMENT '扩展字段',
+    `protocol_version`    VARCHAR(32)   NOT NULL DEFAULT ''     COMMENT '已同意的协议版本',
+    `protocol_agreed_at`  DATETIME(3)   NULL                    COMMENT '同意协议时间',
+    `register_ip`         VARCHAR(64)   NOT NULL DEFAULT ''     COMMENT '注册 IP',
+    `register_receipt`    VARCHAR(64)   NULL                    COMMENT '手机号注册核销回执',
     `create_time`         DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     `updated_at`          DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
     PRIMARY KEY (`user_id`),

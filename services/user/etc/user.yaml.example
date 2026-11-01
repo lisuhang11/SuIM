@@ -42,3 +42,21 @@ registry:
     password: ""
     dialTimeout: 5
     ttl: 10
+
+sms:
+  provider: log
+  url: ""
+  codeTTLSeconds: 300
+  retryTTLSeconds: 120
+  phonePerMinute: 1
+  phonePerHour: 5
+  phonePerDay: 10
+  ipPerMinute: 20
+  devicePerMinute: 10
+  maxAttempts: 5
+  captchaRequired: false
+  captchaURL: ""
+  debugLogCode: false
+  blacklistPhones: []
+  blacklistIPs: []
+  blacklistDevices: []

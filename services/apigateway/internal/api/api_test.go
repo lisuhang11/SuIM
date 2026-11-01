@@ -22,11 +22,23 @@ import (
 
 type userStub struct {
 	userpb.UnimplementedUserServiceServer
-	loggedOut string
+	loggedOut  string
+	smsIP      string
+	registerIP string
 }
 
 func (s *userStub) Register(context.Context, *userpb.RegisterReq) (*userpb.RegisterResp, error) {
 	return &userpb.RegisterResp{User: &userpb.UserInfo{UserId: "new", Nickname: "Ada"}}, nil
+}
+
+func (s *userStub) SendSmsCode(_ context.Context, req *userpb.SendSmsCodeReq) (*userpb.SendSmsCodeResp, error) {
+	s.smsIP = req.GetClientIp()
+	return &userpb.SendSmsCodeResp{ExpireSeconds: 300}, nil
+}
+
+func (s *userStub) RegisterPhone(_ context.Context, req *userpb.RegisterPhoneReq) (*userpb.RegisterPhoneResp, error) {
+	s.registerIP = req.GetClientIp()
+	return &userpb.RegisterPhoneResp{User: &userpb.UserInfo{UserId: "p1"}, Token: "good", ExpireTimeSeconds: 10}, nil
 }
 
 func (s *userStub) Login(context.Context, *userpb.LoginReq) (*userpb.LoginResp, error) {
@@ -270,6 +282,14 @@ func TestGateway(t *testing.T) {
 	res = post(t, httpSrv.URL+"/conversation/incremental", "good", `{"user_id":"u2"}`)
 	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
 		t.Fatalf("incremental conversation as other %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/user/send_sms_code", "", `{"phone":"13800138000","scene":"register","client_ip":"1.2.3.4"}`)
+	if res.Status != http.StatusOK || res.Code != 0 || users.smsIP != "127.0.0.1" || !bytes.Contains(res.Data, []byte(`"expire_seconds":"300"`)) && !bytes.Contains(res.Data, []byte(`"expire_seconds":300`)) {
+		t.Fatalf("send sms %+v ip=%s", res, users.smsIP)
+	}
+	res = post(t, httpSrv.URL+"/user/register_phone", "", `{"phone":"13800138000","code":"123456","scene":"register","agree_protocol":true,"protocol_version":"v1","platform_id":1,"client_ip":"1.2.3.4"}`)
+	if res.Status != http.StatusOK || res.Code != 0 || users.registerIP != "127.0.0.1" {
+		t.Fatalf("register phone %+v ip=%s", res, users.registerIP)
 	}
 	res = post(t, httpSrv.URL+"/user/login", "", `{`)
 	if res.Status != http.StatusBadRequest || res.Code != int32(errorcode.InvalidJSON) {

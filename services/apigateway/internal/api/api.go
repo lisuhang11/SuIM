@@ -4,6 +4,8 @@
 //
 //	POST /user/register
 //	POST /user/login
+//	POST /user/send_sms_code
+//	POST /user/register_phone
 //
 // Token required. Send it in the token header, or as Authorization: Bearer.
 // The token user must be the actor in the request body.
@@ -111,6 +113,8 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("POST /user/register", s.register)
 	mux.HandleFunc("POST /user/login", s.login)
+	mux.HandleFunc("POST /user/send_sms_code", s.sendSmsCode)
+	mux.HandleFunc("POST /user/register_phone", s.registerPhone)
 
 	mux.HandleFunc("POST /user/get", s.auth(s.getUser))
 	mux.HandleFunc("POST /user/get_users", s.auth(s.getUsers))
@@ -306,6 +310,8 @@ func httpStatus(code codes.Code) int {
 		return http.StatusConflict
 	case codes.Unavailable:
 		return http.StatusServiceUnavailable
+	case codes.ResourceExhausted:
+		return http.StatusTooManyRequests
 	case codes.Canceled, codes.DeadlineExceeded:
 		return http.StatusRequestTimeout
 	default:

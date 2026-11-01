@@ -187,19 +187,20 @@ func TestPhoneRegister(t *testing.T) {
 	_, noPassCode := sender.snapshot()
 	noPassReq := phoneReq(noPassPhone, noPassCode, true)
 	noPassReq.Password = ""
+	if _, err := srv.RegisterPhone(ctx, noPassReq); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidPassword) {
+		t.Fatalf("empty password err=%v", err)
+	}
+	noPassReq.Password = "secret1"
 	noPass, err := srv.RegisterPhone(ctx, noPassReq)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { cleanupUser(t, mysqlCfg, noPass.GetUser().GetUserId()) })
-	if noPass.GetUser().GetHasPassword() {
-		t.Fatal("code-only registration stored a usable password")
+	if !noPass.GetUser().GetHasPassword() {
+		t.Fatal("phone registration did not store a login password")
 	}
-	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: noPassPhone, Password: "", PlatformId: 1}); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidLogin) {
-		t.Fatalf("empty password err=%v", err)
-	}
-	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: noPassPhone, Password: "secret1", PlatformId: 1}); !isCode(err, codes.Unauthenticated, errorcode.UserBadCredential) {
-		t.Fatalf("unset password accepted err=%v", err)
+	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: noPassPhone, Password: "secret1", PlatformId: 1}); err != nil {
+		t.Fatalf("phone password login err=%v", err)
 	}
 
 	resendPhone := nextTestPhone()

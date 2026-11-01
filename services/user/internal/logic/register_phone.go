@@ -29,10 +29,8 @@ func (s *Server) RegisterPhone(ctx context.Context, req *userpb.RegisterPhoneReq
 		return nil, err
 	}
 	password := req.GetPassword()
-	if password != "" {
-		if err := validatePassword(password); err != nil {
-			return nil, err
-		}
+	if err := validatePassword(password); err != nil {
+		return nil, err
 	}
 	nickname, err := phoneNickname(req.GetNickname(), national)
 	if err != nil {
@@ -66,7 +64,7 @@ func (s *Server) RegisterPhone(ctx context.Context, req *userpb.RegisterPhoneReq
 		}
 		return nil, errorcode.ErrUserPhoneTaken
 	}
-	hash, usable, err := s.phonePasswordHash(password)
+	hash, err := s.phonePasswordHash(password)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +88,7 @@ func (s *Server) RegisterPhone(ctx context.Context, req *userpb.RegisterPhoneReq
 		ProtocolAgreedAt: s.now().UTC(),
 		RegisterIP:       ip,
 		RegisterReceipt:  got,
-		HasPassword:      usable,
+		HasPassword:      true,
 	}
 	if err := s.beforeRegister(ctx, user); err != nil {
 		return nil, err
@@ -112,20 +110,12 @@ func (s *Server) RegisterPhone(ctx context.Context, req *userpb.RegisterPhoneReq
 	return s.finishPhoneRegister(ctx, user, req.GetPlatformId())
 }
 
-func (s *Server) phonePasswordHash(password string) (string, bool, error) {
-	usable := password != ""
-	if !usable {
-		secret, err := randomSecret()
-		if err != nil {
-			return "", false, errorcode.ErrInternal.WithMsg("create password")
-		}
-		password = secret
-	}
+func (s *Server) phonePasswordHash(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", false, errorcode.ErrInternal.WithMsg("hash password")
+		return "", errorcode.ErrInternal.WithMsg("hash password")
 	}
-	return string(hash), usable, nil
+	return string(hash), nil
 }
 
 func (s *Server) finishPhoneRegister(ctx context.Context, user *model.User, platformID int32) (*userpb.RegisterPhoneResp, error) {

@@ -187,8 +187,7 @@ message SendSmsCodeResp {
   int64 expire_seconds = 1;
 }
 
-// RegisterPhoneReq.scene must be register. A password is stored with bcrypt and can log in.
-// An empty password stores an unusable hash and has_password is false.
+// RegisterPhoneReq.scene must be register. password is required and becomes the login credential.
 // protocol_version is the policy version the user accepted.
 message RegisterPhoneReq {
   string phone = 1;

@@ -48,6 +48,7 @@ type Server struct {
 	users  Users
 	sender MsgSender
 	hooks  Hooks
+	quota  Quota
 	now    func() time.Time
 }
 

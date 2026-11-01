@@ -27,6 +27,12 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 	if err != nil {
 		return nil, err
 	}
+	if len(userIDs) > maxInviteUsers {
+		return nil, errorcode.ErrGroupInvalidArgs.WithMsg("too many users")
+	}
+	if err := s.reserveInvite(ctx, op, len(userIDs)); err != nil {
+		return nil, err
+	}
 
 	// 1. 群未解散，操作者必须已在群内。调用方身份尚未从上下文读取。
 	group, err := s.activeGroup(ctx, groupID)

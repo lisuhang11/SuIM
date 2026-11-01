@@ -31,6 +31,9 @@ func (s *Server) JoinGroup(ctx context.Context, req *grouppb.JoinGroupReq) (*gro
 	if err := normalizeJoinSource(req.GetJoinSource()); err != nil {
 		return nil, err
 	}
+	if err := s.reserveJoin(ctx, userID); err != nil {
+		return nil, err
+	}
 
 	profiles, err := s.requireUsers(ctx, []string{userID})
 	if err != nil {

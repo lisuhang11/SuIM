@@ -24,6 +24,7 @@ const (
 	GroupIDGenFailed     Code = 4018
 	GroupRequestNotFound Code = 4019
 	GroupRequestHandled  Code = 4020
+	GroupTooFrequent     Code = 4021
 )
 
 var (
@@ -47,4 +48,5 @@ var (
 	ErrGroupIDGenFailed     = Define(GroupIDGenFailed, codes.Internal, "group id generation failed")
 	ErrGroupRequestNotFound = Define(GroupRequestNotFound, codes.NotFound, "group request not found")
 	ErrGroupRequestHandled  = Define(GroupRequestHandled, codes.FailedPrecondition, "group request already handled")
+	ErrGroupTooFrequent     = Define(GroupTooFrequent, codes.ResourceExhausted, "group requests are too frequent")
 )

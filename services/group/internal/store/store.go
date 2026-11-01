@@ -19,6 +19,7 @@ var (
 	ErrRequestNotFound = errors.New("group request not found")
 	ErrRequestHandled  = errors.New("group request already handled")
 	ErrDismissed       = errors.New("group dismissed")
+	ErrLimited         = errors.New("group limited")
 )
 
 type Store struct {

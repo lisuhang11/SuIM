@@ -54,6 +54,12 @@ func (s *Server) CreateGroup(ctx context.Context, req *grouppb.CreateGroupReq) (
 	if err != nil {
 		return nil, err
 	}
+	if len(memberIDs) > maxCreateMembers {
+		return nil, errorcode.ErrGroupInvalidArgs.WithMsg("too many members")
+	}
+	if err := s.reserveCreate(ctx, owner); err != nil {
+		return nil, err
+	}
 
 	// 2. 群主和初始成员都必须是已注册用户。
 	profiles, err := s.requireUsers(ctx, append([]string{owner}, memberIDs...))

@@ -14,11 +14,12 @@ import (
 )
 
 func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserReq) (*userpb.UpdateUserResp, error) {
-	// 1. 校验用户 ID，并只接收本次提交的字段。
-	id, err := normalizeUserID(req.GetUserId())
+	// 1. 用会话确定操作者。user_id 为空则改自己，填了别人则拒绝。
+	id, err := s.actorID(ctx, req.GetToken(), req.GetUserId())
 	if err != nil {
 		return nil, err
 	}
+	// 2. 只接收本次提交的字段。
 	patch, err := userPatch(req)
 	if err != nil {
 		return nil, err
@@ -26,7 +27,7 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserReq) (*us
 	if patchEmpty(patch) {
 		return nil, errorcode.ErrUserNothingToUpdate
 	}
-	// 2. 读取当前资料。邮箱与密码不在这里修改。
+	// 3. 读取当前资料。邮箱与密码不在这里修改。
 	old, err := s.store.GetUserByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -34,7 +35,7 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserReq) (*us
 		}
 		return nil, errorcode.ErrInternal.WithMsg("query user")
 	}
-	// 3. 修改资料前 webhook。回调可以改昵称、头像和扩展字段，拒绝则中断。
+	// 4. 修改资料前 webhook。回调可以改昵称、头像和扩展字段，拒绝则中断。
 	if err := s.beforeUpdateUser(ctx, id, old, &patch); err != nil {
 		return nil, err
 	}
@@ -50,7 +51,7 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserReq) (*us
 		}
 		return nil, errorcode.ErrInternal.WithMsg("update user")
 	}
-	// 4. 账号被停用时作废全部会话。
+	// 5. 账号被停用时作废全部会话。
 	//    kafka: 通知 msggateway 断开该用户全部平台的在线连接。尚未接入。
 	if old.IsActive && patch.IsActive != nil && !*patch.IsActive {
 		revoked, err := s.store.RevokeUser(ctx, id)
@@ -59,7 +60,7 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserReq) (*us
 			return nil, errorcode.ErrInternal.WithMsg("revoke session")
 		}
 	}
-	// 5. 修改后 webhook。昵称或头像变化时同步好友和群成员资料尚未接入。
+	// 6. 修改后 webhook。昵称或头像变化时同步好友和群成员资料尚未接入。
 	s.afterUpdateUser(ctx, id, old, patch)
 	//    relation rpc: NotificationUserInfoUpdate，刷新好友侧资料。
 	//    group rpc: NotificationUserInfoUpdate，刷新群成员侧资料。

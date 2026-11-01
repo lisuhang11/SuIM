@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/localcache"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/user"
@@ -78,6 +79,27 @@ func projectUser(u *model.User, viewerID string) *userpb.UserInfo {
 		return toPB(u)
 	}
 	return toPublic(u)
+}
+
+// actorID is the session user for a mutating RPC. An empty requested ID means
+// the token user. A different ID is rejected before any read or write.
+func (s *Server) actorID(ctx context.Context, raw, requested string) (string, error) {
+	claims, _, err := s.loadUsable(ctx, strings.TrimSpace(raw), model.TokenType)
+	if err != nil {
+		return "", err
+	}
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		return claims.UserID, nil
+	}
+	id, err := normalizeUserID(requested)
+	if err != nil {
+		return "", err
+	}
+	if id != claims.UserID {
+		return "", errorcode.ErrNoPermission
+	}
+	return id, nil
 }
 
 func (s *Server) viewerID(ctx context.Context, raw string) (string, error) {

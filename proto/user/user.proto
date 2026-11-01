@@ -128,6 +128,9 @@ message UpdateUserReq {
   optional int32 allow_add_friend = 15;
   optional int32 register_type = 16;
   optional string ex = 17;
+  // token is the caller session. The gateway overwrites it from the request header.
+  // The service acts as this user. user_id must be empty or the same user.
+  string token = 18;
 }
 
 message UpdateUserResp {}
@@ -135,6 +138,9 @@ message UpdateUserResp {}
 // --------------- DeleteUser ---------------
 message DeleteUserReq {
   string user_id = 1;
+  // token is the caller session. The gateway overwrites it from the request header.
+  // user_id must be empty or the same user.
+  string token = 2;
 }
 
 message DeleteUserResp {}
@@ -144,6 +150,9 @@ message ChangePasswordReq {
   string user_id      = 1;
   string old_password = 2;
   string new_password = 3;
+  // token is the caller session. The gateway overwrites it from the request header.
+  // user_id must be empty or the same user.
+  string token = 4;
 }
 
 message ChangePasswordResp {}

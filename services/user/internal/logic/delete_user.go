@@ -10,8 +10,8 @@ import (
 )
 
 func (s *Server) DeleteUser(ctx context.Context, req *userpb.DeleteUserReq) (*userpb.DeleteUserResp, error) {
-	// 1. 校验用户 ID。
-	id, err := normalizeUserID(req.GetUserId())
+	// 1. 用会话确定操作者。user_id 为空则删自己，填了别人则拒绝。
+	id, err := s.actorID(ctx, req.GetToken(), req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

@@ -768,8 +768,11 @@ type UpdateUserReq struct {
 	AllowAddFriend   *int32                 `protobuf:"varint,15,opt,name=allow_add_friend,json=allowAddFriend,proto3,oneof" json:"allow_add_friend,omitempty"`
 	RegisterType     *int32                 `protobuf:"varint,16,opt,name=register_type,json=registerType,proto3,oneof" json:"register_type,omitempty"`
 	Ex               *string                `protobuf:"bytes,17,opt,name=ex,proto3,oneof" json:"ex,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// token is the caller session. The gateway overwrites it from the request header.
+	// The service acts as this user. user_id must be empty or the same user.
+	Token         string `protobuf:"bytes,18,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateUserReq) Reset() {
@@ -921,6 +924,13 @@ func (x *UpdateUserReq) GetEx() string {
 	return ""
 }
 
+func (x *UpdateUserReq) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
 type UpdateUserResp struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -959,8 +969,11 @@ func (*UpdateUserResp) Descriptor() ([]byte, []int) {
 
 // --------------- DeleteUser ---------------
 type DeleteUserReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// token is the caller session. The gateway overwrites it from the request header.
+	// user_id must be empty or the same user.
+	Token         string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -998,6 +1011,13 @@ func (*DeleteUserReq) Descriptor() ([]byte, []int) {
 func (x *DeleteUserReq) GetUserId() string {
 	if x != nil {
 		return x.UserId
+	}
+	return ""
+}
+
+func (x *DeleteUserReq) GetToken() string {
+	if x != nil {
+		return x.Token
 	}
 	return ""
 }
@@ -1040,10 +1060,13 @@ func (*DeleteUserResp) Descriptor() ([]byte, []int) {
 
 // --------------- ChangePassword ---------------
 type ChangePasswordReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	OldPassword   string                 `protobuf:"bytes,2,opt,name=old_password,json=oldPassword,proto3" json:"old_password,omitempty"`
-	NewPassword   string                 `protobuf:"bytes,3,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	UserId      string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	OldPassword string                 `protobuf:"bytes,2,opt,name=old_password,json=oldPassword,proto3" json:"old_password,omitempty"`
+	NewPassword string                 `protobuf:"bytes,3,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	// token is the caller session. The gateway overwrites it from the request header.
+	// user_id must be empty or the same user.
+	Token         string `protobuf:"bytes,4,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1095,6 +1118,13 @@ func (x *ChangePasswordReq) GetOldPassword() string {
 func (x *ChangePasswordReq) GetNewPassword() string {
 	if x != nil {
 		return x.NewPassword
+	}
+	return ""
+}
+
+func (x *ChangePasswordReq) GetToken() string {
+	if x != nil {
+		return x.Token
 	}
 	return ""
 }
@@ -1685,7 +1715,7 @@ const file_user_user_proto_rawDesc = "" +
 	"\akeyword\x18\x01 \x01(\tR\akeyword\x12\x14\n" +
 	"\x05token\x18\x02 \x01(\tR\x05token\"7\n" +
 	"\x0fSearchUsersResp\x12$\n" +
-	"\x05users\x18\x01 \x03(\v2\x0e.user.UserInfoR\x05users\"\xee\x06\n" +
+	"\x05users\x18\x01 \x03(\v2\x0e.user.UserInfoR\x05users\"\x84\a\n" +
 	"\rUpdateUserReq\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1f\n" +
 	"\bnickname\x18\x02 \x01(\tH\x00R\bnickname\x88\x01\x01\x12\"\n" +
@@ -1708,7 +1738,8 @@ const file_user_user_proto_rawDesc = "" +
 	"allow_beep\x18\x0e \x01(\x05H\fR\tallowBeep\x88\x01\x01\x12-\n" +
 	"\x10allow_add_friend\x18\x0f \x01(\x05H\rR\x0eallowAddFriend\x88\x01\x01\x12(\n" +
 	"\rregister_type\x18\x10 \x01(\x05H\x0eR\fregisterType\x88\x01\x01\x12\x13\n" +
-	"\x02ex\x18\x11 \x01(\tH\x0fR\x02ex\x88\x01\x01B\v\n" +
+	"\x02ex\x18\x11 \x01(\tH\x0fR\x02ex\x88\x01\x01\x12\x14\n" +
+	"\x05token\x18\x12 \x01(\tR\x05tokenB\v\n" +
 	"\t_nicknameB\r\n" +
 	"\v_avatar_urlB\x13\n" +
 	"\x11_app_manger_levelB\x16\n" +
@@ -1728,14 +1759,16 @@ const file_user_user_proto_rawDesc = "" +
 	"\x11_allow_add_friendB\x10\n" +
 	"\x0e_register_typeB\x05\n" +
 	"\x03_ex\"\x10\n" +
-	"\x0eUpdateUserResp\"(\n" +
+	"\x0eUpdateUserResp\">\n" +
 	"\rDeleteUserReq\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x10\n" +
-	"\x0eDeleteUserResp\"r\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"\x10\n" +
+	"\x0eDeleteUserResp\"\x88\x01\n" +
 	"\x11ChangePasswordReq\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
 	"\fold_password\x18\x02 \x01(\tR\voldPassword\x12!\n" +
-	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\"\x14\n" +
+	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\x12\x14\n" +
+	"\x05token\x18\x04 \x01(\tR\x05token\"\x14\n" +
 	"\x12ChangePasswordResp\"(\n" +
 	"\x10ValidateTokenReq\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"n\n" +

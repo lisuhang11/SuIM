@@ -222,12 +222,21 @@ func TestProfile(t *testing.T) {
 	avatar := "https://example.com/a.png"
 	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{
 		UserId: id, Nickname: &nick, AvatarUrl: &avatar,
+	}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("update without token: %v", err)
+	}
+	p1, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{
+		UserId: id, Nickname: &nick, AvatarUrl: &avatar, Token: p1.GetToken(),
 	}); err != nil {
 		t.Fatal(err)
 	}
 	gender := int32(1)
 	birth := time.Date(1990, 5, 6, 0, 0, 0, 0, time.UTC).UnixMilli()
-	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id, Gender: &gender, BirthTime: &birth}); err != nil {
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{Token: p1.GetToken(), Gender: &gender, BirthTime: &birth}); err != nil {
 		t.Fatal(err)
 	}
 	got, err = srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id})
@@ -235,14 +244,10 @@ func TestProfile(t *testing.T) {
 		got.GetUser().GetGender() != 1 || got.GetUser().GetBirthTime() != 0 || got.GetUser().GetEmail() != "" {
 		t.Fatalf("public profile: %+v err=%v", got.GetUser(), err)
 	}
-	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id}); !isCode(err, codes.InvalidArgument, errorcode.UserNothingToUpdate) {
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id, Token: p1.GetToken()}); !isCode(err, codes.InvalidArgument, errorcode.UserNothingToUpdate) {
 		t.Fatalf("empty update: %v", err)
 	}
 
-	p1, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if p1.GetUser().GetEmail() != email {
 		t.Fatalf("login profile: %+v", p1.GetUser())
 	}
@@ -272,10 +277,19 @@ func TestProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := srv.ChangePassword(ctx, &userpb.ChangePasswordReq{UserId: id, OldPassword: "nope12", NewPassword: "secret2"}); !isCode(err, codes.Unauthenticated, errorcode.UserPasswordMismatch) {
+	if _, err := srv.ChangePassword(ctx, &userpb.ChangePasswordReq{UserId: id, OldPassword: "secret1", NewPassword: "secret2"}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("change password without token: %v", err)
+	}
+	if _, err := srv.ChangePassword(ctx, &userpb.ChangePasswordReq{UserId: id, OldPassword: "secret1", NewPassword: "secret2", Token: other.GetToken()}); !isCode(err, codes.PermissionDenied, errorcode.NoPermission) {
+		t.Fatalf("change password as other: %v", err)
+	}
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id, Nickname: &nick, Token: other.GetToken()}); !isCode(err, codes.PermissionDenied, errorcode.NoPermission) {
+		t.Fatalf("update as other: %v", err)
+	}
+	if _, err := srv.ChangePassword(ctx, &userpb.ChangePasswordReq{UserId: id, OldPassword: "nope12", NewPassword: "secret2", Token: p1.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserPasswordMismatch) {
 		t.Fatalf("bad old password: %v", err)
 	}
-	if _, err := srv.ChangePassword(ctx, &userpb.ChangePasswordReq{UserId: id, OldPassword: "secret1", NewPassword: "secret2"}); err != nil {
+	if _, err := srv.ChangePassword(ctx, &userpb.ChangePasswordReq{OldPassword: "secret1", NewPassword: "secret2", Token: p1.GetToken()}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: p1.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
@@ -293,19 +307,28 @@ func TestProfile(t *testing.T) {
 	}
 
 	inactive := false
-	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id, IsActive: &inactive}); err != nil {
+	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id, IsActive: &inactive, Token: fresh.GetToken()}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: fresh.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
 		t.Fatalf("token survived disable: %v", err)
 	}
-	if _, err := srv.DeleteUser(ctx, &userpb.DeleteUserReq{UserId: id}); err != nil {
+	if _, err := srv.DeleteUser(ctx, &userpb.DeleteUserReq{UserId: id}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("delete without token: %v", err)
+	}
+	if _, err := srv.DeleteUser(ctx, &userpb.DeleteUserReq{UserId: id, Token: other.GetToken()}); !isCode(err, codes.PermissionDenied, errorcode.NoPermission) {
+		t.Fatalf("delete as other: %v", err)
+	}
+	if _, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id}); err != nil {
+		t.Fatalf("rejected delete removed the user: %v", err)
+	}
+	if _, err := srv.DeleteUser(ctx, &userpb.DeleteUserReq{Token: other.GetToken()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id}); !isCode(err, codes.NotFound, errorcode.UserNotFound) {
+	if _, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: otherReg.GetUser().GetUserId()}); !isCode(err, codes.NotFound, errorcode.UserNotFound) {
 		t.Fatalf("deleted user still readable: %v", err)
 	}
-	if _, err := srv.DeleteUser(ctx, &userpb.DeleteUserReq{UserId: id}); !isCode(err, codes.NotFound, errorcode.UserNotFound) {
+	if _, err := srv.DeleteUser(ctx, &userpb.DeleteUserReq{Token: other.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
 		t.Fatalf("second delete: %v", err)
 	}
 }

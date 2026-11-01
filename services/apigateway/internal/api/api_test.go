@@ -26,6 +26,7 @@ type userStub struct {
 	smsIP      string
 	registerIP string
 	seenToken  string
+	seenUser   string
 }
 
 func (s *userStub) Register(context.Context, *userpb.RegisterReq) (*userpb.RegisterResp, error) {
@@ -74,7 +75,9 @@ func (s *userStub) Logout(_ context.Context, req *userpb.LogoutReq) (*userpb.Log
 	return &userpb.LogoutResp{}, nil
 }
 
-func (s *userStub) UpdateUser(context.Context, *userpb.UpdateUserReq) (*userpb.UpdateUserResp, error) {
+func (s *userStub) UpdateUser(_ context.Context, req *userpb.UpdateUserReq) (*userpb.UpdateUserResp, error) {
+	s.seenToken = req.GetToken()
+	s.seenUser = req.GetUserId()
 	return &userpb.UpdateUserResp{}, nil
 }
 
@@ -201,6 +204,10 @@ func TestGateway(t *testing.T) {
 	res = post(t, httpSrv.URL+"/user/update", "good", `{"user_id":"u2","nickname":"x"}`)
 	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
 		t.Fatalf("update other %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/user/update", "good", `{"user_id":"u1","nickname":"x","token":"spoof"}`)
+	if res.Status != http.StatusOK || res.Code != 0 || users.seenToken != "good" || users.seenUser != "u1" {
+		t.Fatalf("update self %+v token=%s user=%s", res, users.seenToken, users.seenUser)
 	}
 	res = post(t, httpSrv.URL+"/friend/send_request", "good", `{"from_user_id":"u2","to_user_id":"u1","message":"hi"}`)
 	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {

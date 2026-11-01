@@ -129,6 +129,7 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.UserId = userID
+	req.Token = tokenFrom(r)
 	resp, err := s.users.UpdateUser(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)
@@ -146,6 +147,7 @@ func (s *Server) deleteUser(w http.ResponseWriter, r *http.Request) {
 	if !s.requireSelf(w, r, req.GetUserId()) {
 		return
 	}
+	req.Token = tokenFrom(r)
 	resp, err := s.users.DeleteUser(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)
@@ -163,6 +165,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	if !s.requireSelf(w, r, req.GetUserId()) {
 		return
 	}
+	req.Token = tokenFrom(r)
 	resp, err := s.users.ChangePassword(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)

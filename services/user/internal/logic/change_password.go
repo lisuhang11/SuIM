@@ -12,8 +12,8 @@ import (
 )
 
 func (s *Server) ChangePassword(ctx context.Context, req *userpb.ChangePasswordReq) (*userpb.ChangePasswordResp, error) {
-	// 1. 校验用户 ID 和新密码。
-	id, err := normalizeUserID(req.GetUserId())
+	// 1. 用会话确定操作者，再校验新密码。
+	id, err := s.actorID(ctx, req.GetToken(), req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

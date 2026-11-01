@@ -23,6 +23,7 @@ type Config struct {
 }
 
 type SMS struct {
+	Pepper           string   `yaml:"pepper"`
 	Provider         string   `yaml:"provider"`
 	URL              string   `yaml:"url"`
 	CodeTTLSeconds   int      `yaml:"codeTTLSeconds"`
@@ -101,6 +102,13 @@ func (c *Config) Validate() error {
 
 func (c *Config) normalizeSMS() error {
 	s := &c.SMS
+	s.Pepper = strings.TrimSpace(s.Pepper)
+	if s.Pepper == "" {
+		return fmt.Errorf("sms pepper is required")
+	}
+	if s.Pepper == strings.TrimSpace(c.JWT.Secret) {
+		return fmt.Errorf("sms pepper must differ from the jwt secret")
+	}
 	if s.Provider == "" {
 		s.Provider = "log"
 	}

@@ -99,8 +99,8 @@ func TestPhoneRegister(t *testing.T) {
 	})
 	t.Cleanup(stopCache)
 	sender := &captureSMS{}
-	const pepper = "test-secret"
-	srv := logic.New(st, token.NewIssuer(config.JWT{Secret: pepper, ExpireSeconds: 2592000}), tokenCache)
+	const pepper = "sms-pepper"
+	srv := logic.New(st, token.NewIssuer(config.JWT{Secret: "test-secret", ExpireSeconds: 2592000}), tokenCache)
 	policy := testSMSPolicy()
 	srv.UseSMS(sender, nil, policy, pepper)
 

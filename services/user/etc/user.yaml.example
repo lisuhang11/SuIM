@@ -44,6 +44,8 @@ registry:
     ttl: 10
 
 sms:
+  # pepper 只用于验证码 HMAC，必须填写，且不能和 jwt.secret 相同。
+  pepper: ""
   provider: log
   url: ""
   codeTTLSeconds: 300

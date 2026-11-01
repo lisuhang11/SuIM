@@ -107,7 +107,7 @@ func run(cfgPath, migratePath string) error {
 	if cfg.SMS.CaptchaRequired {
 		captcha = sms.HTTPCaptcha{URL: cfg.SMS.CaptchaURL}
 	}
-	userServer.UseSMS(sender, captcha, policy, cfg.JWT.Secret)
+	userServer.UseSMS(sender, captcha, policy, cfg.SMS.Pepper)
 
 	srv := grpc.NewServer()
 	userpb.RegisterUserServiceServer(srv, userServer)

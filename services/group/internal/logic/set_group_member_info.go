@@ -16,7 +16,8 @@ type memberEdit struct {
 	profile bool
 }
 
-// SetGroupMemberInfo 修改群成员的昵称、头像、角色和扩展字段。不能把任何人设成群主。
+// SetGroupMemberInfo 修改群成员的昵称、头像、角色和扩展字段。
+// 不能把任何人设成群主。任命或调整他人角色只留给群主，管理员只能把自己降为普通成员。
 func (s *Server) SetGroupMemberInfo(ctx context.Context, req *grouppb.SetGroupMemberInfoReq) (*grouppb.SetGroupMemberInfoResp, error) {
 	op, err := normalizeUserID(req.GetOpUserId())
 	if err != nil {
@@ -133,31 +134,43 @@ func (s *Server) authorizeMemberEdits(ctx context.Context, groupID, op string, e
 
 func allowMemberEdit(op, target *model.Member, patch model.MemberPatch) error {
 	self := op.UserID == target.UserID
+	if err := allowRoleChange(op, target, patch.RoleLevel); err != nil {
+		return err
+	}
 	switch op.RoleLevel {
 	case model.RoleOwner:
-		if self && patch.RoleLevel != nil {
-			return errorcode.ErrGroupNoPermission.WithMsg("group owner cannot change own role")
-		}
 		return nil
 	case model.RoleAdmin:
 		if target.RoleLevel == model.RoleOwner || (target.RoleLevel == model.RoleAdmin && !self) {
 			return errorcode.ErrGroupNoPermission
-		}
-		if self && patch.RoleLevel != nil && *patch.RoleLevel > op.RoleLevel {
-			return errorcode.ErrGroupNoPermission.WithMsg("cannot raise own role")
 		}
 		return nil
 	case model.RoleOrdinary:
 		if !self {
 			return errorcode.ErrGroupNoPermission
 		}
-		if patch.RoleLevel != nil && *patch.RoleLevel > op.RoleLevel {
-			return errorcode.ErrGroupNoPermission.WithMsg("cannot raise own role")
-		}
 		return nil
 	default:
 		return errorcode.ErrGroupNoPermission
 	}
+}
+
+// allowRoleChange 只让群主改变别人的角色。角色没变时不拦截。
+// 管理员不能任命管理员，只能把自己降为普通成员。群主不能改自己的角色，转让走单独的接口。
+func allowRoleChange(op, target *model.Member, role *int32) error {
+	if role == nil || *role == target.RoleLevel {
+		return nil
+	}
+	if op.RoleLevel == model.RoleOwner {
+		if op.UserID == target.UserID {
+			return errorcode.ErrGroupNoPermission.WithMsg("group owner cannot change own role")
+		}
+		return nil
+	}
+	if op.UserID == target.UserID && op.RoleLevel == model.RoleAdmin && *role == model.RoleOrdinary {
+		return nil
+	}
+	return errorcode.ErrGroupNoPermission.WithMsg("only the group owner can change roles")
 }
 
 func memberPatch(member *grouppb.SetGroupMemberInfo) (model.MemberPatch, error) {

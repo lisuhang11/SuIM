@@ -300,6 +300,9 @@ func TestGroup(t *testing.T) {
 	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: a, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: b, RoleLevel: i32Ptr(model.RoleAdmin)}}}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: b, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: e, RoleLevel: i32Ptr(model.RoleAdmin)}}}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("admin promote code=%v err=%v", status.Code(err), err)
+	}
 	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: b, Members: []*grouppb.SetGroupMemberInfo{{GroupId: vgid, UserId: a, Nickname: strPtr("nope")}}}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
 		t.Fatalf("admin edit owner code=%v err=%v", status.Code(err), err)
 	}

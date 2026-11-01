@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/lisuhang11/SuIM/proto/group"
+	grouppb "github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/services/group/internal/store"
 )
 

@@ -9,6 +9,9 @@ option go_package = "github.com/lisuhang11/SuIM/proto/user;userpb";
 service UserService {
   rpc Register(RegisterReq) returns (RegisterResp);
   rpc Login(LoginReq) returns (LoginResp);
+  // LoginPhone consumes a login-scene code and issues a session.
+  // A register-scene code cannot be used here.
+  rpc LoginPhone(LoginPhoneReq) returns (LoginResp);
   rpc GetUserByID(GetUserByIDReq) returns (GetUserByIDResp);
   rpc GetUsersByIDs(GetUsersByIDsReq) returns (GetUsersByIDsResp);
   rpc SearchUsers(SearchUsersReq) returns (SearchUsersResp);
@@ -61,18 +64,27 @@ message RegisterResp {
   UserInfo user = 1;
 }
 
+// LoginReq is account plus password. phone is rejected. An email address is
+// accepted as the account for users who registered with email.
 message LoginReq {
   string email = 1;
   string password = 2;
   int32 platform_id = 3;
-  // phone is an alternative to email. Send only one of them.
   string phone = 4;
+  string account = 5;
 }
 
 message LoginResp {
   UserInfo user = 1;
   string token = 2;
   int64 expire_time_seconds = 3;
+}
+
+// LoginPhoneReq logs in with a login-scene SMS code. The server does not accept a scene field.
+message LoginPhoneReq {
+  string phone = 1;
+  string code = 2;
+  int32 platform_id = 3;
 }
 
 message GetUserByIDReq {

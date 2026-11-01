@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	UserService_Register_FullMethodName       = "/user.UserService/Register"
 	UserService_Login_FullMethodName          = "/user.UserService/Login"
+	UserService_LoginPhone_FullMethodName     = "/user.UserService/LoginPhone"
 	UserService_GetUserByID_FullMethodName    = "/user.UserService/GetUserByID"
 	UserService_GetUsersByIDs_FullMethodName  = "/user.UserService/GetUsersByIDs"
 	UserService_SearchUsers_FullMethodName    = "/user.UserService/SearchUsers"
@@ -42,6 +43,9 @@ const (
 type UserServiceClient interface {
 	Register(ctx context.Context, in *RegisterReq, opts ...grpc.CallOption) (*RegisterResp, error)
 	Login(ctx context.Context, in *LoginReq, opts ...grpc.CallOption) (*LoginResp, error)
+	// LoginPhone consumes a login-scene code and issues a session.
+	// A register-scene code cannot be used here.
+	LoginPhone(ctx context.Context, in *LoginPhoneReq, opts ...grpc.CallOption) (*LoginResp, error)
 	GetUserByID(ctx context.Context, in *GetUserByIDReq, opts ...grpc.CallOption) (*GetUserByIDResp, error)
 	GetUsersByIDs(ctx context.Context, in *GetUsersByIDsReq, opts ...grpc.CallOption) (*GetUsersByIDsResp, error)
 	SearchUsers(ctx context.Context, in *SearchUsersReq, opts ...grpc.CallOption) (*SearchUsersResp, error)
@@ -80,6 +84,16 @@ func (c *userServiceClient) Login(ctx context.Context, in *LoginReq, opts ...grp
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LoginResp)
 	err := c.cc.Invoke(ctx, UserService_Login_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) LoginPhone(ctx context.Context, in *LoginPhoneReq, opts ...grpc.CallOption) (*LoginResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LoginResp)
+	err := c.cc.Invoke(ctx, UserService_LoginPhone_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +209,9 @@ func (c *userServiceClient) RegisterPhone(ctx context.Context, in *RegisterPhone
 type UserServiceServer interface {
 	Register(context.Context, *RegisterReq) (*RegisterResp, error)
 	Login(context.Context, *LoginReq) (*LoginResp, error)
+	// LoginPhone consumes a login-scene code and issues a session.
+	// A register-scene code cannot be used here.
+	LoginPhone(context.Context, *LoginPhoneReq) (*LoginResp, error)
 	GetUserByID(context.Context, *GetUserByIDReq) (*GetUserByIDResp, error)
 	GetUsersByIDs(context.Context, *GetUsersByIDsReq) (*GetUsersByIDsResp, error)
 	SearchUsers(context.Context, *SearchUsersReq) (*SearchUsersResp, error)
@@ -224,6 +241,9 @@ func (UnimplementedUserServiceServer) Register(context.Context, *RegisterReq) (*
 }
 func (UnimplementedUserServiceServer) Login(context.Context, *LoginReq) (*LoginResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method Login not implemented")
+}
+func (UnimplementedUserServiceServer) LoginPhone(context.Context, *LoginPhoneReq) (*LoginResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method LoginPhone not implemented")
 }
 func (UnimplementedUserServiceServer) GetUserByID(context.Context, *GetUserByIDReq) (*GetUserByIDResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUserByID not implemented")
@@ -308,6 +328,24 @@ func _UserService_Login_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServiceServer).Login(ctx, req.(*LoginReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_LoginPhone_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LoginPhoneReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).LoginPhone(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_LoginPhone_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).LoginPhone(ctx, req.(*LoginPhoneReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -506,6 +544,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Login",
 			Handler:    _UserService_Login_Handler,
+		},
+		{
+			MethodName: "LoginPhone",
+			Handler:    _UserService_LoginPhone_Handler,
 		},
 		{
 			MethodName: "GetUserByID",

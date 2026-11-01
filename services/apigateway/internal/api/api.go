@@ -4,6 +4,7 @@
 //
 //	POST /user/register
 //	POST /user/login
+//	POST /user/login_phone
 //	POST /user/send_sms_code
 //	POST /user/register_phone
 //
@@ -113,6 +114,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("POST /user/register", s.register)
 	mux.HandleFunc("POST /user/login", s.login)
+	mux.HandleFunc("POST /user/login_phone", s.loginPhone)
 	mux.HandleFunc("POST /user/send_sms_code", s.sendSmsCode)
 	mux.HandleFunc("POST /user/register_phone", s.registerPhone)
 

@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/user"
+	userpb "github.com/lisuhang11/SuIM/proto/user"
 	"github.com/lisuhang11/SuIM/services/user/internal/model"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
@@ -36,6 +36,7 @@ func (s *Server) Register(ctx context.Context, req *userpb.RegisterReq) (*userpb
 	user := &model.User{
 		UserID:       id,
 		Email:        email,
+		Account:      email,
 		PasswordHash: string(hash),
 		Nickname:     nickname,
 		IsActive:     true,

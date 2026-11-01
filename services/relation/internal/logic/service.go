@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/lisuhang11/SuIM/pkg/webhook"
-	"github.com/lisuhang11/SuIM/proto/relation"
+	relationpb "github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )

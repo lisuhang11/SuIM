@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/lisuhang11/SuIM/pkg/webhook"
-	"github.com/lisuhang11/SuIM/proto/group"
+	grouppb "github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 	"github.com/lisuhang11/SuIM/services/group/internal/store"

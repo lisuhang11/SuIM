@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/user"
+	userpb "github.com/lisuhang11/SuIM/proto/user"
 	"github.com/lisuhang11/SuIM/services/user/internal/model"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 	"github.com/lisuhang11/SuIM/services/user/internal/token"

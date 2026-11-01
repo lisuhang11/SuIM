@@ -8,31 +8,23 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/user"
-	"github.com/lisuhang11/SuIM/services/user/internal/model"
+	userpb "github.com/lisuhang11/SuIM/proto/user"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
 func (s *Server) Login(ctx context.Context, req *userpb.LoginReq) (*userpb.LoginResp, error) {
-	// 1. 校验手机号或邮箱、密码和平台号。两者只能填一个。
-	email := strings.ToLower(strings.TrimSpace(req.GetEmail()))
-	phone := strings.TrimSpace(req.GetPhone())
-	if req.GetPassword() == "" || req.GetPlatformId() <= 0 || (email == "" && phone == "") || (email != "" && phone != "") {
+	// 1. 只接受账户和密码。手机号不能走这条登录。
+	account := strings.TrimSpace(req.GetAccount())
+	if account == "" {
+		account = strings.TrimSpace(req.GetEmail())
+	}
+	if strings.TrimSpace(req.GetPhone()) != "" || account == "" || req.GetPassword() == "" || req.GetPlatformId() <= 0 {
 		return nil, errorcode.ErrUserInvalidLogin
 	}
-	// 2. 按手机号或邮箱查用户。不存在、格式不对时与密码错误返回同一错误。
-	var (
-		user *model.User
-		err  error
-	)
-	if phone != "" {
-		area, national, nerr := NormalizePhone(phone)
-		if nerr != nil {
-			return nil, errorcode.ErrUserBadCredential
-		}
-		user, err = s.store.GetUserByPhone(ctx, area, national)
-	} else {
-		user, err = s.store.GetUserByEmail(ctx, email)
+	// 2. 先按账户查，邮箱注册的旧账号再按邮箱查。不存在和密码错误返回同一结果。
+	user, err := s.store.GetUserByAccount(ctx, account)
+	if errors.Is(err, store.ErrNotFound) && strings.Contains(account, "@") {
+		user, err = s.store.GetUserByEmail(ctx, strings.ToLower(account))
 	}
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {

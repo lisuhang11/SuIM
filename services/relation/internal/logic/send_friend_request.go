@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/relation"
+	relationpb "github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
 

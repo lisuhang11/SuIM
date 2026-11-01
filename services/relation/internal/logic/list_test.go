@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/proto/relation"
+	relationpb "github.com/lisuhang11/SuIM/proto/relation"
 )
 
 func TestFriendListRejectsBadPage(t *testing.T) {

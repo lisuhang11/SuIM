@@ -59,6 +59,20 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
+func (s *Server) loginPhone(w http.ResponseWriter, r *http.Request) {
+	var req userpb.LoginPhoneReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	resp, err := s.users.LoginPhone(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	var req userpb.LoginReq
 	if err := decode(w, r, &req); err != nil {

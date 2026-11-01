@@ -4,78 +4,11 @@ import (
 	"context"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/pkg/idhash"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/services/conversation/internal/model"
 )
 
 const syncLimit = 200
-
-func (s *Server) GetFullOwnerConversationIDs(ctx context.Context, req *conversationpb.GetFullOwnerConversationIDsReq) (*conversationpb.GetFullOwnerConversationIDsResp, error) {
-	userID, err := normalizeUserID(req.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	head, err := s.store.Version(ctx, userID)
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("query conversation version")
-	}
-	ids, err := s.store.ConversationIDs(ctx, userID)
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("list conversation ids")
-	}
-	sum := idhash.Hash(ids)
-	resp := &conversationpb.GetFullOwnerConversationIDsResp{
-		Version:         head.Version,
-		VersionId:       head.ID,
-		Equal:           req.GetIdHash() == sum,
-		ConversationIds: ids,
-	}
-	if resp.Equal {
-		resp.ConversationIds = nil
-	}
-	return resp, nil
-}
-
-func (s *Server) GetIncrementalConversation(ctx context.Context, req *conversationpb.GetIncrementalConversationReq) (*conversationpb.GetIncrementalConversationResp, error) {
-	userID, err := normalizeUserID(req.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-	head, err := s.store.Version(ctx, userID)
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("query conversation version")
-	}
-	if needFull(head, req.GetVersionId(), req.GetVersion()) {
-		return &conversationpb.GetIncrementalConversationResp{Version: head.Version, VersionId: head.ID, Full: true}, nil
-	}
-	if head.Version <= req.GetVersion() {
-		return &conversationpb.GetIncrementalConversationResp{Version: head.Version, VersionId: head.ID}, nil
-	}
-	logs, err := s.store.Changes(ctx, userID, req.GetVersion(), syncLimit)
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("query conversation changes")
-	}
-	if len(logs) >= syncLimit {
-		return &conversationpb.GetIncrementalConversationResp{Version: head.Version, VersionId: head.ID, Full: true}, nil
-	}
-	insertIDs, updateIDs, deleteIDs := splitLogs(logs)
-	insert, err := s.conversationsByID(ctx, userID, insertIDs)
-	if err != nil {
-		return nil, err
-	}
-	update, err := s.conversationsByID(ctx, userID, updateIDs)
-	if err != nil {
-		return nil, err
-	}
-	return &conversationpb.GetIncrementalConversationResp{
-		Version:   head.Version,
-		VersionId: head.ID,
-		Delete:    deleteIDs,
-		Insert:    insert,
-		Update:    update,
-	}, nil
-}
 
 func needFull(head model.VersionHead, versionID string, version uint64) bool {
 	return version == 0 || versionID == "" || head.ID == "" || head.ID != versionID

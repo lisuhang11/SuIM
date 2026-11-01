@@ -169,15 +169,31 @@ func TestPhoneRegister(t *testing.T) {
 	if _, err := srv.RegisterPhone(ctx, asRegister); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidScene) {
 		t.Fatalf("login scene register err=%v", err)
 	}
-	logged, err := srv.Login(ctx, &userpb.LoginReq{Phone: phone, Password: "secret1", PlatformId: 1})
-	if err != nil || logged.GetUser().GetUserId() != reg.GetUser().GetUserId() {
-		t.Fatalf("phone login %+v err=%v", logged.GetUser(), err)
+	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: phone, Password: "secret1", PlatformId: 1}); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidLogin) {
+		t.Fatalf("phone password login err=%v", err)
 	}
-	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: phone, Email: "a@b.c", Password: "secret1", PlatformId: 1}); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidLogin) {
-		t.Fatalf("both identifiers err=%v", err)
+	if _, err := srv.LoginPhone(ctx, &userpb.LoginPhoneReq{Phone: phone, Code: code, PlatformId: 1}); !isCode(err, codes.Unauthenticated, errorcode.UserSmsCodeInvalid) {
+		t.Fatalf("register code logged in err=%v", err)
 	}
-	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: "12345", Password: "secret1", PlatformId: 1}); !isCode(err, codes.Unauthenticated, errorcode.UserBadCredential) {
-		t.Fatalf("bad phone login err=%v", err)
+	if _, err := srv.LoginPhone(ctx, &userpb.LoginPhoneReq{Phone: "12345", Code: loginCode, PlatformId: 1}); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidPhone) {
+		t.Fatalf("bad phone code login err=%v", err)
+	}
+	if _, err := srv.LoginPhone(ctx, &userpb.LoginPhoneReq{Phone: unknown, Code: "000000", PlatformId: 1}); !isCode(err, codes.Unauthenticated, errorcode.UserSmsCodeInvalid) {
+		t.Fatalf("unknown phone code login err=%v", err)
+	}
+	byCode, err := srv.LoginPhone(ctx, &userpb.LoginPhoneReq{Phone: phone, Code: loginCode, PlatformId: 1})
+	if err != nil || byCode.GetUser().GetUserId() != reg.GetUser().GetUserId() || byCode.GetToken() == "" {
+		t.Fatalf("code login %+v err=%v", byCode.GetUser(), err)
+	}
+	againCode, err := srv.LoginPhone(ctx, &userpb.LoginPhoneReq{Phone: phone, Code: loginCode, PlatformId: 1})
+	if err != nil || againCode.GetUser().GetUserId() != reg.GetUser().GetUserId() {
+		t.Fatalf("code login retry err=%v", err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: byCode.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("code login retry did not replace the session: %v", err)
+	}
+	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: phone, Account: "a@b.c", Password: "secret1", PlatformId: 1}); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidLogin) {
+		t.Fatalf("phone with account err=%v", err)
 	}
 
 	noPassPhone := nextTestPhone()
@@ -199,8 +215,8 @@ func TestPhoneRegister(t *testing.T) {
 	if !noPass.GetUser().GetHasPassword() {
 		t.Fatal("phone registration did not store a login password")
 	}
-	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: noPassPhone, Password: "secret1", PlatformId: 1}); err != nil {
-		t.Fatalf("phone password login err=%v", err)
+	if _, err := srv.Login(ctx, &userpb.LoginReq{Account: noPassPhone, Password: "secret1", PlatformId: 1}); !isCode(err, codes.Unauthenticated, errorcode.UserBadCredential) {
+		t.Fatalf("phone number accepted as account err=%v", err)
 	}
 
 	resendPhone := nextTestPhone()

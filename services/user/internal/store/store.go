@@ -116,10 +116,10 @@ func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO user (
 			user_id, email, password_hash, nickname, avatar_url,
-			app_manger_level, global_recv_msg_opt, is_active
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			app_manger_level, global_recv_msg_opt, is_active, account
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		u.UserID, u.Email, u.PasswordHash, u.Nickname, u.AvatarURL,
-		u.AppMangerLevel, u.GlobalRecvMsgOpt, u.IsActive,
+		u.AppMangerLevel, u.GlobalRecvMsgOpt, u.IsActive, nullIfEmpty(u.Account),
 	)
 	if err != nil {
 		var me *mysqldriver.MySQLError
@@ -144,6 +144,10 @@ const userColumns = `user_id, email, password_hash, nickname, avatar_url,
 
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE email = ?`, email)
+}
+
+func (s *Store) GetUserByAccount(ctx context.Context, account string) (*model.User, error) {
+	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE account = ?`, account)
 }
 
 func (s *Store) GetUserByID(ctx context.Context, userID string) (*model.User, error) {

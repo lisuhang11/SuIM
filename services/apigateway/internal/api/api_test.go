@@ -27,6 +27,7 @@ type userStub struct {
 	registerIP string
 	seenToken  string
 	seenUser   string
+	loginPhone string
 }
 
 func (s *userStub) Register(context.Context, *userpb.RegisterReq) (*userpb.RegisterResp, error) {
@@ -41,6 +42,11 @@ func (s *userStub) SendSmsCode(_ context.Context, req *userpb.SendSmsCodeReq) (*
 func (s *userStub) RegisterPhone(_ context.Context, req *userpb.RegisterPhoneReq) (*userpb.RegisterPhoneResp, error) {
 	s.registerIP = req.GetClientIp()
 	return &userpb.RegisterPhoneResp{User: &userpb.UserInfo{UserId: "p1"}, Token: "good", ExpireTimeSeconds: 10}, nil
+}
+
+func (s *userStub) LoginPhone(_ context.Context, req *userpb.LoginPhoneReq) (*userpb.LoginResp, error) {
+	s.loginPhone = req.GetPhone() + ":" + req.GetCode()
+	return &userpb.LoginResp{User: &userpb.UserInfo{UserId: "p1"}, Token: "phone", ExpireTimeSeconds: 10}, nil
 }
 
 func (s *userStub) Login(context.Context, *userpb.LoginReq) (*userpb.LoginResp, error) {
@@ -292,6 +298,10 @@ func TestGateway(t *testing.T) {
 	res = post(t, httpSrv.URL+"/conversation/incremental", "good", `{"user_id":"u2"}`)
 	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
 		t.Fatalf("incremental conversation as other %+v", res)
+	}
+	res = post(t, httpSrv.URL+"/user/login_phone", "", `{"phone":"13800138000","code":"123456","platform_id":1}`)
+	if res.Status != http.StatusOK || res.Code != 0 || users.loginPhone != "13800138000:123456" || !bytes.Contains(res.Data, []byte(`"token":"phone"`)) {
+		t.Fatalf("login phone %+v code=%s", res, users.loginPhone)
 	}
 	res = post(t, httpSrv.URL+"/user/send_sms_code", "", `{"phone":"13800138000","scene":"register","client_ip":"1.2.3.4"}`)
 	if res.Status != http.StatusOK || res.Code != 0 || users.smsIP != "127.0.0.1" || !bytes.Contains(res.Data, []byte(`"expire_seconds":"300"`)) && !bytes.Contains(res.Data, []byte(`"expire_seconds":300`)) {

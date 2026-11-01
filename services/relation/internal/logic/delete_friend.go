@@ -1,0 +1,32 @@
+package logic
+
+import (
+	"context"
+	"errors"
+
+	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	relationpb "github.com/lisuhang11/SuIM/proto/relation"
+	"github.com/lisuhang11/SuIM/services/relation/internal/store"
+)
+
+func (s *Server) DeleteFriend(ctx context.Context, req *relationpb.DeleteFriendReq) (*relationpb.DeleteFriendResp, error) {
+	// 1. 校验双方 userID。调用方必须是关系拥有者，操作者身份尚未从上下文接入。
+	owner, err := normalizeUserID(req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	friend, err := normalizeUserID(req.GetFriendId())
+	if err != nil {
+		return nil, err
+	}
+	// 2. 只删除这一侧的好友关系。
+	if err := s.store.DeleteFriend(ctx, owner, friend, s.now()); err != nil {
+		if errors.Is(err, store.ErrNotFriend) {
+			return nil, errorcode.ErrRelationNotFriend
+		}
+		return nil, errorcode.ErrInternal.WithMsg("delete friend")
+	}
+	// 3. 通知对方好友已删除。尚未接入。
+	s.afterDeleteFriend(ctx, owner, friend)
+	return &relationpb.DeleteFriendResp{}, nil
+}

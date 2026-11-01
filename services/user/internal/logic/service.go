@@ -117,5 +117,6 @@ func toPB(u *model.User) *userpb.UserInfo {
 		AllowAddFriend:   u.AllowAddFriend,
 		RegisterType:     u.RegisterType,
 		Ex:               u.Ex,
+		HasPassword:      u.HasPassword,
 	}
 }

@@ -126,7 +126,7 @@ func TestPhoneRegister(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { cleanupUser(t, mysqlCfg, reg.GetUser().GetUserId()) })
-	if reg.GetToken() == "" || reg.GetUser().GetRegisterType() != model.RegisterTypePhone || reg.GetUser().GetNickname() != "用户"+phone[len(phone)-4:] {
+	if reg.GetToken() == "" || !reg.GetUser().GetHasPassword() || reg.GetUser().GetRegisterType() != model.RegisterTypePhone || reg.GetUser().GetNickname() != "用户"+phone[len(phone)-4:] {
 		t.Fatalf("register %+v", reg.GetUser())
 	}
 	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: reg.GetToken()}); err != nil {
@@ -187,17 +187,19 @@ func TestPhoneRegister(t *testing.T) {
 	_, noPassCode := sender.snapshot()
 	noPassReq := phoneReq(noPassPhone, noPassCode, true)
 	noPassReq.Password = ""
-	if _, err := srv.RegisterPhone(ctx, noPassReq); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidPassword) {
-		t.Fatalf("empty password err=%v", err)
-	}
-	noPassReq.Password = "secret1"
 	noPass, err := srv.RegisterPhone(ctx, noPassReq)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { cleanupUser(t, mysqlCfg, noPass.GetUser().GetUserId()) })
-	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: noPassPhone, Password: "secret1", PlatformId: 1}); err != nil {
-		t.Fatalf("phone password login err=%v", err)
+	if noPass.GetUser().GetHasPassword() {
+		t.Fatal("code-only registration stored a usable password")
+	}
+	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: noPassPhone, Password: "", PlatformId: 1}); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidLogin) {
+		t.Fatalf("empty password err=%v", err)
+	}
+	if _, err := srv.Login(ctx, &userpb.LoginReq{Phone: noPassPhone, Password: "secret1", PlatformId: 1}); !isCode(err, codes.Unauthenticated, errorcode.UserBadCredential) {
+		t.Fatalf("unset password accepted err=%v", err)
 	}
 
 	resendPhone := nextTestPhone()

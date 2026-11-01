@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     `protocol_agreed_at`  DATETIME(3)   NULL                    COMMENT '同意协议时间',
     `register_ip`         VARCHAR(64)   NOT NULL DEFAULT ''     COMMENT '注册 IP',
     `register_receipt`    VARCHAR(64)   NULL                    COMMENT '手机号注册核销回执',
+    `has_password`        TINYINT(1)    NOT NULL DEFAULT 1      COMMENT '是否设置了可登录密码',
     `create_time`         DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     `updated_at`          DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
     PRIMARY KEY (`user_id`),

@@ -47,6 +47,8 @@ message UserInfo {
   int32 allow_add_friend = 17;
   int32 register_type = 18;
   string ex = 19;
+  // has_password is set only on the caller's own profile. A public card leaves it false.
+  bool has_password = 20;
 }
 
 message RegisterReq {
@@ -176,7 +178,8 @@ message SendSmsCodeResp {
   int64 expire_seconds = 1;
 }
 
-// RegisterPhoneReq.scene must be register. password is required and becomes the login credential.
+// RegisterPhoneReq.scene must be register. A password is stored with bcrypt and can log in.
+// An empty password stores an unusable hash and has_password is false.
 // protocol_version is the policy version the user accepted.
 message RegisterPhoneReq {
   string phone = 1;

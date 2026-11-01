@@ -44,8 +44,10 @@ type UserInfo struct {
 	AllowAddFriend   int32                  `protobuf:"varint,17,opt,name=allow_add_friend,json=allowAddFriend,proto3" json:"allow_add_friend,omitempty"`
 	RegisterType     int32                  `protobuf:"varint,18,opt,name=register_type,json=registerType,proto3" json:"register_type,omitempty"`
 	Ex               string                 `protobuf:"bytes,19,opt,name=ex,proto3" json:"ex,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// has_password is set only on the caller's own profile. A public card leaves it false.
+	HasPassword   bool `protobuf:"varint,20,opt,name=has_password,json=hasPassword,proto3" json:"has_password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UserInfo) Reset() {
@@ -209,6 +211,13 @@ func (x *UserInfo) GetEx() string {
 		return x.Ex
 	}
 	return ""
+}
+
+func (x *UserInfo) GetHasPassword() bool {
+	if x != nil {
+		return x.HasPassword
+	}
+	return false
 }
 
 type RegisterReq struct {
@@ -1432,7 +1441,8 @@ func (x *SendSmsCodeResp) GetExpireSeconds() int64 {
 	return 0
 }
 
-// RegisterPhoneReq.scene must be register. password may be empty for a code-only account.
+// RegisterPhoneReq.scene must be register. A password is stored with bcrypt and can log in.
+// An empty password stores an unusable hash and has_password is false.
 // protocol_version is the policy version the user accepted.
 type RegisterPhoneReq struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
@@ -1614,7 +1624,7 @@ var File_user_user_proto protoreflect.FileDescriptor
 
 const file_user_user_proto_rawDesc = "" +
 	"\n" +
-	"\x0fuser/user.proto\x12\x04user\"\xd9\x04\n" +
+	"\x0fuser/user.proto\x12\x04user\"\xfc\x04\n" +
 	"\bUserInfo\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x1a\n" +
@@ -1639,7 +1649,8 @@ const file_user_user_proto_rawDesc = "" +
 	"allow_beep\x18\x10 \x01(\x05R\tallowBeep\x12(\n" +
 	"\x10allow_add_friend\x18\x11 \x01(\x05R\x0eallowAddFriend\x12#\n" +
 	"\rregister_type\x18\x12 \x01(\x05R\fregisterType\x12\x0e\n" +
-	"\x02ex\x18\x13 \x01(\tR\x02ex\"[\n" +
+	"\x02ex\x18\x13 \x01(\tR\x02ex\x12!\n" +
+	"\fhas_password\x18\x14 \x01(\bR\vhasPassword\"[\n" +
 	"\vRegisterReq\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x1a\n" +

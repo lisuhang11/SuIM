@@ -19,11 +19,11 @@ func (s *Store) CreatePhoneUser(ctx context.Context, u *model.User) error {
 			user_id, email, password_hash, nickname, avatar_url,
 			app_manger_level, global_recv_msg_opt, is_active,
 			area_code, phone_number, register_type, ex,
-			protocol_version, protocol_agreed_at, register_ip, register_receipt)
-		VALUES (?, NULL, ?, ?, '', 0, 0, 1, ?, ?, ?, '', ?, ?, ?, ?)`,
+			protocol_version, protocol_agreed_at, register_ip, register_receipt, has_password)
+		VALUES (?, NULL, ?, ?, '', 0, 0, 1, ?, ?, ?, '', ?, ?, ?, ?, ?)`,
 		u.UserID, u.PasswordHash, u.Nickname,
 		u.AreaCode, u.PhoneNumber, model.RegisterTypePhone,
-		u.ProtocolVersion, agreed.UTC(), u.RegisterIP, u.RegisterReceipt,
+		u.ProtocolVersion, agreed.UTC(), u.RegisterIP, u.RegisterReceipt, boolTiny(u.HasPassword),
 	)
 	if err != nil {
 		var me *mysql.MySQLError
@@ -38,4 +38,11 @@ func (s *Store) CreatePhoneUser(ctx context.Context, u *model.User) error {
 	}
 	*u = *got
 	return nil
+}
+
+func boolTiny(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }

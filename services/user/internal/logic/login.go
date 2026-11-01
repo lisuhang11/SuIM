@@ -40,8 +40,9 @@ func (s *Server) Login(ctx context.Context, req *userpb.LoginReq) (*userpb.Login
 		}
 		return nil, errorcode.ErrInternal.WithMsg("query user")
 	}
-	// 3. 校验密码。
-	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.GetPassword())) != nil {
+	// 3. 校验密码。没有设置登录密码的账号，和密码错误返回同一结果。
+	match := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.GetPassword())) == nil
+	if !user.HasPassword || !match {
 		return nil, errorcode.ErrUserBadCredential
 	}
 	// 4. 停用账号拒绝登录。

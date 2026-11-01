@@ -15,7 +15,11 @@ func (s *Server) GetUserByID(ctx context.Context, req *userpb.GetUserByIDReq) (*
 	if err != nil {
 		return nil, err
 	}
-	// 2. 查询用户。
+	// 2. 查询用户。没有令牌或令牌不是本人时只返回公开名片。
+	viewer, err := s.viewerID(ctx, req.GetToken())
+	if err != nil {
+		return nil, err
+	}
 	user, err := s.store.GetUserByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -23,7 +27,7 @@ func (s *Server) GetUserByID(ctx context.Context, req *userpb.GetUserByIDReq) (*
 		}
 		return nil, errorcode.ErrInternal.WithMsg("query user")
 	}
-	return &userpb.GetUserByIDResp{User: toPB(user)}, nil
+	return &userpb.GetUserByIDResp{User: projectUser(user, viewer)}, nil
 }
 
 func (s *Server) GetUsersByIDs(ctx context.Context, req *userpb.GetUsersByIDsReq) (*userpb.GetUsersByIDsResp, error) {
@@ -41,14 +45,18 @@ func (s *Server) GetUsersByIDs(ctx context.Context, req *userpb.GetUsersByIDsReq
 		seen[id] = struct{}{}
 		ids = append(ids, id)
 	}
-	// 2. 批量查询。不存在的 ID 不出现在结果里。
+	// 2. 批量查询。不存在的 ID 不出现在结果里。只有调用者自己的那一行是完整资料。
+	viewer, err := s.viewerID(ctx, req.GetToken())
+	if err != nil {
+		return nil, err
+	}
 	users, err := s.store.GetUsersByIDs(ctx, ids)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("query users")
 	}
 	resp := &userpb.GetUsersByIDsResp{Users: make(map[string]*userpb.UserInfo, len(users))}
 	for _, user := range users {
-		resp.Users[user.UserID] = toPB(user)
+		resp.Users[user.UserID] = projectUser(user, viewer)
 	}
 	return resp, nil
 }

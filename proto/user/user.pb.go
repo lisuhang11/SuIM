@@ -445,8 +445,11 @@ func (x *LoginResp) GetExpireTimeSeconds() int64 {
 }
 
 type GetUserByIDReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// token identifies the caller. The gateway overwrites it from the request header.
+	// A matching caller receives the full profile; everyone else receives the public card.
+	Token         string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -484,6 +487,13 @@ func (*GetUserByIDReq) Descriptor() ([]byte, []int) {
 func (x *GetUserByIDReq) GetUserId() string {
 	if x != nil {
 		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetUserByIDReq) GetToken() string {
+	if x != nil {
+		return x.Token
 	}
 	return ""
 }
@@ -534,8 +544,10 @@ func (x *GetUserByIDResp) GetUser() *UserInfo {
 
 // --------------- GetUsersByIDs ---------------
 type GetUsersByIDsReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserIds       []string               `protobuf:"bytes,1,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	UserIds []string               `protobuf:"bytes,1,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	// token identifies the caller. Only the caller's own row is returned in full.
+	Token         string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -575,6 +587,13 @@ func (x *GetUsersByIDsReq) GetUserIds() []string {
 		return x.UserIds
 	}
 	return nil
+}
+
+func (x *GetUsersByIDsReq) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
 }
 
 type GetUsersByIDsResp struct {
@@ -623,8 +642,10 @@ func (x *GetUsersByIDsResp) GetUsers() map[string]*UserInfo {
 
 // SearchUsers matches an exact user_id. Email, account, and phone are not searched.
 type SearchUsersReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Keyword       string                 `protobuf:"bytes,1,opt,name=keyword,proto3" json:"keyword,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Keyword string                 `protobuf:"bytes,1,opt,name=keyword,proto3" json:"keyword,omitempty"`
+	// token identifies the caller. Searching oneself returns the full profile.
+	Token         string `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -662,6 +683,13 @@ func (*SearchUsersReq) Descriptor() ([]byte, []int) {
 func (x *SearchUsersReq) GetKeyword() string {
 	if x != nil {
 		return x.Keyword
+	}
+	return ""
+}
+
+func (x *SearchUsersReq) GetToken() string {
+	if x != nil {
+		return x.Token
 	}
 	return ""
 }
@@ -1627,21 +1655,24 @@ const file_user_user_proto_rawDesc = "" +
 	"\tLoginResp\x12\"\n" +
 	"\x04user\x18\x01 \x01(\v2\x0e.user.UserInfoR\x04user\x12\x14\n" +
 	"\x05token\x18\x02 \x01(\tR\x05token\x12.\n" +
-	"\x13expire_time_seconds\x18\x03 \x01(\x03R\x11expireTimeSeconds\")\n" +
+	"\x13expire_time_seconds\x18\x03 \x01(\x03R\x11expireTimeSeconds\"?\n" +
 	"\x0eGetUserByIDReq\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"5\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"5\n" +
 	"\x0fGetUserByIDResp\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.user.UserInfoR\x04user\"-\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.user.UserInfoR\x04user\"C\n" +
 	"\x10GetUsersByIDsReq\x12\x19\n" +
-	"\buser_ids\x18\x01 \x03(\tR\auserIds\"\x97\x01\n" +
+	"\buser_ids\x18\x01 \x03(\tR\auserIds\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"\x97\x01\n" +
 	"\x11GetUsersByIDsResp\x128\n" +
 	"\x05users\x18\x01 \x03(\v2\".user.GetUsersByIDsResp.UsersEntryR\x05users\x1aH\n" +
 	"\n" +
 	"UsersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12$\n" +
-	"\x05value\x18\x02 \x01(\v2\x0e.user.UserInfoR\x05value:\x028\x01\"*\n" +
+	"\x05value\x18\x02 \x01(\v2\x0e.user.UserInfoR\x05value:\x028\x01\"@\n" +
 	"\x0eSearchUsersReq\x12\x18\n" +
-	"\akeyword\x18\x01 \x01(\tR\akeyword\"7\n" +
+	"\akeyword\x18\x01 \x01(\tR\akeyword\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"7\n" +
 	"\x0fSearchUsersResp\x12$\n" +
 	"\x05users\x18\x01 \x03(\v2\x0e.user.UserInfoR\x05users\"\xee\x06\n" +
 	"\rUpdateUserReq\x12\x17\n" +

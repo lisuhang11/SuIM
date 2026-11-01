@@ -192,14 +192,14 @@ func TestProfile(t *testing.T) {
 		t.Fatalf("empty user id: %v", err)
 	}
 	got, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id})
-	if err != nil || got.GetUser().GetNickname() != "Ada" {
-		t.Fatalf("get user: %+v err=%v", got, err)
+	if err != nil || got.GetUser().GetNickname() != "Ada" || got.GetUser().GetEmail() != "" || got.GetUser().GetAppMangerLevel() != 0 {
+		t.Fatalf("public get user: %+v err=%v", got, err)
 	}
 	if _, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: "missing-user"}); !isCode(err, codes.NotFound, errorcode.UserNotFound) {
 		t.Fatalf("missing user: %v", err)
 	}
 	batch, err := srv.GetUsersByIDs(ctx, &userpb.GetUsersByIDsReq{UserIds: []string{id, id, "missing-user"}})
-	if err != nil || len(batch.GetUsers()) != 1 || batch.GetUsers()[id].GetEmail() != email {
+	if err != nil || len(batch.GetUsers()) != 1 || batch.GetUsers()[id].GetNickname() != "Ada" || batch.GetUsers()[id].GetEmail() != "" {
 		t.Fatalf("batch: %+v err=%v", batch, err)
 	}
 	if _, err := srv.SearchUsers(ctx, &userpb.SearchUsersReq{Keyword: " "}); !isCode(err, codes.InvalidArgument, errorcode.UserInvalidProfile) {
@@ -210,7 +210,7 @@ func TestProfile(t *testing.T) {
 		t.Fatalf("search email: %+v err=%v", found, err)
 	}
 	found, err = srv.SearchUsers(ctx, &userpb.SearchUsersReq{Keyword: id})
-	if err != nil || len(found.GetUsers()) != 1 || found.GetUsers()[0].GetEmail() != email {
+	if err != nil || len(found.GetUsers()) != 1 || found.GetUsers()[0].GetNickname() != "Ada" || found.GetUsers()[0].GetEmail() != "" {
 		t.Fatalf("search id: %+v err=%v", found, err)
 	}
 	none, err := srv.SearchUsers(ctx, &userpb.SearchUsersReq{Keyword: "nobody-" + id})
@@ -232,8 +232,8 @@ func TestProfile(t *testing.T) {
 	}
 	got, err = srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id})
 	if err != nil || got.GetUser().GetNickname() != "Ada Lovelace" || got.GetUser().GetAvatarUrl() != "https://example.com/a.png" ||
-		got.GetUser().GetGender() != 1 || got.GetUser().GetBirthTime() != birth || !got.GetUser().GetIsActive() {
-		t.Fatalf("updated profile: %+v err=%v", got.GetUser(), err)
+		got.GetUser().GetGender() != 1 || got.GetUser().GetBirthTime() != 0 || got.GetUser().GetEmail() != "" {
+		t.Fatalf("public profile: %+v err=%v", got.GetUser(), err)
 	}
 	if _, err := srv.UpdateUser(ctx, &userpb.UpdateUserReq{UserId: id}); !isCode(err, codes.InvalidArgument, errorcode.UserNothingToUpdate) {
 		t.Fatalf("empty update: %v", err)
@@ -242,6 +242,31 @@ func TestProfile(t *testing.T) {
 	p1, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if p1.GetUser().GetEmail() != email {
+		t.Fatalf("login profile: %+v", p1.GetUser())
+	}
+	self, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id, Token: p1.GetToken()})
+	if err != nil || self.GetUser().GetEmail() != email || self.GetUser().GetBirthTime() != birth || !self.GetUser().GetIsActive() {
+		t.Fatalf("self profile: %+v err=%v", self.GetUser(), err)
+	}
+	otherEmail := fmt.Sprintf("other-%d@example.com", time.Now().UnixNano())
+	otherReg, err := srv.Register(ctx, &userpb.RegisterReq{Username: "Bea", Email: otherEmail, Password: "secret1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { cleanupUser(t, mysqlCfg, otherReg.GetUser().GetUserId()) })
+	other, err := srv.Login(ctx, &userpb.LoginReq{Email: otherEmail, Password: "secret1", PlatformId: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hidden, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id, Token: other.GetToken()})
+	if err != nil || hidden.GetUser().GetNickname() != "Ada Lovelace" || hidden.GetUser().GetEmail() != "" || hidden.GetUser().GetBirthTime() != 0 {
+		t.Fatalf("other viewer: %+v err=%v", hidden.GetUser(), err)
+	}
+	mixed, err := srv.GetUsersByIDs(ctx, &userpb.GetUsersByIDsReq{UserIds: []string{id, otherReg.GetUser().GetUserId()}, Token: other.GetToken()})
+	if err != nil || mixed.GetUsers()[id].GetEmail() != "" || mixed.GetUsers()[otherReg.GetUser().GetUserId()].GetEmail() != otherEmail {
+		t.Fatalf("mixed batch: %+v err=%v", mixed.GetUsers(), err)
 	}
 	p2, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 2})
 	if err != nil {

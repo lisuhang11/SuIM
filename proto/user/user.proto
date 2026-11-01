@@ -75,6 +75,9 @@ message LoginResp {
 
 message GetUserByIDReq {
   string user_id = 1;
+  // token identifies the caller. The gateway overwrites it from the request header.
+  // A matching caller receives the full profile; everyone else receives the public card.
+  string token = 2;
 }
 
 message GetUserByIDResp {
@@ -84,6 +87,8 @@ message GetUserByIDResp {
 // --------------- GetUsersByIDs ---------------
 message GetUsersByIDsReq {
   repeated string user_ids = 1;
+  // token identifies the caller. Only the caller's own row is returned in full.
+  string token = 2;
 }
 
 message GetUsersByIDsResp {
@@ -93,6 +98,8 @@ message GetUsersByIDsResp {
 // SearchUsers matches an exact user_id. Email, account, and phone are not searched.
 message SearchUsersReq {
   string keyword = 1;
+  // token identifies the caller. Searching oneself returns the full profile.
+  string token = 2;
 }
 
 message SearchUsersResp {

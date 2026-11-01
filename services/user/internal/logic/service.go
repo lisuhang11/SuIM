@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/lisuhang11/SuIM/pkg/localcache"
@@ -59,6 +60,36 @@ func (s *Server) invalidate(ctx context.Context, hashes []string) {
 		return
 	}
 	s.tokens.Del(ctx, hashes...)
+}
+
+// toPublic is the card returned to anyone other than the profile owner.
+func toPublic(u *model.User) *userpb.UserInfo {
+	return &userpb.UserInfo{
+		UserId:         u.UserID,
+		Nickname:       u.Nickname,
+		AvatarUrl:      u.AvatarURL,
+		Gender:         u.Gender,
+		AllowAddFriend: u.AllowAddFriend,
+	}
+}
+
+func projectUser(u *model.User, viewerID string) *userpb.UserInfo {
+	if viewerID != "" && viewerID == u.UserID {
+		return toPB(u)
+	}
+	return toPublic(u)
+}
+
+func (s *Server) viewerID(ctx context.Context, raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	claims, _, err := s.loadUsable(ctx, raw, model.TokenType)
+	if err != nil {
+		return "", err
+	}
+	return claims.UserID, nil
 }
 
 func toPB(u *model.User) *userpb.UserInfo {

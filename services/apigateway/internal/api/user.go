@@ -79,6 +79,7 @@ func (s *Server) getUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	req.Token = tokenFrom(r)
 	resp, err := s.users.GetUserByID(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)
@@ -93,6 +94,7 @@ func (s *Server) searchUsers(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	req.Token = tokenFrom(r)
 	resp, err := s.users.SearchUsers(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)
@@ -107,6 +109,7 @@ func (s *Server) getUsers(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	req.Token = tokenFrom(r)
 	resp, err := s.users.GetUsersByIDs(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)

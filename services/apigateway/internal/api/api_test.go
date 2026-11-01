@@ -25,6 +25,7 @@ type userStub struct {
 	loggedOut  string
 	smsIP      string
 	registerIP string
+	seenToken  string
 }
 
 func (s *userStub) Register(context.Context, *userpb.RegisterReq) (*userpb.RegisterResp, error) {
@@ -53,6 +54,7 @@ func (s *userStub) ValidateToken(_ context.Context, req *userpb.ValidateTokenReq
 }
 
 func (s *userStub) SearchUsers(_ context.Context, req *userpb.SearchUsersReq) (*userpb.SearchUsersResp, error) {
+	s.seenToken = req.GetToken()
 	if req.GetKeyword() == "missing" {
 		return &userpb.SearchUsersResp{Users: []*userpb.UserInfo{}}, nil
 	}
@@ -60,6 +62,7 @@ func (s *userStub) SearchUsers(_ context.Context, req *userpb.SearchUsersReq) (*
 }
 
 func (s *userStub) GetUserByID(_ context.Context, req *userpb.GetUserByIDReq) (*userpb.GetUserByIDResp, error) {
+	s.seenToken = req.GetToken()
 	if req.GetUserId() == "missing" {
 		return nil, errorcode.ErrUserNotFound
 	}
@@ -182,9 +185,9 @@ func TestGateway(t *testing.T) {
 	if res.Status != http.StatusNotFound || res.Code != int32(errorcode.UserNotFound) {
 		t.Fatalf("missing user %+v", res)
 	}
-	res = post(t, httpSrv.URL+"/user/get", "good", `{"user_id":"u1"}`)
-	if res.Status != http.StatusOK || res.Code != 0 || !bytes.Contains(res.Data, []byte(`"user_id":"u1"`)) {
-		t.Fatalf("get user %+v", res)
+	res = post(t, httpSrv.URL+"/user/get", "good", `{"user_id":"u1","token":"spoof"}`)
+	if res.Status != http.StatusOK || res.Code != 0 || !bytes.Contains(res.Data, []byte(`"user_id":"u1"`)) || users.seenToken != "good" {
+		t.Fatalf("get user %+v token=%s", res, users.seenToken)
 	}
 	res = post(t, httpSrv.URL+"/user/search", "good", `{"keyword":"missing"}`)
 	if res.Status != http.StatusOK || res.Code != 0 || bytes.Contains(res.Data, []byte(`"user_id"`)) {

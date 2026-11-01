@@ -20,7 +20,11 @@ func (s *Server) SearchUsers(ctx context.Context, req *userpb.SearchUsersReq) (*
 	if err != nil {
 		return &userpb.SearchUsersResp{}, nil
 	}
-	// 2. 查不到时返回空列表，页面显示搜索为空。
+	// 2. 查不到时返回空列表，页面显示搜索为空。别人只能看到公开名片。
+	viewer, err := s.viewerID(ctx, req.GetToken())
+	if err != nil {
+		return nil, err
+	}
 	user, err := s.store.GetUserByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -28,5 +32,5 @@ func (s *Server) SearchUsers(ctx context.Context, req *userpb.SearchUsersReq) (*
 		}
 		return nil, errorcode.ErrInternal.WithMsg("search users")
 	}
-	return &userpb.SearchUsersResp{Users: []*userpb.UserInfo{toPB(user)}}, nil
+	return &userpb.SearchUsersResp{Users: []*userpb.UserInfo{projectUser(user, viewer)}}, nil
 }

@@ -113,13 +113,22 @@ func TestGroup(t *testing.T) {
 		t.Fatalf("groups %+v err=%v", listed, err)
 	}
 
-	members, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: gid, Limit: 1})
+	members, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: gid, UserId: a, Limit: 1})
 	if err != nil || members.GetTotal() != 2 || len(members.GetMembers()) != 1 || members.GetMembers()[0].GetRoleLevel() != model.RoleOwner || members.GetMembers()[0].GetNickname() != a {
 		t.Fatalf("members %+v err=%v", members, err)
 	}
-	ids, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: gid})
+	ids, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: gid, UserId: a})
 	if err != nil || len(ids.GetUserIds()) != 2 || ids.GetUserIds()[0] != a {
 		t.Fatalf("ids %+v err=%v", ids, err)
+	}
+	if _, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: gid, UserId: d, Limit: 20}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("outsider members code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: gid, UserId: d}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("outsider member ids code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.GetFullGroupMemberUserIDs(ctx, &grouppb.GetFullGroupMemberUserIDsReq{GroupId: gid, UserId: d}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("outsider full member ids code=%v err=%v", status.Code(err), err)
 	}
 
 	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: gid, OpUserId: b, UserIds: []string{c}}); err != nil {
@@ -151,7 +160,7 @@ func TestGroup(t *testing.T) {
 	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: vgid, OpUserId: b, UserIds: []string{c}, Reason: "please"}); err != nil {
 		t.Fatal(err)
 	}
-	afterReq, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: vgid})
+	afterReq, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: vgid, UserId: a})
 	if err != nil || len(afterReq.GetUserIds()) != 2 {
 		t.Fatalf("request path still two members %+v err=%v", afterReq, err)
 	}
@@ -173,7 +182,7 @@ func TestGroup(t *testing.T) {
 	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: vgid, UserId: e, ReqMsg: "let me in", JoinSource: model.JoinBySearch, Ex: "from-search"}); err != nil {
 		t.Fatal(err)
 	}
-	afterJoin, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: vgid})
+	afterJoin, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: vgid, UserId: a})
 	if err != nil || len(afterJoin.GetUserIds()) != 3 {
 		t.Fatalf("join request stays out %+v err=%v", afterJoin, err)
 	}
@@ -198,7 +207,7 @@ func TestGroup(t *testing.T) {
 	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: ogid, UserId: c, JoinSource: model.JoinByQRCode}); err != nil {
 		t.Fatal(err)
 	}
-	joinedMembers, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: ogid, Limit: 20})
+	joinedMembers, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: ogid, UserId: a, Limit: 20})
 	if err != nil || joinedMembers.GetTotal() != 2 {
 		t.Fatalf("direct join %+v err=%v", joinedMembers, err)
 	}
@@ -235,7 +244,7 @@ func TestGroup(t *testing.T) {
 	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{GroupId: vgid, OpUserId: a, FromUserId: e, HandleResult: model.HandleRefuse, HandledMsg: "no"}); err != nil {
 		t.Fatal(err)
 	}
-	stillOut, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: vgid})
+	stillOut, err := srv.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: vgid, UserId: a})
 	if err != nil || len(stillOut.GetUserIds()) != 3 {
 		t.Fatalf("refused user stays out %+v err=%v", stillOut, err)
 	}
@@ -252,7 +261,7 @@ func TestGroup(t *testing.T) {
 	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{GroupId: vgid, OpUserId: a, FromUserId: e, HandleResult: model.HandleAgree, HandledMsg: "ok"}); err != nil {
 		t.Fatal(err)
 	}
-	approved, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: vgid, Limit: 20})
+	approved, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: vgid, UserId: a, Limit: 20})
 	if err != nil || approved.GetTotal() != 4 {
 		t.Fatalf("approved members %+v err=%v", approved, err)
 	}
@@ -586,11 +595,11 @@ func TestGroupSync(t *testing.T) {
 	if err != nil || !members.GetFull() || len(members.GetInsert()) != 0 || members.GetGroup().GetGroupId() != gid || members.GetGroup().GetMemberCount() != 2 {
 		t.Fatalf("full members %+v err=%v", members, err)
 	}
-	memberIDs, err := srv.GetFullGroupMemberUserIDs(ctx, &grouppb.GetFullGroupMemberUserIDsReq{GroupId: gid})
+	memberIDs, err := srv.GetFullGroupMemberUserIDs(ctx, &grouppb.GetFullGroupMemberUserIDsReq{GroupId: gid, UserId: a})
 	if err != nil || memberIDs.GetEqual() || len(memberIDs.GetUserIds()) != 2 || memberIDs.GetUserIds()[0] != a {
 		t.Fatalf("member ids %+v err=%v", memberIDs, err)
 	}
-	equalMembers, err := srv.GetFullGroupMemberUserIDs(ctx, &grouppb.GetFullGroupMemberUserIDsReq{GroupId: gid, IdHash: idhash.Hash(memberIDs.GetUserIds())})
+	equalMembers, err := srv.GetFullGroupMemberUserIDs(ctx, &grouppb.GetFullGroupMemberUserIDsReq{GroupId: gid, UserId: a, IdHash: idhash.Hash(memberIDs.GetUserIds())})
 	if err != nil || !equalMembers.GetEqual() || len(equalMembers.GetUserIds()) != 0 {
 		t.Fatalf("equal member ids %+v err=%v", equalMembers, err)
 	}
@@ -611,6 +620,10 @@ func TestGroupSync(t *testing.T) {
 	}
 	if _, err := srv.DismissGroup(ctx, &grouppb.DismissGroupReq{GroupId: dismissed.GetGroupId(), OpUserId: a}); err != nil {
 		t.Fatal(err)
+	}
+	dismissedMembers, err := srv.GetGroupMembers(ctx, &grouppb.GetGroupMembersReq{GroupId: dismissed.GetGroupId(), UserId: a, Limit: 20})
+	if err != nil || dismissedMembers.GetTotal() != 1 {
+		t.Fatalf("dismissed members %+v err=%v", dismissedMembers, err)
 	}
 	batch, err := srv.BatchGetIncrementalGroupMembers(ctx, &grouppb.BatchGetIncrementalGroupMembersReq{
 		UserId: a,

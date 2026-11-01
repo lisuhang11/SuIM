@@ -44,8 +44,8 @@ type JoinedGroup struct {
 	Super bool
 }
 
-func (c *GroupClient) MemberUserIDs(ctx context.Context, groupID string) ([]string, error) {
-	resp, err := c.client.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: groupID})
+func (c *GroupClient) MemberUserIDs(ctx context.Context, groupID, userID string) ([]string, error) {
+	resp, err := c.client.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: groupID, UserId: userID})
 	if err != nil {
 		return nil, err
 	}

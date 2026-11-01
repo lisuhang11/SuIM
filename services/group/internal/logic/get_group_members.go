@@ -6,11 +6,13 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// GetGroupMembers 分页返回群成员资料。
+// GetGroupMembers 分页返回群成员资料。调用者必须已经在群里。
 func (s *Server) GetGroupMembers(ctx context.Context, req *grouppb.GetGroupMembersReq) (*grouppb.GetGroupMembersResp, error) {
-	// 请求里没有操作者，成员可见性尚未校验。
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireMember(ctx, groupID, req.GetUserId()); err != nil {
 		return nil, err
 	}
 	offset, limit, err := page(req.GetOffset(), req.GetLimit())

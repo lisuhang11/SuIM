@@ -284,10 +284,12 @@ message GetGroupMemberResp {
 }
 
 // --------------- GetGroupMembers ---------------
+// user_id is the caller and must already be a member. The gateway overwrites it from the session.
 message GetGroupMembersReq {
   string group_id = 1;
   int32 offset = 2;
   int32 limit = 3;
+  string user_id = 4;
 }
 message GetGroupMembersResp {
   repeated GroupMemberFullInfo members = 1;
@@ -295,8 +297,10 @@ message GetGroupMembersResp {
 }
 
 // --------------- GetGroupMemberUserIDs ----------
+// user_id is the caller and must already be a member. The gateway overwrites it from the session.
 message GetGroupMemberUserIDsReq {
   string group_id = 1;
+  string user_id = 2;
 }
 message GetGroupMemberUserIDsResp {
   repeated string user_ids = 1;
@@ -370,9 +374,11 @@ message BatchGetIncrementalGroupMembersResp {
   map<string, GetIncrementalGroupMembersResp> groups = 1;
 }
 
+// user_id is the caller and must already be a member. The gateway overwrites it from the session.
 message GetFullGroupMemberUserIDsReq {
   string group_id = 1;
   uint64 id_hash = 2;
+  string user_id = 3;
 }
 message GetFullGroupMemberUserIDsResp {
   uint64 version = 1;

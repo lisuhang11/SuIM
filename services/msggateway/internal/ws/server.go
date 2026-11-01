@@ -32,7 +32,7 @@ type JoinedGroup struct {
 
 // GroupDirectory reads group membership. It may be nil when the group service is down.
 type GroupDirectory interface {
-	MemberUserIDs(ctx context.Context, groupID string) ([]string, error)
+	MemberUserIDs(ctx context.Context, groupID, userID string) ([]string, error)
 	Joined(ctx context.Context, userID string) ([]JoinedGroup, error)
 }
 
@@ -196,7 +196,7 @@ func acceptsOnlinePush(c *Client) bool {
 func (s *Server) recipients(ctx context.Context, msg *msgpb.MsgData) []string {
 	if msg.SessionType == 2 || msg.SessionType == 3 {
 		if s.groups != nil && msg.GroupId != "" {
-			ids, err := s.groups.MemberUserIDs(ctx, msg.GroupId)
+			ids, err := s.groups.MemberUserIDs(ctx, msg.GroupId, msg.SendId)
 			if err == nil && len(ids) > 0 {
 				return uniqueIDs(ids)
 			}

@@ -6,10 +6,13 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// GetGroupMemberUserIDs 返回群内全部成员的用户 ID。
+// GetGroupMemberUserIDs 返回群内全部成员的用户 ID。调用者必须已经在群里。
 func (s *Server) GetGroupMemberUserIDs(ctx context.Context, req *grouppb.GetGroupMemberUserIDsReq) (*grouppb.GetGroupMemberUserIDsResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireMember(ctx, groupID, req.GetUserId()); err != nil {
 		return nil, err
 	}
 	if _, err := s.store.TakeGroup(ctx, groupID); err != nil {

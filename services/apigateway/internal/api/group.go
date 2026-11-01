@@ -309,6 +309,7 @@ func (s *Server) getGroupMembers(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	req.UserId = current(r).userID
 	resp, err := s.groups.GetGroupMembers(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)
@@ -323,6 +324,7 @@ func (s *Server) getGroupMemberUserIDs(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	req.UserId = current(r).userID
 	resp, err := s.groups.GetGroupMemberUserIDs(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)
@@ -405,6 +407,7 @@ func (s *Server) fullGroupMemberUserIDs(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, err)
 		return
 	}
+	req.UserId = current(r).userID
 	resp, err := s.groups.GetFullGroupMemberUserIDs(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)

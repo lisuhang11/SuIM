@@ -66,6 +66,21 @@ func (s *Server) memberOf(ctx context.Context, groupID, userID string) (*model.M
 	return member, nil
 }
 
+// requireMember rejects callers who are not in the group. A dismissed group still allows its members.
+func (s *Server) requireMember(ctx context.Context, groupID, userID string) error {
+	userID, err := normalizeUserID(userID)
+	if err != nil {
+		return err
+	}
+	if _, err := s.memberOf(ctx, groupID, userID); err != nil {
+		if errors.Is(err, errorcode.ErrGroupNotMember) {
+			return errorcode.ErrGroupNoPermission
+		}
+		return err
+	}
+	return nil
+}
+
 func (s *Server) fillMembers(ctx context.Context, members []*model.Member) error {
 	var missing []string
 	seen := map[string]struct{}{}

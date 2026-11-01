@@ -176,7 +176,7 @@ message SendSmsCodeResp {
   int64 expire_seconds = 1;
 }
 
-// RegisterPhoneReq.scene must be register. password may be empty for a code-only account.
+// RegisterPhoneReq.scene must be register. password is required and becomes the login credential.
 // protocol_version is the policy version the user accepted.
 message RegisterPhoneReq {
   string phone = 1;

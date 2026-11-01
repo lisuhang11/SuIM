@@ -128,11 +128,3 @@ func randomCode() (string, error) {
 		return fmt.Sprintf("%06d", n), nil
 	}
 }
-
-func randomSecret() (string, error) {
-	var b [32]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	return string(b[:]), nil
-}

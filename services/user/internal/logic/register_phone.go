@@ -29,10 +29,8 @@ func (s *Server) RegisterPhone(ctx context.Context, req *userpb.RegisterPhoneReq
 		return nil, err
 	}
 	password := req.GetPassword()
-	if password != "" {
-		if err := validatePassword(password); err != nil {
-			return nil, err
-		}
+	if err := validatePassword(password); err != nil {
+		return nil, err
 	}
 	nickname, err := phoneNickname(req.GetNickname(), national)
 	if err != nil {
@@ -112,13 +110,6 @@ func (s *Server) RegisterPhone(ctx context.Context, req *userpb.RegisterPhoneReq
 }
 
 func (s *Server) phonePasswordHash(password string) (string, error) {
-	if password == "" {
-		secret, err := randomSecret()
-		if err != nil {
-			return "", errorcode.ErrInternal.WithMsg("create password")
-		}
-		password = secret
-	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", errorcode.ErrInternal.WithMsg("hash password")

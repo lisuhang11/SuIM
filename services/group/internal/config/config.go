@@ -9,14 +9,21 @@ import (
 )
 
 type Config struct {
-	ListenIP   string          `yaml:"listenIP"`
-	RegisterIP string          `yaml:"registerIP"`
-	Port       int             `yaml:"port"`
-	MySQL      config.MySQL    `yaml:"mysql"`
-	Redis      config.Redis    `yaml:"redis"`
-	LocalCache LocalCache      `yaml:"localCache"`
-	Registry   register.Config `yaml:"registry"`
-	Webhooks   Webhooks        `yaml:"webhooks"`
+	ListenIP    string          `yaml:"listenIP"`
+	RegisterIP  string          `yaml:"registerIP"`
+	Port        int             `yaml:"port"`
+	MySQL       config.MySQL    `yaml:"mysql"`
+	Redis       config.Redis    `yaml:"redis"`
+	LocalCache  LocalCache      `yaml:"localCache"`
+	MemberLimit MemberLimit     `yaml:"memberLimit"`
+	Registry    register.Config `yaml:"registry"`
+	Webhooks    Webhooks        `yaml:"webhooks"`
+}
+
+// MemberLimit is how many members one group may hold, including the owner.
+type MemberLimit struct {
+	Normal int `yaml:"normal"`
+	Super  int `yaml:"super"`
 }
 
 type Webhooks struct {
@@ -72,6 +79,15 @@ func (c *Config) Validate() error {
 	}
 	if !c.LocalCache.Enable() {
 		return fmt.Errorf("localCache topic, slotNum, slotSize, successExpire and failedExpire are required")
+	}
+	if c.MemberLimit.Normal == 0 {
+		c.MemberLimit.Normal = 200
+	}
+	if c.MemberLimit.Super == 0 {
+		c.MemberLimit.Super = 1000
+	}
+	if c.MemberLimit.Normal < 1 || c.MemberLimit.Super < c.MemberLimit.Normal {
+		return fmt.Errorf("memberLimit normal must be positive and super must be at least normal")
 	}
 	if c.Registry.Type == "" {
 		return fmt.Errorf("registry type is required")

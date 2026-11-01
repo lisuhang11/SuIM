@@ -62,7 +62,7 @@ func (s *Server) JoinGroup(ctx context.Context, req *grouppb.JoinGroupReq) (*gro
 		if err := s.beforeMembersJoin(ctx, groupID, group.Ex, []*model.Member{member}); err != nil {
 			return nil, err
 		}
-		if err := s.store.AddMembers(ctx, groupID, []*model.Member{member}, now); err != nil {
+		if err := s.store.AddMembers(ctx, groupID, []*model.Member{member}, now, s.memberCap(group.GroupType)); err != nil {
 			return nil, mapStore(err)
 		}
 		// 会话 seq 尚未接入。进入通知带上新的成员版本。

@@ -115,6 +115,7 @@ func run(cfgPath, migratePath string) error {
 		msgclient.New(msgpb.NewMsgServiceClient(msgConn)),
 	)
 	groupServer.UseQuota(store.NewQuota(rdb))
+	groupServer.UseMemberLimit(cfg.MemberLimit.Normal, cfg.MemberLimit.Super)
 	groupServer.UseHooks(logic.Hooks{
 		Client:                   hooks,
 		BeforeCreateGroup:        w.BeforeCreateGroup,

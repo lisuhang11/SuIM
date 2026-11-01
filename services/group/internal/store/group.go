@@ -144,7 +144,7 @@ func (s *Store) findGroups(ctx context.Context, groupIDs []string) ([]*model.Gro
 	return ordered, nil
 }
 
-func (s *Store) CreateGroup(ctx context.Context, group *model.Group, members []*model.Member, now time.Time) error {
+func (s *Store) CreateGroup(ctx context.Context, group *model.Group, members []*model.Member, now time.Time, limit int) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -166,6 +166,9 @@ func (s *Store) CreateGroup(ctx context.Context, group *model.Group, members []*
 		notifTime, group.NotificationUserID, group.Ex); err != nil {
 		return err
 	}
+	if err := roomFor(len(members), 0, limit); err != nil {
+		return err
+	}
 	if err := insertMembers(ctx, tx, members); err != nil {
 		return err
 	}
@@ -181,7 +184,7 @@ func (s *Store) CreateGroup(ctx context.Context, group *model.Group, members []*
 	return nil
 }
 
-func (s *Store) AddMembers(ctx context.Context, groupID string, members []*model.Member, now time.Time) error {
+func (s *Store) AddMembers(ctx context.Context, groupID string, members []*model.Member, now time.Time, limit int) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -198,6 +201,13 @@ func (s *Store) AddMembers(ctx context.Context, groupID string, members []*model
 	}
 	if status == model.GroupStatusDismissed {
 		return ErrDismissed
+	}
+	var current int
+	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM group_member WHERE group_id = ?", groupID).Scan(&current); err != nil {
+		return err
+	}
+	if err := roomFor(len(members), current, limit); err != nil {
+		return err
 	}
 	if err := insertMembers(ctx, tx, members); err != nil {
 		return err
@@ -540,6 +550,13 @@ func (s *Store) fillOwnersAndCounts(ctx context.Context, groups []*model.Group) 
 	for _, g := range groups {
 		g.MemberCount = counts[g.GroupID]
 		g.OwnerUserID = owners[g.GroupID]
+	}
+	return nil
+}
+
+func roomFor(adding, current, limit int) error {
+	if limit > 0 && current+adding > limit {
+		return ErrFull
 	}
 	return nil
 }

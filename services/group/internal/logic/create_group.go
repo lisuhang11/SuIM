@@ -57,6 +57,9 @@ func (s *Server) CreateGroup(ctx context.Context, req *grouppb.CreateGroupReq) (
 	if len(memberIDs) > maxCreateMembers {
 		return nil, errorcode.ErrGroupInvalidArgs.WithMsg("too many members")
 	}
+	if len(memberIDs)+1 > s.memberCap(groupType) {
+		return nil, errorcode.ErrGroupFull
+	}
 	if err := s.reserveCreate(ctx, owner); err != nil {
 		return nil, err
 	}
@@ -103,7 +106,7 @@ func (s *Server) CreateGroup(ctx context.Context, req *grouppb.CreateGroupReq) (
 	if err := s.beforeMembersJoin(ctx, group.GroupID, group.Ex, members); err != nil {
 		return nil, err
 	}
-	if err := s.store.CreateGroup(ctx, group, members, now); err != nil {
+	if err := s.store.CreateGroup(ctx, group, members, now, s.memberCap(group.GroupType)); err != nil {
 		return nil, mapStore(err)
 	}
 

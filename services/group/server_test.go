@@ -524,6 +524,136 @@ func TestGroup(t *testing.T) {
 	}
 }
 
+func TestGroupMemberLimit(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn)
+	if err != nil {
+		t.Skipf("mysql is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	script, err := os.ReadFile(filepath.Join("..", "..", "migrations", "group.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx, string(script)); err != nil {
+		t.Fatal(err)
+	}
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	a := "ma-" + suffix
+	b := "mb-" + suffix
+	c := "mc-" + suffix
+	d := "md-" + suffix
+	e := "me-" + suffix
+	t.Cleanup(func() { cleanupGroup(t, mysqlCfg, a, b, c, d, e) })
+	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}, d: {}, e: {}}, nil)
+	srv.UseMemberLimit(2, 3)
+
+	if _, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{
+		CreatorUserId: a, GroupName: "over", GroupType: model.GroupTypeNormal, MemberIds: []string{b, c},
+	}); !isCode(err, codes.InvalidArgument, errorcode.GroupFull) {
+		t.Fatalf("create over cap code=%v err=%v", status.Code(err), err)
+	}
+
+	created, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{
+		CreatorUserId: a, GroupName: "full", GroupType: model.GroupTypeNormal, MemberIds: []string{b},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gid := created.GetGroupId()
+	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: gid, OpUserId: a, UserIds: []string{c}}); !isCode(err, codes.InvalidArgument, errorcode.GroupFull) {
+		t.Fatalf("invite full code=%v err=%v", status.Code(err), err)
+	}
+	if n := memberCount(t, srv, ctx, gid, a); n != 2 {
+		t.Fatalf("full group members=%d", n)
+	}
+
+	open, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{
+		CreatorUserId: a, GroupName: "open", GroupType: model.GroupTypeNormal, NeedVerification: model.NeedDirectly,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ogid := open.GetGroupId()
+	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: ogid, OpUserId: a, UserIds: []string{b, c}}); !isCode(err, codes.InvalidArgument, errorcode.GroupFull) {
+		t.Fatalf("invite past one seat code=%v err=%v", status.Code(err), err)
+	}
+	if n := memberCount(t, srv, ctx, ogid, a); n != 1 {
+		t.Fatalf("partial invite wrote members=%d", n)
+	}
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: ogid, UserId: b, JoinSource: model.JoinBySearch}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.JoinGroup(ctx, &grouppb.JoinGroupReq{GroupId: ogid, UserId: c, JoinSource: model.JoinBySearch}); !isCode(err, codes.InvalidArgument, errorcode.GroupFull) {
+		t.Fatalf("direct join full code=%v err=%v", status.Code(err), err)
+	}
+	if n := memberCount(t, srv, ctx, ogid, a); n != 2 {
+		t.Fatalf("direct join members=%d", n)
+	}
+
+	verified, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{
+		CreatorUserId: a, GroupName: "apply", GroupType: model.GroupTypeNormal, NeedVerification: model.NeedVerifyAll, MemberIds: []string{b},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vgid := verified.GetGroupId()
+	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: vgid, OpUserId: b, UserIds: []string{c}, Reason: "please"}); err != nil {
+		t.Fatal(err)
+	}
+	if n := memberCount(t, srv, ctx, vgid, a); n != 2 {
+		t.Fatalf("application consumed a seat, members=%d", n)
+	}
+	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{
+		GroupId: vgid, OpUserId: a, FromUserId: c, HandleResult: model.HandleAgree,
+	}); !isCode(err, codes.InvalidArgument, errorcode.GroupFull) {
+		t.Fatalf("agree full code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.GroupApplicationResponse(ctx, &grouppb.GroupApplicationResponseReq{
+		GroupId: vgid, OpUserId: a, FromUserId: c, HandleResult: model.HandleAgree,
+	}); !isCode(err, codes.InvalidArgument, errorcode.GroupFull) {
+		t.Fatalf("agree stayed pending code=%v err=%v", status.Code(err), err)
+	}
+	if n := memberCount(t, srv, ctx, vgid, a); n != 2 {
+		t.Fatalf("agreed into a full group, members=%d", n)
+	}
+
+	super, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{
+		CreatorUserId: a, GroupName: "super", GroupType: model.GroupTypeSuper,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sgid := super.GetGroupId()
+	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: sgid, OpUserId: a, UserIds: []string{b, c}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.InviteUserToGroup(ctx, &grouppb.InviteUserToGroupReq{GroupId: sgid, OpUserId: a, UserIds: []string{d}}); !isCode(err, codes.InvalidArgument, errorcode.GroupFull) {
+		t.Fatalf("super invite code=%v err=%v", status.Code(err), err)
+	}
+	if n := memberCount(t, srv, ctx, sgid, a); n != 3 {
+		t.Fatalf("super members=%d", n)
+	}
+}
+
+func memberCount(t *testing.T, srv *logic.Server, ctx context.Context, groupID, userID string) int {
+	t.Helper()
+	ids, err := srv.GetFullGroupMemberUserIDs(ctx, &grouppb.GetFullGroupMemberUserIDsReq{GroupId: groupID, UserId: userID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return len(ids.GetUserIds())
+}
+
 func TestGroupSync(t *testing.T) {
 	ctx := context.Background()
 	env := readEnvFile(t, filepath.Join("..", "..", ".env"))

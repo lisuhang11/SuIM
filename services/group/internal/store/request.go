@@ -50,7 +50,7 @@ func (s *Store) PageUserRequests(ctx context.Context, userID string, groupIDs []
 }
 
 // HandleRequest closes a pending request. member is inserted in the same transaction when agreeing a user who is not yet in the group.
-func (s *Store) HandleRequest(ctx context.Context, groupID, userID, handledMsg string, handleResult int32, handleUserID string, now time.Time, member *model.Member) error {
+func (s *Store) HandleRequest(ctx context.Context, groupID, userID, handledMsg string, handleResult int32, handleUserID string, now time.Time, member *model.Member, limit int) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -68,6 +68,13 @@ func (s *Store) HandleRequest(ctx context.Context, groupID, userID, handledMsg s
 		}
 		if status == model.GroupStatusDismissed {
 			return ErrDismissed
+		}
+		var current int
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM group_member WHERE group_id = ?", groupID).Scan(&current); err != nil {
+			return err
+		}
+		if err := roomFor(1, current, limit); err != nil {
+			return err
 		}
 	}
 	var handle int32

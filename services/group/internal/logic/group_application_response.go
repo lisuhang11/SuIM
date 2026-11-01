@@ -65,7 +65,7 @@ func (s *Server) GroupApplicationResponse(ctx context.Context, req *grouppb.Grou
 			}
 		}
 	}
-	if err := s.store.HandleRequest(ctx, groupID, from, handledMsg, req.GetHandleResult(), op, now, member); err != nil {
+	if err := s.store.HandleRequest(ctx, groupID, from, handledMsg, req.GetHandleResult(), op, now, member, s.memberCap(group.GroupType)); err != nil {
 		return nil, mapStore(err)
 	}
 	request.HandleResult = req.GetHandleResult()

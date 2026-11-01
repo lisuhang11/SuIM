@@ -44,16 +44,33 @@ type Hooks struct {
 
 type Server struct {
 	grouppb.UnimplementedGroupServiceServer
-	store  *store.Store
-	users  Users
-	sender MsgSender
-	hooks  Hooks
-	quota  Quota
-	now    func() time.Time
+	store        *store.Store
+	users        Users
+	sender       MsgSender
+	hooks        Hooks
+	quota        Quota
+	memberNormal int
+	memberSuper  int
+	now          func() time.Time
 }
 
 func New(st *store.Store, users Users, sender MsgSender) *Server {
-	return &Server{store: st, users: users, sender: sender, now: time.Now}
+	return &Server{store: st, users: users, sender: sender, memberNormal: 200, memberSuper: 1000, now: time.Now}
+}
+
+// UseMemberLimit sets how many members a normal group and a super group may hold, including the owner.
+func (s *Server) UseMemberLimit(normal, super int) {
+	if s != nil && normal > 0 && super >= normal {
+		s.memberNormal = normal
+		s.memberSuper = super
+	}
+}
+
+func (s *Server) memberCap(groupType int32) int {
+	if groupType == model.GroupTypeSuper {
+		return s.memberSuper
+	}
+	return s.memberNormal
 }
 
 // UseHooks attaches webhook switches. A nil client leaves every callback disabled.

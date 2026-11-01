@@ -20,6 +20,7 @@ var (
 	ErrRequestHandled  = errors.New("group request already handled")
 	ErrDismissed       = errors.New("group dismissed")
 	ErrLimited         = errors.New("group limited")
+	ErrFull            = errors.New("group is full")
 )
 
 type Store struct {

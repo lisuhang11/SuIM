@@ -29,6 +29,8 @@ func mapStore(err error) error {
 		return errorcode.ErrGroupRequestHandled
 	case errors.Is(err, store.ErrDismissed):
 		return errorcode.ErrGroupDismissed
+	case errors.Is(err, store.ErrFull):
+		return errorcode.ErrGroupFull
 	default:
 		return err
 	}

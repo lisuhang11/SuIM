@@ -28,6 +28,10 @@ localCache:
   successExpire: 300
   failedExpire: 5
 
+memberLimit:
+  normal: 200
+  super: 1000
+
 registry:
   type: etcd
   etcd:

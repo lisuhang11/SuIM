@@ -99,7 +99,7 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 	if err := s.beforeMembersJoin(ctx, groupID, group.Ex, members); err != nil {
 		return nil, err
 	}
-	if err := s.store.AddMembers(ctx, groupID, members, now); err != nil {
+	if err := s.store.AddMembers(ctx, groupID, members, now, s.memberCap(group.GroupType)); err != nil {
 		return nil, mapStore(err)
 	}
 	// 4. 邀请通知带上新的成员版本。

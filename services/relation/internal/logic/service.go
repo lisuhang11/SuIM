@@ -30,12 +30,25 @@ type Hooks struct {
 	AfterRemoveBlack      webhook.AfterConfig
 }
 
+// Groups reports whether a group rule blocks a friend request.
+type Groups interface {
+	MemberFriendAllowed(ctx context.Context, user1, user2 string) (bool, error)
+}
+
 type Server struct {
 	relationpb.UnimplementedRelationServiceServer
-	store *store.Store
-	users Users
-	hooks Hooks
-	now   func() time.Time
+	store  *store.Store
+	users  Users
+	groups Groups
+	hooks  Hooks
+	now    func() time.Time
+}
+
+// UseGroups attaches the group rule. A nil client skips the check, which is only for in-process tests.
+func (s *Server) UseGroups(groups Groups) {
+	if s != nil {
+		s.groups = groups
+	}
 }
 
 func New(st *store.Store, users Users, hooks Hooks) *Server {

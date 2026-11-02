@@ -19,9 +19,11 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
+	grouppb "github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/relation/internal/config"
+	"github.com/lisuhang11/SuIM/services/relation/internal/groupclient"
 	"github.com/lisuhang11/SuIM/services/relation/internal/logic"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 	"github.com/lisuhang11/SuIM/services/relation/internal/userclient"
@@ -75,6 +77,14 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("dial user service: %w", err)
 	}
 	defer userConn.Close()
+	groupConn, err := reg.Dial(ctx, "group",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial group service: %w", err)
+	}
+	defer groupConn.Close()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
@@ -89,7 +99,7 @@ func run(cfgPath, migratePath string) error {
 
 	srv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
 	w := cfg.Webhooks
-	relationpb.RegisterRelationServiceServer(srv, logic.New(st, userclient.New(userpb.NewUserServiceClient(userConn)), logic.Hooks{
+	relationServer := logic.New(st, userclient.New(userpb.NewUserServiceClient(userConn)), logic.Hooks{
 		Client:                hooks,
 		BeforeAddFriend:       w.BeforeAddFriend,
 		AfterAddFriend:        w.AfterAddFriend,
@@ -100,7 +110,9 @@ func run(cfgPath, migratePath string) error {
 		AfterDeleteFriend:     w.AfterDeleteFriend,
 		BeforeAddBlack:        w.BeforeAddBlack,
 		AfterRemoveBlack:      w.AfterRemoveBlack,
-	}))
+	})
+	relationServer.UseGroups(groupclient.New(grouppb.NewGroupServiceClient(groupConn)))
+	relationpb.RegisterRelationServiceServer(srv, relationServer)
 
 	id, err := newID()
 	if err != nil {

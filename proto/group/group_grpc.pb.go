@@ -45,6 +45,7 @@ const (
 	GroupService_GetIncrementalGroupMembers_FullMethodName      = "/group.GroupService/GetIncrementalGroupMembers"
 	GroupService_BatchGetIncrementalGroupMembers_FullMethodName = "/group.GroupService/BatchGetIncrementalGroupMembers"
 	GroupService_GetFullGroupMemberUserIDs_FullMethodName       = "/group.GroupService/GetFullGroupMemberUserIDs"
+	GroupService_MemberFriendAllowed_FullMethodName             = "/group.GroupService/MemberFriendAllowed"
 )
 
 // GroupServiceClient is the client API for GroupService service.
@@ -81,6 +82,8 @@ type GroupServiceClient interface {
 	GetIncrementalGroupMembers(ctx context.Context, in *GetIncrementalGroupMembersReq, opts ...grpc.CallOption) (*GetIncrementalGroupMembersResp, error)
 	BatchGetIncrementalGroupMembers(ctx context.Context, in *BatchGetIncrementalGroupMembersReq, opts ...grpc.CallOption) (*BatchGetIncrementalGroupMembersResp, error)
 	GetFullGroupMemberUserIDs(ctx context.Context, in *GetFullGroupMemberUserIDsReq, opts ...grpc.CallOption) (*GetFullGroupMemberUserIDsResp, error)
+	// 好友服务发申请前询问：两人是否被某个未解散群禁止互加好友。
+	MemberFriendAllowed(ctx context.Context, in *MemberFriendAllowedReq, opts ...grpc.CallOption) (*MemberFriendAllowedResp, error)
 }
 
 type groupServiceClient struct {
@@ -351,6 +354,16 @@ func (c *groupServiceClient) GetFullGroupMemberUserIDs(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *groupServiceClient) MemberFriendAllowed(ctx context.Context, in *MemberFriendAllowedReq, opts ...grpc.CallOption) (*MemberFriendAllowedResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MemberFriendAllowedResp)
+	err := c.cc.Invoke(ctx, GroupService_MemberFriendAllowed_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GroupServiceServer is the server API for GroupService service.
 // All implementations must embed UnimplementedGroupServiceServer
 // for forward compatibility.
@@ -385,6 +398,8 @@ type GroupServiceServer interface {
 	GetIncrementalGroupMembers(context.Context, *GetIncrementalGroupMembersReq) (*GetIncrementalGroupMembersResp, error)
 	BatchGetIncrementalGroupMembers(context.Context, *BatchGetIncrementalGroupMembersReq) (*BatchGetIncrementalGroupMembersResp, error)
 	GetFullGroupMemberUserIDs(context.Context, *GetFullGroupMemberUserIDsReq) (*GetFullGroupMemberUserIDsResp, error)
+	// 好友服务发申请前询问：两人是否被某个未解散群禁止互加好友。
+	MemberFriendAllowed(context.Context, *MemberFriendAllowedReq) (*MemberFriendAllowedResp, error)
 	mustEmbedUnimplementedGroupServiceServer()
 }
 
@@ -472,6 +487,9 @@ func (UnimplementedGroupServiceServer) BatchGetIncrementalGroupMembers(context.C
 }
 func (UnimplementedGroupServiceServer) GetFullGroupMemberUserIDs(context.Context, *GetFullGroupMemberUserIDsReq) (*GetFullGroupMemberUserIDsResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFullGroupMemberUserIDs not implemented")
+}
+func (UnimplementedGroupServiceServer) MemberFriendAllowed(context.Context, *MemberFriendAllowedReq) (*MemberFriendAllowedResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method MemberFriendAllowed not implemented")
 }
 func (UnimplementedGroupServiceServer) mustEmbedUnimplementedGroupServiceServer() {}
 func (UnimplementedGroupServiceServer) testEmbeddedByValue()                      {}
@@ -962,6 +980,24 @@ func _GroupService_GetFullGroupMemberUserIDs_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GroupService_MemberFriendAllowed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MemberFriendAllowedReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroupServiceServer).MemberFriendAllowed(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroupService_MemberFriendAllowed_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroupServiceServer).MemberFriendAllowed(ctx, req.(*MemberFriendAllowedReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GroupService_ServiceDesc is the grpc.ServiceDesc for GroupService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1072,6 +1108,10 @@ var GroupService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFullGroupMemberUserIDs",
 			Handler:    _GroupService_GetFullGroupMemberUserIDs_Handler,
+		},
+		{
+			MethodName: "MemberFriendAllowed",
+			Handler:    _GroupService_MemberFriendAllowed_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

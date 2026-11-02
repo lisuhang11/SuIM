@@ -37,6 +37,9 @@ service GroupService {
   rpc GetIncrementalGroupMembers(GetIncrementalGroupMembersReq) returns (GetIncrementalGroupMembersResp);
   rpc BatchGetIncrementalGroupMembers(BatchGetIncrementalGroupMembersReq) returns (BatchGetIncrementalGroupMembersResp);
   rpc GetFullGroupMemberUserIDs(GetFullGroupMemberUserIDsReq) returns (GetFullGroupMemberUserIDsResp);
+
+  // 好友服务发申请前询问：两人是否被某个未解散群禁止互加好友。
+  rpc MemberFriendAllowed(MemberFriendAllowedReq) returns (MemberFriendAllowedResp);
 }
 
 
@@ -385,4 +388,13 @@ message GetFullGroupMemberUserIDsResp {
   string version_id = 2;
   bool equal = 3;
   repeated string user_ids = 4;
+}
+
+// user_id_1 是申请人，必须与调用上下文里的用户一致。
+message MemberFriendAllowedReq {
+  string user_id_1 = 1;
+  string user_id_2 = 2;
+}
+message MemberFriendAllowedResp {
+  bool allowed = 1;
 }

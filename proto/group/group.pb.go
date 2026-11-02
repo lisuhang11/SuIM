@@ -3489,6 +3489,103 @@ func (x *GetFullGroupMemberUserIDsResp) GetUserIds() []string {
 	return nil
 }
 
+// user_id_1 是申请人，必须与调用上下文里的用户一致。
+type MemberFriendAllowedReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId_1      string                 `protobuf:"bytes,1,opt,name=user_id_1,json=userId1,proto3" json:"user_id_1,omitempty"`
+	UserId_2      string                 `protobuf:"bytes,2,opt,name=user_id_2,json=userId2,proto3" json:"user_id_2,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MemberFriendAllowedReq) Reset() {
+	*x = MemberFriendAllowedReq{}
+	mi := &file_group_group_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MemberFriendAllowedReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MemberFriendAllowedReq) ProtoMessage() {}
+
+func (x *MemberFriendAllowedReq) ProtoReflect() protoreflect.Message {
+	mi := &file_group_group_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MemberFriendAllowedReq.ProtoReflect.Descriptor instead.
+func (*MemberFriendAllowedReq) Descriptor() ([]byte, []int) {
+	return file_group_group_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *MemberFriendAllowedReq) GetUserId_1() string {
+	if x != nil {
+		return x.UserId_1
+	}
+	return ""
+}
+
+func (x *MemberFriendAllowedReq) GetUserId_2() string {
+	if x != nil {
+		return x.UserId_2
+	}
+	return ""
+}
+
+type MemberFriendAllowedResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Allowed       bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MemberFriendAllowedResp) Reset() {
+	*x = MemberFriendAllowedResp{}
+	mi := &file_group_group_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MemberFriendAllowedResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MemberFriendAllowedResp) ProtoMessage() {}
+
+func (x *MemberFriendAllowedResp) ProtoReflect() protoreflect.Message {
+	mi := &file_group_group_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MemberFriendAllowedResp.ProtoReflect.Descriptor instead.
+func (*MemberFriendAllowedResp) Descriptor() ([]byte, []int) {
+	return file_group_group_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *MemberFriendAllowedResp) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
 var File_group_group_proto protoreflect.FileDescriptor
 
 const file_group_group_proto_rawDesc = "" +
@@ -3779,7 +3876,12 @@ const file_group_group_proto_rawDesc = "" +
 	"\n" +
 	"version_id\x18\x02 \x01(\tR\tversionId\x12\x14\n" +
 	"\x05equal\x18\x03 \x01(\bR\x05equal\x12\x19\n" +
-	"\buser_ids\x18\x04 \x03(\tR\auserIds2\xe1\x10\n" +
+	"\buser_ids\x18\x04 \x03(\tR\auserIds\"P\n" +
+	"\x16MemberFriendAllowedReq\x12\x1a\n" +
+	"\tuser_id_1\x18\x01 \x01(\tR\auserId1\x12\x1a\n" +
+	"\tuser_id_2\x18\x02 \x01(\tR\auserId2\"3\n" +
+	"\x17MemberFriendAllowedResp\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed2\xb7\x11\n" +
 	"\fGroupService\x12<\n" +
 	"\vCreateGroup\x12\x15.group.CreateGroupReq\x1a\x16.group.CreateGroupResp\x12?\n" +
 	"\fDismissGroup\x12\x16.group.DismissGroupReq\x1a\x17.group.DismissGroupResp\x12Q\n" +
@@ -3806,7 +3908,8 @@ const file_group_group_proto_rawDesc = "" +
 	"\x13GetFullJoinGroupIDs\x12\x1d.group.GetFullJoinGroupIDsReq\x1a\x1e.group.GetFullJoinGroupIDsResp\x12i\n" +
 	"\x1aGetIncrementalGroupMembers\x12$.group.GetIncrementalGroupMembersReq\x1a%.group.GetIncrementalGroupMembersResp\x12x\n" +
 	"\x1fBatchGetIncrementalGroupMembers\x12).group.BatchGetIncrementalGroupMembersReq\x1a*.group.BatchGetIncrementalGroupMembersResp\x12f\n" +
-	"\x19GetFullGroupMemberUserIDs\x12#.group.GetFullGroupMemberUserIDsReq\x1a$.group.GetFullGroupMemberUserIDsRespB0Z.github.com/lisuhang11/SuIM/proto/group;grouppbb\x06proto3"
+	"\x19GetFullGroupMemberUserIDs\x12#.group.GetFullGroupMemberUserIDsReq\x1a$.group.GetFullGroupMemberUserIDsResp\x12T\n" +
+	"\x13MemberFriendAllowed\x12\x1d.group.MemberFriendAllowedReq\x1a\x1e.group.MemberFriendAllowedRespB0Z.github.com/lisuhang11/SuIM/proto/group;grouppbb\x06proto3"
 
 var (
 	file_group_group_proto_rawDescOnce sync.Once
@@ -3820,7 +3923,7 @@ func file_group_group_proto_rawDescGZIP() []byte {
 	return file_group_group_proto_rawDescData
 }
 
-var file_group_group_proto_msgTypes = make([]protoimpl.MessageInfo, 57)
+var file_group_group_proto_msgTypes = make([]protoimpl.MessageInfo, 59)
 var file_group_group_proto_goTypes = []any{
 	(*GroupInfo)(nil),                           // 0: group.GroupInfo
 	(*GroupMemberFullInfo)(nil),                 // 1: group.GroupMemberFullInfo
@@ -3878,7 +3981,9 @@ var file_group_group_proto_goTypes = []any{
 	(*BatchGetIncrementalGroupMembersResp)(nil), // 53: group.BatchGetIncrementalGroupMembersResp
 	(*GetFullGroupMemberUserIDsReq)(nil),        // 54: group.GetFullGroupMemberUserIDsReq
 	(*GetFullGroupMemberUserIDsResp)(nil),       // 55: group.GetFullGroupMemberUserIDsResp
-	nil,                                         // 56: group.BatchGetIncrementalGroupMembersResp.GroupsEntry
+	(*MemberFriendAllowedReq)(nil),              // 56: group.MemberFriendAllowedReq
+	(*MemberFriendAllowedResp)(nil),             // 57: group.MemberFriendAllowedResp
+	nil,                                         // 58: group.BatchGetIncrementalGroupMembersResp.GroupsEntry
 }
 var file_group_group_proto_depIdxs = []int32{
 	0,  // 0: group.CreateGroupResp.group:type_name -> group.GroupInfo
@@ -3897,7 +4002,7 @@ var file_group_group_proto_depIdxs = []int32{
 	1,  // 13: group.GetIncrementalGroupMembersResp.update:type_name -> group.GroupMemberFullInfo
 	0,  // 14: group.GetIncrementalGroupMembersResp.group:type_name -> group.GroupInfo
 	50, // 15: group.BatchGetIncrementalGroupMembersReq.groups:type_name -> group.GetIncrementalGroupMembersReq
-	56, // 16: group.BatchGetIncrementalGroupMembersResp.groups:type_name -> group.BatchGetIncrementalGroupMembersResp.GroupsEntry
+	58, // 16: group.BatchGetIncrementalGroupMembersResp.groups:type_name -> group.BatchGetIncrementalGroupMembersResp.GroupsEntry
 	51, // 17: group.BatchGetIncrementalGroupMembersResp.GroupsEntry.value:type_name -> group.GetIncrementalGroupMembersResp
 	3,  // 18: group.GroupService.CreateGroup:input_type -> group.CreateGroupReq
 	5,  // 19: group.GroupService.DismissGroup:input_type -> group.DismissGroupReq
@@ -3925,34 +4030,36 @@ var file_group_group_proto_depIdxs = []int32{
 	50, // 41: group.GroupService.GetIncrementalGroupMembers:input_type -> group.GetIncrementalGroupMembersReq
 	52, // 42: group.GroupService.BatchGetIncrementalGroupMembers:input_type -> group.BatchGetIncrementalGroupMembersReq
 	54, // 43: group.GroupService.GetFullGroupMemberUserIDs:input_type -> group.GetFullGroupMemberUserIDsReq
-	4,  // 44: group.GroupService.CreateGroup:output_type -> group.CreateGroupResp
-	6,  // 45: group.GroupService.DismissGroup:output_type -> group.DismissGroupResp
-	8,  // 46: group.GroupService.TransferGroupOwner:output_type -> group.TransferGroupOwnerResp
-	10, // 47: group.GroupService.UpdateGroupInfo:output_type -> group.UpdateGroupInfoResp
-	12, // 48: group.GroupService.GetGroupsInfo:output_type -> group.GetGroupsInfoResp
-	14, // 49: group.GroupService.InviteUserToGroup:output_type -> group.InviteUserToGroupResp
-	16, // 50: group.GroupService.KickGroupMember:output_type -> group.KickGroupMemberResp
-	18, // 51: group.GroupService.QuitGroup:output_type -> group.QuitGroupResp
-	20, // 52: group.GroupService.JoinGroup:output_type -> group.JoinGroupResp
-	22, // 53: group.GroupService.GroupApplicationResponse:output_type -> group.GroupApplicationResponseResp
-	24, // 54: group.GroupService.GetGroupApplicationList:output_type -> group.GetGroupApplicationListResp
-	26, // 55: group.GroupService.GetUserReqApplicationList:output_type -> group.GetUserReqApplicationListResp
-	29, // 56: group.GroupService.SetGroupMemberInfo:output_type -> group.SetGroupMemberInfoResp
-	31, // 57: group.GroupService.MuteGroupMember:output_type -> group.MuteGroupMemberResp
-	33, // 58: group.GroupService.CancelMuteGroupMember:output_type -> group.CancelMuteGroupMemberResp
-	35, // 59: group.GroupService.MuteGroup:output_type -> group.MuteGroupResp
-	37, // 60: group.GroupService.CancelMuteGroup:output_type -> group.CancelMuteGroupResp
-	39, // 61: group.GroupService.GetGroupMember:output_type -> group.GetGroupMemberResp
-	41, // 62: group.GroupService.GetGroupMembers:output_type -> group.GetGroupMembersResp
-	43, // 63: group.GroupService.GetGroupMemberUserIDs:output_type -> group.GetGroupMemberUserIDsResp
-	45, // 64: group.GroupService.GetJoinedGroups:output_type -> group.GetJoinedGroupsResp
-	47, // 65: group.GroupService.GetIncrementalJoinGroups:output_type -> group.GetIncrementalJoinGroupsResp
-	49, // 66: group.GroupService.GetFullJoinGroupIDs:output_type -> group.GetFullJoinGroupIDsResp
-	51, // 67: group.GroupService.GetIncrementalGroupMembers:output_type -> group.GetIncrementalGroupMembersResp
-	53, // 68: group.GroupService.BatchGetIncrementalGroupMembers:output_type -> group.BatchGetIncrementalGroupMembersResp
-	55, // 69: group.GroupService.GetFullGroupMemberUserIDs:output_type -> group.GetFullGroupMemberUserIDsResp
-	44, // [44:70] is the sub-list for method output_type
-	18, // [18:44] is the sub-list for method input_type
+	56, // 44: group.GroupService.MemberFriendAllowed:input_type -> group.MemberFriendAllowedReq
+	4,  // 45: group.GroupService.CreateGroup:output_type -> group.CreateGroupResp
+	6,  // 46: group.GroupService.DismissGroup:output_type -> group.DismissGroupResp
+	8,  // 47: group.GroupService.TransferGroupOwner:output_type -> group.TransferGroupOwnerResp
+	10, // 48: group.GroupService.UpdateGroupInfo:output_type -> group.UpdateGroupInfoResp
+	12, // 49: group.GroupService.GetGroupsInfo:output_type -> group.GetGroupsInfoResp
+	14, // 50: group.GroupService.InviteUserToGroup:output_type -> group.InviteUserToGroupResp
+	16, // 51: group.GroupService.KickGroupMember:output_type -> group.KickGroupMemberResp
+	18, // 52: group.GroupService.QuitGroup:output_type -> group.QuitGroupResp
+	20, // 53: group.GroupService.JoinGroup:output_type -> group.JoinGroupResp
+	22, // 54: group.GroupService.GroupApplicationResponse:output_type -> group.GroupApplicationResponseResp
+	24, // 55: group.GroupService.GetGroupApplicationList:output_type -> group.GetGroupApplicationListResp
+	26, // 56: group.GroupService.GetUserReqApplicationList:output_type -> group.GetUserReqApplicationListResp
+	29, // 57: group.GroupService.SetGroupMemberInfo:output_type -> group.SetGroupMemberInfoResp
+	31, // 58: group.GroupService.MuteGroupMember:output_type -> group.MuteGroupMemberResp
+	33, // 59: group.GroupService.CancelMuteGroupMember:output_type -> group.CancelMuteGroupMemberResp
+	35, // 60: group.GroupService.MuteGroup:output_type -> group.MuteGroupResp
+	37, // 61: group.GroupService.CancelMuteGroup:output_type -> group.CancelMuteGroupResp
+	39, // 62: group.GroupService.GetGroupMember:output_type -> group.GetGroupMemberResp
+	41, // 63: group.GroupService.GetGroupMembers:output_type -> group.GetGroupMembersResp
+	43, // 64: group.GroupService.GetGroupMemberUserIDs:output_type -> group.GetGroupMemberUserIDsResp
+	45, // 65: group.GroupService.GetJoinedGroups:output_type -> group.GetJoinedGroupsResp
+	47, // 66: group.GroupService.GetIncrementalJoinGroups:output_type -> group.GetIncrementalJoinGroupsResp
+	49, // 67: group.GroupService.GetFullJoinGroupIDs:output_type -> group.GetFullJoinGroupIDsResp
+	51, // 68: group.GroupService.GetIncrementalGroupMembers:output_type -> group.GetIncrementalGroupMembersResp
+	53, // 69: group.GroupService.BatchGetIncrementalGroupMembers:output_type -> group.BatchGetIncrementalGroupMembersResp
+	55, // 70: group.GroupService.GetFullGroupMemberUserIDs:output_type -> group.GetFullGroupMemberUserIDsResp
+	57, // 71: group.GroupService.MemberFriendAllowed:output_type -> group.MemberFriendAllowedResp
+	45, // [45:72] is the sub-list for method output_type
+	18, // [18:45] is the sub-list for method input_type
 	18, // [18:18] is the sub-list for extension type_name
 	18, // [18:18] is the sub-list for extension extendee
 	0,  // [0:18] is the sub-list for field type_name
@@ -3971,7 +4078,7 @@ func file_group_group_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_group_group_proto_rawDesc), len(file_group_group_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   57,
+			NumMessages:   59,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

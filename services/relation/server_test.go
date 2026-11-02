@@ -80,6 +80,15 @@ func TestFriendApply(t *testing.T) {
 	t.Cleanup(func() { cleanupRelation(t, mysqlCfg, from, to) })
 
 	srv := logic.New(st, knownUsers{from: {}, to: {}}, logic.Hooks{})
+	srv.UseGroups(fixedGroups{allowed: false})
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: from, ToUserId: to, Message: "hi"}); !isCode(err, codes.PermissionDenied, errorcode.RelationGroupFriendForbidden) {
+		t.Fatalf("group forbid code=%v err=%v", status.Code(err), err)
+	}
+	srv.UseGroups(failGroups{})
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: from, ToUserId: to, Message: "hi"}); !isCode(err, codes.Internal, errorcode.Internal) {
+		t.Fatalf("group down code=%v err=%v", status.Code(err), err)
+	}
+	srv.UseGroups(nil)
 
 	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: from, ToUserId: from}); !isCode(err, codes.InvalidArgument, errorcode.RelationCanNotAddYourself) {
 		t.Fatalf("self add code=%v err=%v", status.Code(err), err)
@@ -471,6 +480,18 @@ func TestFriendPageAndIDs(t *testing.T) {
 	if err != nil || len(blacks.GetBlacks()) != 1 || blacks.GetBlacks()[0].GetBlackUser().GetUserId() != c {
 		t.Fatalf("second blacks %+v err=%v", blacks, err)
 	}
+}
+
+type fixedGroups struct{ allowed bool }
+
+func (g fixedGroups) MemberFriendAllowed(context.Context, string, string) (bool, error) {
+	return g.allowed, nil
+}
+
+type failGroups struct{}
+
+func (failGroups) MemberFriendAllowed(context.Context, string, string) (bool, error) {
+	return false, fmt.Errorf("group down")
 }
 
 func isCode(err error, grpc codes.Code, code errorcode.Code) bool {

@@ -842,6 +842,70 @@ func memberState(t *testing.T, cfg config.MySQL, groupID, oldOwner, newOwner str
 	return role, mute.Valid, nil
 }
 
+func TestMemberFriendAllowed(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn)
+	if err != nil {
+		t.Skipf("mysql is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	script, err := os.ReadFile(filepath.Join("..", "..", "migrations", "group.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx, string(script)); err != nil {
+		t.Fatal(err)
+	}
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	a := "fa-" + suffix
+	b := "fb-" + suffix
+	c := "fc-" + suffix
+	t.Cleanup(func() { cleanupGroup(t, mysqlCfg, a, b, c) })
+	srv := logic.New(st, knownUsers{a: {}, b: {}, c: {}}, nil)
+
+	created, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{CreatorUserId: a, GroupName: "room", MemberIds: []string{b}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gid := created.GetGroupId()
+	denied, err := srv.MemberFriendAllowed(ctx, &grouppb.MemberFriendAllowedReq{UserId_1: a, UserId_2: b})
+	if err != nil || denied.GetAllowed() {
+		t.Fatalf("default forbid allowed=%v err=%v", denied.GetAllowed(), err)
+	}
+	outsider, err := srv.MemberFriendAllowed(ctx, &grouppb.MemberFriendAllowedReq{UserId_1: a, UserId_2: c})
+	if err != nil || !outsider.GetAllowed() {
+		t.Fatalf("outsider allowed=%v err=%v", outsider.GetAllowed(), err)
+	}
+	allow := int32(1)
+	if _, err := srv.UpdateGroupInfo(ctx, &grouppb.UpdateGroupInfoReq{GroupId: gid, OpUserId: a, ApplyMemberFriend: &allow}); err != nil {
+		t.Fatal(err)
+	}
+	opened, err := srv.MemberFriendAllowed(ctx, &grouppb.MemberFriendAllowedReq{UserId_1: a, UserId_2: b})
+	if err != nil || !opened.GetAllowed() {
+		t.Fatalf("allow flag allowed=%v err=%v", opened.GetAllowed(), err)
+	}
+	forbid := int32(0)
+	if _, err := srv.UpdateGroupInfo(ctx, &grouppb.UpdateGroupInfoReq{GroupId: gid, OpUserId: a, ApplyMemberFriend: &forbid}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.DismissGroup(ctx, &grouppb.DismissGroupReq{GroupId: gid, OpUserId: a}); err != nil {
+		t.Fatal(err)
+	}
+	dismissed, err := srv.MemberFriendAllowed(ctx, &grouppb.MemberFriendAllowedReq{UserId_1: a, UserId_2: b})
+	if err != nil || !dismissed.GetAllowed() {
+		t.Fatalf("dismissed allowed=%v err=%v", dismissed.GetAllowed(), err)
+	}
+}
+
 func isCode(err error, grpc codes.Code, code errorcode.Code) bool {
 	got, ok := errorcode.CodeOf(err)
 	return ok && got == code && status.Code(err) == grpc

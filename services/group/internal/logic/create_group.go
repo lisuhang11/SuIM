@@ -110,7 +110,7 @@ func (s *Server) CreateGroup(ctx context.Context, req *grouppb.CreateGroupReq) (
 		return nil, mapStore(err)
 	}
 
-	// 4. 建群通知带上成员版本，由 msggateway 推给在线成员。公告通知尚未接入。
+	// 4. 建群通知带上成员版本。建群时带了公告，再发一条公告提示。
 	created, err := s.store.TakeGroup(ctx, groupID)
 	if err != nil {
 		return nil, mapStore(err)

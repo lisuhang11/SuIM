@@ -18,6 +18,7 @@ const (
 	sessionSuper  = 3
 
 	contentGroupCreated         = 1501
+	contentGroupInfoSet         = 1502
 	contentJoinGroupApplication = 1503
 	contentMemberQuit           = 1504
 	contentApplicationAccepted  = 1505
@@ -34,6 +35,8 @@ const (
 	contentMemberInfoSet        = 1516
 	contentMemberSetAdmin       = 1517
 	contentMemberSetOrdinary    = 1518
+	contentGroupAnnouncement    = 1519
+	contentGroupName            = 1520
 
 	sessionSingle = 1
 
@@ -41,11 +44,20 @@ const (
 	receiverAdmin     = 1
 
 	optNotNotification = "isNotNotification"
+	optHistory         = "history"
+	optUnreadCount     = "unreadCount"
+	optSendMsg         = "isSendMsg"
+	optOfflinePush     = "offlinePush"
 )
 
 // 成员变更写成通知消息。msggateway 只负责把这条消息推给在线成员。
 // 客户端在版本号正好是本地加一时直接套用，否则再拉 incremental_members。
 func (s *Server) sendNotice(ctx context.Context, op string, group *model.Group, contentType int32, detail any) {
+	s.sendNoticeOptions(ctx, op, group, contentType, detail, nil)
+}
+
+// sendNoticeOptions 发送群通知。opts 为空时沿用原有选项：缺省项由 msgtransfer 视为开启。
+func (s *Server) sendNoticeOptions(ctx context.Context, op string, group *model.Group, contentType int32, detail any, opts map[string]bool) {
 	if s.sender == nil || group == nil {
 		return
 	}
@@ -54,8 +66,23 @@ func (s *Server) sendNotice(ctx context.Context, op string, group *model.Group, 
 		slog.Warn("group notice", "err", err, "groupID", group.GroupID, "contentType", contentType)
 		return
 	}
+	if opts != nil {
+		msg.Options = opts
+	}
 	if err := s.sender.SendNotification(ctx, msg); err != nil {
 		slog.Warn("group notice", "err", err, "groupID", group.GroupID, "contentType", contentType)
+	}
+}
+
+// groupInfoOptions 按 OpenIM 的 isSendMsg 区分聊天记录和仅推送。
+// 进聊天记录的副本计未读；通知副本本身不落历史，也不走离线推送。
+func groupInfoOptions(sendMessage bool) map[string]bool {
+	return map[string]bool{
+		optNotNotification: false,
+		optSendMsg:         sendMessage,
+		optUnreadCount:     sendMessage,
+		optHistory:         false,
+		optOfflinePush:     false,
 	}
 }
 
@@ -87,6 +114,50 @@ func (s *Server) notifyCreated(ctx context.Context, owner string, group *model.G
 		GroupMemberVersion:   version,
 		GroupMemberVersionID: versionID,
 	})
+	if group.Notification != "" {
+		s.sendNoticeOptions(ctx, owner, group, contentGroupAnnouncement, groupInfoNameTips{
+			OpUser:               memberNotice(ownerMember),
+			Group:                groupNotice(group),
+			GroupMemberVersion:   version,
+			GroupMemberVersionID: versionID,
+		}, groupInfoOptions(true))
+	}
+}
+
+// notifyGroupInfo 按改动的字段发提示。公告、群名、其他资料可以同时发出。
+// 非空公告和群名进入群聊天记录；清空公告、头像和其他资料只推给在线成员。
+func (s *Server) notifyGroupInfo(ctx context.Context, op string, group *model.Group, opMember *model.Member, patch model.GroupPatch) {
+	if group == nil {
+		return
+	}
+	versionID, version := s.memberHead(ctx, group.GroupID)
+	info := groupNotice(group)
+	operator := memberNotice(opMember)
+	if patch.Notification != nil {
+		s.sendNoticeOptions(ctx, op, group, contentGroupAnnouncement, groupInfoNameTips{
+			OpUser:               operator,
+			Group:                info,
+			GroupMemberVersion:   version,
+			GroupMemberVersionID: versionID,
+		}, groupInfoOptions(group.Notification != ""))
+	}
+	if patch.Name != nil {
+		s.sendNoticeOptions(ctx, op, group, contentGroupName, groupInfoNameTips{
+			OpUser:               operator,
+			Group:                info,
+			GroupMemberVersion:   version,
+			GroupMemberVersionID: versionID,
+		}, groupInfoOptions(true))
+	}
+	if patch.Introduction != nil || patch.FaceURL != nil || patch.NeedVerification != nil ||
+		patch.LookMemberInfo != nil || patch.ApplyMemberFriend != nil || patch.Ex != nil {
+		s.sendNoticeOptions(ctx, op, group, contentGroupInfoSet, groupInfoSetTips{
+			OpUser:               operator,
+			Group:                info,
+			GroupMemberVersion:   version,
+			GroupMemberVersionID: versionID,
+		}, groupInfoOptions(false))
+	}
 }
 
 func (s *Server) notifyInvited(ctx context.Context, op string, group *model.Group, opMember *model.Member, invited []*model.Member) {
@@ -554,6 +625,21 @@ type memberCancelMutedTips struct {
 	OpUser               noticeMember `json:"opUser"`
 	OperationTime        int64        `json:"operationTime"`
 	MutedUser            noticeMember `json:"mutedUser"`
+	GroupMemberVersion   uint64       `json:"groupMemberVersion"`
+	GroupMemberVersionID string       `json:"groupMemberVersionID"`
+}
+
+type groupInfoNameTips struct {
+	OpUser               noticeMember `json:"opUser"`
+	Group                noticeGroup  `json:"group"`
+	GroupMemberVersion   uint64       `json:"groupMemberVersion"`
+	GroupMemberVersionID string       `json:"groupMemberVersionID"`
+}
+
+type groupInfoSetTips struct {
+	OpUser               noticeMember `json:"opUser"`
+	MuteTime             int64        `json:"muteTime,omitempty"`
+	Group                noticeGroup  `json:"group"`
 	GroupMemberVersion   uint64       `json:"groupMemberVersion"`
 	GroupMemberVersionID string       `json:"groupMemberVersionID"`
 }

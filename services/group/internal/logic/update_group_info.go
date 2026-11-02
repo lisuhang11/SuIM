@@ -67,11 +67,12 @@ func (s *Server) UpdateGroupInfo(ctx context.Context, req *grouppb.UpdateGroupIn
 		return nil, mapStore(err)
 	}
 
-	// 3. 修改后 webhook。群名、公告和资料变更通知尚未接入。
+	// 3. 群名、公告写入群聊天记录；头像和其他资料只推给在线成员。然后走修改后 webhook。
 	group, err := s.store.TakeGroup(ctx, groupID)
 	if err != nil {
 		return nil, mapStore(err)
 	}
+	s.notifyGroupInfo(ctx, op, group, member, patch)
 	s.afterSetGroupInfo(ctx, group)
 	if exChanged || (patch.Ex != nil) {
 		s.afterSetGroupInfoEx(ctx, group)

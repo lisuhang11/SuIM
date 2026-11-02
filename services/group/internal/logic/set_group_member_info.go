@@ -58,6 +58,7 @@ func (s *Server) SetGroupMemberInfo(ctx context.Context, req *grouppb.SetGroupMe
 	}
 
 	// 修改成员前 webhook。回调可以改昵称、头像、角色和扩展字段，拒绝则中断。
+	// 回调改过的角色必须仍是这个操作者本来就能改的，否则整次请求不写入。
 	updates := make(map[string][]store.MemberUpdate, len(grouped))
 	for groupID, edits := range grouped {
 		if _, err := s.activeGroup(ctx, groupID); err != nil {
@@ -66,11 +67,24 @@ func (s *Server) SetGroupMemberInfo(ctx context.Context, req *grouppb.SetGroupMe
 		if err := s.authorizeMemberEdits(ctx, groupID, op, edits); err != nil {
 			return nil, err
 		}
+		opMember, err := s.memberOf(ctx, groupID, op)
+		if err != nil {
+			return nil, err
+		}
 		groupUpdates := make([]store.MemberUpdate, 0, len(edits))
 		for i := range edits {
 			if err := s.beforeSetMember(ctx, groupID, edits[i].userID, &edits[i].patch); err != nil {
 				return nil, err
 			}
+			target, err := s.memberOf(ctx, groupID, edits[i].userID)
+			if err != nil {
+				return nil, err
+			}
+			if err := allowRoleChange(opMember, target, edits[i].patch.RoleLevel); err != nil {
+				return nil, err
+			}
+			edits[i].role = edits[i].patch.RoleLevel != nil && *edits[i].patch.RoleLevel != target.RoleLevel
+			edits[i].profile = edits[i].patch.ProfileChanged()
 			groupUpdates = append(groupUpdates, store.MemberUpdate{UserID: edits[i].userID, Patch: edits[i].patch})
 		}
 		updates[groupID] = groupUpdates

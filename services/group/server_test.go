@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +20,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/idhash"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/services/group/internal/logic"
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
@@ -862,6 +866,110 @@ func memberState(t *testing.T, cfg config.MySQL, groupID, oldOwner, newOwner str
 		return 0, false, err
 	}
 	return role, mute.Valid, nil
+}
+
+func TestWebhookRoleStaysAuthorized(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn)
+	if err != nil {
+		t.Skipf("mysql is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	script, err := os.ReadFile(filepath.Join("..", "..", "migrations", "group.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx, string(script)); err != nil {
+		t.Fatal(err)
+	}
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	owner := "wo-" + suffix
+	member := "wm-" + suffix
+	other := "wx-" + suffix
+	t.Cleanup(func() { cleanupGroup(t, mysqlCfg, owner, member, other) })
+	promote := member
+	httpSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			UserID string `json:"userID"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		resp := struct {
+			webhook.CommonCallbackResp
+			RoleLevel *int32 `json:"roleLevel,omitempty"`
+		}{}
+		if body.UserID == promote {
+			role := int32(model.RoleAdmin)
+			if body.UserID == owner {
+				role = model.RoleOrdinary
+			}
+			resp.RoleLevel = &role
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	t.Cleanup(httpSrv.Close)
+	hooks := webhook.NewWebhookClient(httpSrv.URL)
+	t.Cleanup(hooks.Close)
+	srv := logic.New(st, knownUsers{owner: {}, member: {}, other: {}}, nil)
+	srv.UseHooks(logic.Hooks{
+		Client:                   hooks,
+		BeforeSetGroupMemberInfo: webhook.BeforeConfig{Enable: true, Timeout: 2},
+	})
+	created, err := srv.CreateGroup(ctx, &grouppb.CreateGroupReq{CreatorUserId: owner, GroupName: "room", MemberIds: []string{member, other}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gid := created.GetGroupId()
+	memberOf := func(userID string) *grouppb.GroupMemberFullInfo {
+		t.Helper()
+		resp, err := srv.GetGroupMember(ctx, &grouppb.GetGroupMemberReq{GroupId: gid, UserId: userID})
+		if err != nil || resp.GetMember().GetUserId() != userID {
+			t.Fatalf("member %s %+v err=%v", userID, resp, err)
+		}
+		return resp.GetMember()
+	}
+
+	promote = member
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: member, Members: []*grouppb.SetGroupMemberInfo{{
+		GroupId: gid, UserId: member, Nickname: strPtr("raised"),
+	}}}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("ordinary raise code=%v err=%v", status.Code(err), err)
+	}
+	if got := memberOf(member); got.GetNickname() != member || got.GetRoleLevel() != model.RoleOrdinary {
+		t.Fatalf("ordinary member changed %+v", got)
+	}
+
+	promote = owner
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: owner, Members: []*grouppb.SetGroupMemberInfo{
+		{GroupId: gid, UserId: member, Nickname: strPtr("first")},
+		{GroupId: gid, UserId: owner, Nickname: strPtr("self")},
+	}}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("owner self role code=%v err=%v", status.Code(err), err)
+	}
+	if got := memberOf(member); got.GetNickname() != member {
+		t.Fatalf("batch wrote member %+v", got)
+	}
+	if got := memberOf(owner); got.GetNickname() != owner || got.GetRoleLevel() != model.RoleOwner {
+		t.Fatalf("batch wrote owner %+v", got)
+	}
+
+	promote = member
+	if _, err := srv.SetGroupMemberInfo(ctx, &grouppb.SetGroupMemberInfoReq{OpUserId: owner, Members: []*grouppb.SetGroupMemberInfo{{
+		GroupId: gid, UserId: member, Nickname: strPtr("named"),
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := memberOf(member); got.GetNickname() != "named" || got.GetRoleLevel() != model.RoleAdmin {
+		t.Fatalf("owner webhook role %+v", got)
+	}
 }
 
 func TestMemberFriendAllowed(t *testing.T) {

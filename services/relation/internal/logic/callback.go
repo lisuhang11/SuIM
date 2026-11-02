@@ -26,9 +26,9 @@ type beforeAddFriendReq struct {
 type friendAgreeReq struct {
 	webhook.CommonCallbackReq
 	FromUserID   string `json:"fromUserID"`
-	ToUserID     string `json:"blackUserID"`
-	HandleResult int32  `json:"HandleResult"`
-	HandleMsg    string `json:"HandleMsg"`
+	ToUserID     string `json:"toUserID"`
+	HandleResult int32  `json:"handleResult"`
+	HandleMsg    string `json:"handleMsg"`
 }
 
 type setRemarkReq struct {

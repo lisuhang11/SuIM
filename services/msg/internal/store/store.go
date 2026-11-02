@@ -106,8 +106,9 @@ func (s *Store) SeqState(ctx context.Context, userID string, conversationIDs []s
 		return nil, err
 	}
 	readSeq := map[string]int64{}
+	userMax := map[string]int64{}
 	if len(conversationIDs) > 0 {
-		query := `SELECT conversation_id, read_seq FROM seq_user WHERE user_id = ? AND conversation_id IN (` + placeholders(len(conversationIDs)) + `)`
+		query := `SELECT conversation_id, max_seq, read_seq FROM seq_user WHERE user_id = ? AND conversation_id IN (` + placeholders(len(conversationIDs)) + `)`
 		params := append([]any{userID}, args(conversationIDs)...)
 		rows, err := s.db.QueryContext(ctx, query, params...)
 		if err != nil {
@@ -116,11 +117,12 @@ func (s *Store) SeqState(ctx context.Context, userID string, conversationIDs []s
 		defer rows.Close()
 		for rows.Next() {
 			var id string
-			var seq int64
-			if err := rows.Scan(&id, &seq); err != nil {
+			var maxOne, readOne int64
+			if err := rows.Scan(&id, &maxOne, &readOne); err != nil {
 				return nil, err
 			}
-			readSeq[id] = seq
+			userMax[id] = maxOne
+			readSeq[id] = readOne
 		}
 		if err := rows.Err(); err != nil {
 			return nil, err
@@ -135,7 +137,11 @@ func (s *Store) SeqState(ctx context.Context, userID string, conversationIDs []s
 	}
 	out := make(map[string]SeqState, len(conversationIDs))
 	for _, id := range conversationIDs {
-		out[id] = SeqState{MaxSeq: maxSeq[id], HasReadSeq: readSeq[id], MaxSeqTime: times[id]}
+		seq := maxSeq[id]
+		if capSeq := userMax[id]; capSeq > 0 && (seq == 0 || capSeq < seq) {
+			seq = capSeq
+		}
+		out[id] = SeqState{MaxSeq: seq, HasReadSeq: readSeq[id], MaxSeqTime: times[id]}
 	}
 	return out, nil
 }
@@ -250,6 +256,37 @@ func (s *Store) BySeqs(ctx context.Context, conversationID string, seqs []int64)
 	}
 	defer rows.Close()
 	return scanMsgs(rows)
+}
+
+// UserMaxSeq is this user's visible ceiling. A missing row is zero, which means no personal ceiling.
+func (s *Store) UserMaxSeq(ctx context.Context, userID, conversationID string) (int64, error) {
+	var seq int64
+	err := s.db.QueryRowContext(ctx, `SELECT max_seq FROM seq_user WHERE user_id = ? AND conversation_id = ?`, userID, conversationID).Scan(&seq)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return seq, err
+}
+
+// SetUserMaxSeq writes this user's visible ceiling. Zero clears it. The conversation row is updated when it exists.
+func (s *Store) SetUserMaxSeq(ctx context.Context, conversationID, userID string, seq int64) error {
+	if userID == "" || conversationID == "" || seq < 0 {
+		return fmt.Errorf("user max seq is invalid")
+	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO seq_user (user_id, conversation_id, max_seq) VALUES (?, ?, ?) AS new
+ON DUPLICATE KEY UPDATE max_seq = new.max_seq`, userID, conversationID, seq)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE conversation SET max_seq = ? WHERE owner_user_id = ? AND conversation_id = ?`, seq, userID, conversationID)
+	if err != nil {
+		var me *mysql.MySQLError
+		if errors.As(err, &me) && me.Number == 1146 {
+			return nil
+		}
+	}
+	return err
 }
 
 // SetReadSeq raises this user's read cursor. A smaller value leaves the stored cursor in place.

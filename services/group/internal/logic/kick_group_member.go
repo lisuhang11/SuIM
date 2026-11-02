@@ -59,12 +59,16 @@ func (s *Server) KickGroupMember(ctx context.Context, req *grouppb.KickGroupMemb
 	default:
 		return nil, errorcode.ErrGroupNoPermission
 	}
+	group, err := s.store.TakeGroup(ctx, groupID)
+	if err != nil {
+		return nil, mapStore(err)
+	}
 	if err := s.store.DeleteMember(ctx, groupID, target, s.now()); err != nil {
 		return nil, mapStore(err)
 	}
-	// 会话 seq 尚未接入。踢人通知推给仍在群里的成员。
-	if group, err := s.store.TakeGroup(ctx, groupID); err == nil {
-		s.notifyKicked(ctx, op, group, opMember, targetMember)
+	s.notifyKicked(ctx, op, group, opMember, targetMember)
+	if err := s.freezeHistory(ctx, group, []string{target}); err != nil {
+		return nil, err
 	}
 	s.afterKick(ctx, groupID, target)
 	return &grouppb.KickGroupMemberResp{}, nil

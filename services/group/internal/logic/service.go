@@ -49,6 +49,7 @@ type Server struct {
 	sender       MsgSender
 	hooks        Hooks
 	quota        Quota
+	seq          SeqClient
 	memberNormal int
 	memberSuper  int
 	now          func() time.Time

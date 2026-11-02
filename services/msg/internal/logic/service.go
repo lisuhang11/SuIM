@@ -45,6 +45,8 @@ type History interface {
 	MaxSeqs(ctx context.Context, conversationIDs []string) (map[string]int64, error)
 	SeqState(ctx context.Context, userID string, conversationIDs []string) (map[string]store.SeqState, error)
 	SeqBounds(ctx context.Context, userID, conversationID string) (minSeq, maxSeq int64, err error)
+	UserMaxSeq(ctx context.Context, userID, conversationID string) (int64, error)
+	SetUserMaxSeq(ctx context.Context, conversationID, userID string, seq int64) error
 	PinnedConversationIDs(ctx context.Context, userID string) ([]string, error)
 	Range(ctx context.Context, conversationID string, begin, end, limit int64) ([]*msgpb.MsgData, error)
 	BySeqs(ctx context.Context, conversationID string, seqs []int64) ([]*msgpb.MsgData, error)

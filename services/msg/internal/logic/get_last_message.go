@@ -21,15 +21,19 @@ func (s *Server) GetLastMessage(ctx context.Context, req *msgpb.GetLastMessageRe
 		if s.store == nil || id == "" {
 			continue
 		}
-		if !canRead(id, req.GetUserId()) {
-			return nil, errorcode.ErrNoPermission
+		_, maxSeq, err := s.visibleSeqs(ctx, req.GetUserId(), id)
+		if err != nil {
+			return nil, err
 		}
-		msg, err := s.store.Last(ctx, id)
+		if maxSeq <= 0 {
+			continue
+		}
+		msgs, err := s.store.Range(ctx, id, maxSeq, maxSeq, 1)
 		if err != nil {
 			return nil, errorcode.ErrInternal.WithMsg("query last message")
 		}
-		if msg != nil {
-			out.Msgs[id] = msg
+		if len(msgs) > 0 {
+			out.Msgs[id] = msgs[0]
 		}
 	}
 	return out, nil

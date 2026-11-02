@@ -18,6 +18,10 @@ service MsgService {
   rpc MarkConversationAsRead(MarkConversationAsReadReq) returns (MarkConversationAsReadResp);
   // SetConversationHasReadSeq stores a read cursor without marking individual messages.
   rpc SetConversationHasReadSeq(SetConversationHasReadSeqReq) returns (SetConversationHasReadSeqResp);
+  // GetConversationMaxSeq reads the conversation's latest sequence. It does not check membership.
+  rpc GetConversationMaxSeq(GetConversationMaxSeqReq) returns (GetConversationMaxSeqResp);
+  // SetUserConversationMaxSeq writes one user's visible ceiling. Zero clears it.
+  rpc SetUserConversationMaxSeq(SetUserConversationMaxSeqReq) returns (SetUserConversationMaxSeqResp);
 }
 
 // OfflinePushInfo is the notification payload on MsgData field 20.
@@ -192,6 +196,22 @@ message SetConversationHasReadSeqReq {
 }
 
 message SetConversationHasReadSeqResp {}
+
+message GetConversationMaxSeqReq {
+  string conversation_id = 1;
+}
+
+message GetConversationMaxSeqResp {
+  int64 max_seq = 1;
+}
+
+message SetUserConversationMaxSeqReq {
+  string conversation_id = 1;
+  repeated string user_ids = 2;
+  int64 max_seq = 3;
+}
+
+message SetUserConversationMaxSeqResp {}
 
 message SetAppBackgroundStatusReq {
   string user_id = 1;

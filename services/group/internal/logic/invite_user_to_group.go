@@ -95,12 +95,15 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 	for _, id := range userIDs {
 		members = append(members, newMember(groupID, id, profiles[id], model.RoleOrdinary, op, now))
 	}
-	// 3. 成员入群前 webhook。会话 seq 尚未接入。
+	// 3. 成员入群前 webhook。写入后清掉离开时留下的序号上限。
 	if err := s.beforeMembersJoin(ctx, groupID, group.Ex, members); err != nil {
 		return nil, err
 	}
 	if err := s.store.AddMembers(ctx, groupID, members, now, s.memberCap(group.GroupType)); err != nil {
 		return nil, mapStore(err)
+	}
+	if err := s.reopenHistory(ctx, group, userIDs); err != nil {
+		return nil, err
 	}
 	// 4. 邀请通知带上新的成员版本。
 	if latest, err := s.store.TakeGroup(ctx, groupID); err == nil {

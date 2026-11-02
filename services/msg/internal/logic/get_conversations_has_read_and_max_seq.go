@@ -33,6 +33,14 @@ func (s *Server) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *msgp
 		return nil, errorcode.ErrInternal.WithMsg("query read seq")
 	}
 	for id, item := range state {
+		if _, group := groupIDFromConversation(id); group {
+			if _, _, err := s.visibleSeqs(ctx, req.GetUserId(), id); err != nil {
+				if code, ok := errorcode.CodeOf(err); ok && code == errorcode.NoPermission {
+					continue
+				}
+				return nil, err
+			}
+		}
 		out.Seqs[id] = &msgpb.Seqs{MaxSeq: item.MaxSeq, HasReadSeq: item.HasReadSeq, MaxSeqTime: item.MaxSeqTime}
 	}
 	return out, nil

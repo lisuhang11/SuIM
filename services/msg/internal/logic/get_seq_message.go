@@ -13,16 +13,12 @@ func (s *Server) GetSeqMessage(ctx context.Context, req *msgpb.GetSeqMessageReq)
 		if item == nil || item.ConversationId == "" {
 			continue
 		}
-		if !canRead(item.ConversationId, req.GetUserId()) {
-			return nil, errorcode.ErrNoPermission
+		minSeq, maxSeq, err := s.visibleSeqs(ctx, req.GetUserId(), item.ConversationId)
+		if err != nil {
+			return nil, err
 		}
 		if s.store == nil {
 			continue
-		}
-		// 1. 先按会话和用户的序号边界判断 isEnd，再只取范围内的序号。
-		minSeq, maxSeq, err := s.store.SeqBounds(ctx, req.GetUserId(), item.ConversationId)
-		if err != nil {
-			return nil, errorcode.ErrInternal.WithMsg("query seq bounds")
 		}
 		wanted, isEnd, endSeq := seqWindow(req.Order, minSeq, maxSeq, item.Seqs)
 		var msgs []*msgpb.MsgData

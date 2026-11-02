@@ -109,11 +109,13 @@ func run(cfgPath, migratePath string) error {
 		defer hooks.Close()
 	}
 	w := cfg.Webhooks
+	messages := msgclient.New(msgpb.NewMsgServiceClient(msgConn))
 	groupServer := logic.New(
 		st,
 		userclient.New(userpb.NewUserServiceClient(userConn)),
-		msgclient.New(msgpb.NewMsgServiceClient(msgConn)),
+		messages,
 	)
+	groupServer.UseSeq(messages)
 	groupServer.UseQuota(store.NewQuota(rdb))
 	groupServer.UseMemberLimit(cfg.MemberLimit.Normal, cfg.MemberLimit.Super)
 	groupServer.UseHooks(logic.Hooks{

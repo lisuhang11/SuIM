@@ -25,12 +25,16 @@ func (s *Server) QuitGroup(ctx context.Context, req *grouppb.QuitGroupReq) (*gro
 	if member.RoleLevel == model.RoleOwner {
 		return nil, errorcode.ErrGroupOwnerQuit
 	}
+	group, err := s.store.TakeGroup(ctx, groupID)
+	if err != nil {
+		return nil, mapStore(err)
+	}
 	if err := s.store.DeleteMember(ctx, groupID, userID, s.now()); err != nil {
 		return nil, mapStore(err)
 	}
-	// 会话 seq 尚未接入。退群通知推给仍在群里的成员。
-	if group, err := s.store.TakeGroup(ctx, groupID); err == nil {
-		s.notifyQuit(ctx, group, member)
+	s.notifyQuit(ctx, group, member)
+	if err := s.freezeHistory(ctx, group, []string{userID}); err != nil {
+		return nil, err
 	}
 	s.afterQuit(ctx, groupID, userID)
 	return &grouppb.QuitGroupResp{}, nil

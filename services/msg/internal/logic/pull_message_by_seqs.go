@@ -13,9 +13,10 @@ func (s *Server) PullMessageBySeqs(ctx context.Context, req *msgpb.PullMessageBy
 		if item == nil || item.ConversationId == "" {
 			continue
 		}
-		// 1. 单聊只允许会话双方拉取。
-		if !canRead(item.ConversationId, req.GetUserId()) {
-			return nil, errorcode.ErrNoPermission
+		// 1. 单聊只允许会话双方。群会话允许当前成员，以及离开时记下水位的人。
+		minSeq, maxSeq, err := s.visibleSeqs(ctx, req.GetUserId(), item.ConversationId)
+		if err != nil {
+			return nil, err
 		}
 		if s.store == nil {
 			continue
@@ -24,25 +25,29 @@ func (s *Server) PullMessageBySeqs(ctx context.Context, req *msgpb.PullMessageBy
 		if limit <= 0 || limit > 200 {
 			limit = 200
 		}
-		maxSeqs, err := s.store.MaxSeqs(ctx, []string{item.ConversationId})
-		if err != nil {
-			return nil, errorcode.ErrInternal.WithMsg("query max seq")
-		}
-		maxSeq := maxSeqs[item.ConversationId]
 		begin, end := item.Begin, item.End
-		// 2. begin 和 end 都为 0 时取最新一页。指定了区间就按区间查。
+		// 2. begin 和 end 都为 0 时取这个人可见范围内的最新一页。
 		if begin <= 0 && end <= 0 {
 			end = maxSeq
 			begin = end - limit + 1
+			if minSeq > 0 && begin < minSeq {
+				begin = minSeq
+			}
 			if begin < 1 {
 				begin = 1
 			}
 		} else {
-			if begin <= 0 {
+			if begin <= 0 || (minSeq > 0 && begin < minSeq) {
+				begin = minSeq
+			}
+			if begin < 1 {
 				begin = 1
 			}
 			if end <= 0 {
 				end = begin + limit - 1
+			}
+			if maxSeq > 0 && end > maxSeq {
+				end = maxSeq
 			}
 		}
 		var msgs []*msgpb.MsgData

@@ -68,6 +68,11 @@ func (s *Server) GroupApplicationResponse(ctx context.Context, req *grouppb.Grou
 	if err := s.store.HandleRequest(ctx, groupID, from, handledMsg, req.GetHandleResult(), op, now, member, s.memberCap(group.GroupType)); err != nil {
 		return nil, mapStore(err)
 	}
+	if member != nil {
+		if err := s.reopenHistory(ctx, group, []string{from}); err != nil {
+			return nil, err
+		}
+	}
 	request.HandleResult = req.GetHandleResult()
 	request.HandledMsg = handledMsg
 	request.HandleUserID = op

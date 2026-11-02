@@ -193,6 +193,46 @@ func TestPullLatestPage(t *testing.T) {
 	}
 }
 
+func TestPullGroupUsesMembershipAndCeiling(t *testing.T) {
+	hist := &fakeHistory{max: 10, msgs: []*msgpb.MsgData{{Seq: 4}, {Seq: 10}}}
+	member := New(hist, nil, nil, &fakeGroups{speakers: map[string]GroupSpeaker{
+		"g1:a": {InGroup: true},
+	}})
+	resp, err := member.PullMessageBySeqs(context.Background(), &msgpb.PullMessageBySeqsReq{
+		UserId:    "a",
+		SeqRanges: []*msgpb.SeqRange{{ConversationId: "g_g1", Begin: 1, End: 10, Num: 20}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Msgs["g_g1"] == nil || resp.Msgs["g_g1"].MaxSeq != 10 || hist.end != 10 {
+		t.Fatalf("member pull %+v end=%d", resp.Msgs["g_g1"], hist.end)
+	}
+
+	stranger := New(hist, nil, nil, &fakeGroups{})
+	_, err = stranger.PullMessageBySeqs(context.Background(), &msgpb.PullMessageBySeqsReq{
+		UserId:    "c",
+		SeqRanges: []*msgpb.SeqRange{{ConversationId: "g_g1", Begin: 1, End: 10, Num: 20}},
+	})
+	if code, _ := errorcode.CodeOf(err); code != errorcode.NoPermission {
+		t.Fatalf("stranger code %d err %v", code, err)
+	}
+
+	hist.userMax = 4
+	left := New(hist, nil, nil, &fakeGroups{})
+	resp, err = left.PullMessageBySeqs(context.Background(), &msgpb.PullMessageBySeqsReq{
+		UserId:    "b",
+		SeqRanges: []*msgpb.SeqRange{{ConversationId: "g_g1", Begin: 1, End: 10, Num: 20}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pull := resp.Msgs["g_g1"]
+	if pull == nil || pull.MaxSeq != 4 || hist.end != 4 {
+		t.Fatalf("left pull %+v end=%d", pull, hist.end)
+	}
+}
+
 func TestPullRejectsStranger(t *testing.T) {
 	srv := New(&fakeHistory{max: 1}, nil, nil, nil)
 	_, err := srv.PullMessageBySeqs(context.Background(), &msgpb.PullMessageBySeqsReq{
@@ -265,6 +305,7 @@ type fakeHistory struct {
 	max        int64
 	min        int64
 	read       int64
+	userMax    int64
 	seqTime    int64
 	pinned     []string
 	begin, end int64
@@ -295,10 +336,21 @@ func (f *fakeHistory) SeqState(_ context.Context, _ string, ids []string) (map[s
 }
 func (f *fakeHistory) SeqBounds(context.Context, string, string) (int64, int64, error) {
 	minSeq := f.min
-	if minSeq <= 0 && f.max > 0 {
+	maxSeq := f.max
+	if f.userMax > 0 && (maxSeq == 0 || f.userMax < maxSeq) {
+		maxSeq = f.userMax
+	}
+	if minSeq <= 0 && maxSeq > 0 {
 		minSeq = 1
 	}
-	return minSeq, f.max, nil
+	return minSeq, maxSeq, nil
+}
+func (f *fakeHistory) UserMaxSeq(context.Context, string, string) (int64, error) {
+	return f.userMax, nil
+}
+func (f *fakeHistory) SetUserMaxSeq(_ context.Context, _, _ string, seq int64) error {
+	f.userMax = seq
+	return nil
 }
 func (f *fakeHistory) PinnedConversationIDs(context.Context, string) ([]string, error) {
 	return f.pinned, nil

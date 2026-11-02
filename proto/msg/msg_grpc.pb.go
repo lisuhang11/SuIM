@@ -28,6 +28,8 @@ const (
 	MsgService_MarkMsgsAsRead_FullMethodName                   = "/msg.MsgService/MarkMsgsAsRead"
 	MsgService_MarkConversationAsRead_FullMethodName           = "/msg.MsgService/MarkConversationAsRead"
 	MsgService_SetConversationHasReadSeq_FullMethodName        = "/msg.MsgService/SetConversationHasReadSeq"
+	MsgService_GetConversationMaxSeq_FullMethodName            = "/msg.MsgService/GetConversationMaxSeq"
+	MsgService_SetUserConversationMaxSeq_FullMethodName        = "/msg.MsgService/SetUserConversationMaxSeq"
 )
 
 // MsgServiceClient is the client API for MsgService service.
@@ -48,6 +50,10 @@ type MsgServiceClient interface {
 	MarkConversationAsRead(ctx context.Context, in *MarkConversationAsReadReq, opts ...grpc.CallOption) (*MarkConversationAsReadResp, error)
 	// SetConversationHasReadSeq stores a read cursor without marking individual messages.
 	SetConversationHasReadSeq(ctx context.Context, in *SetConversationHasReadSeqReq, opts ...grpc.CallOption) (*SetConversationHasReadSeqResp, error)
+	// GetConversationMaxSeq reads the conversation's latest sequence. It does not check membership.
+	GetConversationMaxSeq(ctx context.Context, in *GetConversationMaxSeqReq, opts ...grpc.CallOption) (*GetConversationMaxSeqResp, error)
+	// SetUserConversationMaxSeq writes one user's visible ceiling. Zero clears it.
+	SetUserConversationMaxSeq(ctx context.Context, in *SetUserConversationMaxSeqReq, opts ...grpc.CallOption) (*SetUserConversationMaxSeqResp, error)
 }
 
 type msgServiceClient struct {
@@ -148,6 +154,26 @@ func (c *msgServiceClient) SetConversationHasReadSeq(ctx context.Context, in *Se
 	return out, nil
 }
 
+func (c *msgServiceClient) GetConversationMaxSeq(ctx context.Context, in *GetConversationMaxSeqReq, opts ...grpc.CallOption) (*GetConversationMaxSeqResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetConversationMaxSeqResp)
+	err := c.cc.Invoke(ctx, MsgService_GetConversationMaxSeq_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgServiceClient) SetUserConversationMaxSeq(ctx context.Context, in *SetUserConversationMaxSeqReq, opts ...grpc.CallOption) (*SetUserConversationMaxSeqResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetUserConversationMaxSeqResp)
+	err := c.cc.Invoke(ctx, MsgService_SetUserConversationMaxSeq_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServiceServer is the server API for MsgService service.
 // All implementations must embed UnimplementedMsgServiceServer
 // for forward compatibility.
@@ -166,6 +192,10 @@ type MsgServiceServer interface {
 	MarkConversationAsRead(context.Context, *MarkConversationAsReadReq) (*MarkConversationAsReadResp, error)
 	// SetConversationHasReadSeq stores a read cursor without marking individual messages.
 	SetConversationHasReadSeq(context.Context, *SetConversationHasReadSeqReq) (*SetConversationHasReadSeqResp, error)
+	// GetConversationMaxSeq reads the conversation's latest sequence. It does not check membership.
+	GetConversationMaxSeq(context.Context, *GetConversationMaxSeqReq) (*GetConversationMaxSeqResp, error)
+	// SetUserConversationMaxSeq writes one user's visible ceiling. Zero clears it.
+	SetUserConversationMaxSeq(context.Context, *SetUserConversationMaxSeqReq) (*SetUserConversationMaxSeqResp, error)
 	mustEmbedUnimplementedMsgServiceServer()
 }
 
@@ -202,6 +232,12 @@ func (UnimplementedMsgServiceServer) MarkConversationAsRead(context.Context, *Ma
 }
 func (UnimplementedMsgServiceServer) SetConversationHasReadSeq(context.Context, *SetConversationHasReadSeqReq) (*SetConversationHasReadSeqResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetConversationHasReadSeq not implemented")
+}
+func (UnimplementedMsgServiceServer) GetConversationMaxSeq(context.Context, *GetConversationMaxSeqReq) (*GetConversationMaxSeqResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetConversationMaxSeq not implemented")
+}
+func (UnimplementedMsgServiceServer) SetUserConversationMaxSeq(context.Context, *SetUserConversationMaxSeqReq) (*SetUserConversationMaxSeqResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetUserConversationMaxSeq not implemented")
 }
 func (UnimplementedMsgServiceServer) mustEmbedUnimplementedMsgServiceServer() {}
 func (UnimplementedMsgServiceServer) testEmbeddedByValue()                    {}
@@ -386,6 +422,42 @@ func _MsgService_SetConversationHasReadSeq_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MsgService_GetConversationMaxSeq_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConversationMaxSeqReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServiceServer).GetConversationMaxSeq(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MsgService_GetConversationMaxSeq_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServiceServer).GetConversationMaxSeq(ctx, req.(*GetConversationMaxSeqReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MsgService_SetUserConversationMaxSeq_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetUserConversationMaxSeqReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServiceServer).SetUserConversationMaxSeq(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MsgService_SetUserConversationMaxSeq_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServiceServer).SetUserConversationMaxSeq(ctx, req.(*SetUserConversationMaxSeqReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MsgService_ServiceDesc is the grpc.ServiceDesc for MsgService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -428,6 +500,14 @@ var MsgService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetConversationHasReadSeq",
 			Handler:    _MsgService_SetConversationHasReadSeq_Handler,
+		},
+		{
+			MethodName: "GetConversationMaxSeq",
+			Handler:    _MsgService_GetConversationMaxSeq_Handler,
+		},
+		{
+			MethodName: "SetUserConversationMaxSeq",
+			Handler:    _MsgService_SetUserConversationMaxSeq_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

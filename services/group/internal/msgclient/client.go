@@ -22,3 +22,24 @@ func (c *Client) SendNotification(ctx context.Context, msg *msgpb.MsgData) error
 	_, err := c.api.SendMsg(ctx, &msgpb.SendMsgReq{MsgData: msg})
 	return err
 }
+
+func (c *Client) ConversationMaxSeq(ctx context.Context, conversationID string) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	resp, err := c.api.GetConversationMaxSeq(ctx, &msgpb.GetConversationMaxSeqReq{ConversationId: conversationID})
+	if err != nil {
+		return 0, err
+	}
+	return resp.GetMaxSeq(), nil
+}
+
+func (c *Client) SetConversationMaxSeq(ctx context.Context, conversationID string, userIDs []string, seq int64) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	_, err := c.api.SetUserConversationMaxSeq(ctx, &msgpb.SetUserConversationMaxSeqReq{
+		ConversationId: conversationID,
+		UserIds:        userIDs,
+		MaxSeq:         seq,
+	})
+	return err
+}

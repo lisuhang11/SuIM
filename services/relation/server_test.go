@@ -199,7 +199,10 @@ func TestBlackAndFriend(t *testing.T) {
 			}
 			_ = json.NewEncoder(w).Encode(resp)
 		case "/" + "callbackAfterRemoveBlackCommand":
-			removed <- struct{}{}
+			select {
+			case removed <- struct{}{}:
+			default:
+			}
 			_ = json.NewEncoder(w).Encode(webhook.CommonCallbackResp{})
 		default:
 			http.NotFound(w, r)
@@ -253,6 +256,9 @@ func TestBlackAndFriend(t *testing.T) {
 	if _, err := srv.UnblockUser(ctx, &relationpb.UnblockUserReq{UserId: a, BlockedUserId: b}); err != nil {
 		t.Fatalf("second unblock: %v", err)
 	}
+	if _, err := srv.UnblockUser(ctx, &relationpb.UnblockUserReq{UserId: b, BlockedUserId: a}); err != nil {
+		t.Fatalf("unblock reverse: %v", err)
+	}
 
 	friend, err := srv.IsFriend(ctx, &relationpb.IsFriendReq{User1: a, User2: b})
 	if err != nil || friend.GetInUser1Friends() || friend.GetInUser2Friends() {
@@ -305,6 +311,115 @@ func TestBlackAndFriend(t *testing.T) {
 	}
 	if _, err := srv.UpdateFriend(ctx, &relationpb.UpdateFriendReq{OwnerUserId: a, FriendUserId: b, Remark: &remark}); !isCode(err, codes.NotFound, errorcode.RelationNotFriend) {
 		t.Fatalf("update missing code=%v err=%v", status.Code(err), err)
+	}
+}
+
+func TestBlockedFriendRequest(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn)
+	if err != nil {
+		t.Skipf("mysql is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	script, err := os.ReadFile(filepath.Join("..", "..", "migrations", "relation.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx, string(script)); err != nil {
+		t.Fatal(err)
+	}
+	a := fmt.Sprintf("ba-%d", time.Now().UnixNano())
+	b := fmt.Sprintf("bb-%d", time.Now().UnixNano())
+	t.Cleanup(func() { cleanupRelation(t, mysqlCfg, a, b) })
+
+	var agrees atomic.Int32
+	httpSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/"+webhook.CommandBeforeAddFriendAgree {
+			agrees.Add(1)
+		}
+		_ = json.NewEncoder(w).Encode(webhook.CommonCallbackResp{})
+	}))
+	t.Cleanup(httpSrv.Close)
+	hooks := webhook.NewWebhookClient(httpSrv.URL)
+	t.Cleanup(hooks.Close)
+	srv := logic.New(st, knownUsers{a: {}, b: {}}, logic.Hooks{
+		Client:               hooks,
+		BeforeAddFriendAgree: webhook.BeforeConfig{Enable: true, Timeout: 2},
+	})
+
+	if _, err := srv.BlockUser(ctx, &relationpb.BlockUserReq{UserId: a, BlockedUserId: a}); !isCode(err, codes.InvalidArgument, errorcode.RelationCannotBlockYourself) {
+		t.Fatalf("self block code=%v err=%v", status.Code(err), err)
+	}
+	self, err := srv.IsBlack(ctx, &relationpb.IsBlackReq{User1: a, User2: a})
+	if err != nil || self.GetInUser1Blacklist() || self.GetInUser2Blacklist() {
+		t.Fatalf("self black %+v err=%v", self, err)
+	}
+
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: "hi"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.BlockUser(ctx, &relationpb.BlockUserReq{UserId: a, BlockedUserId: b}); err != nil {
+		t.Fatal(err)
+	}
+	friends, err := srv.IsFriend(ctx, &relationpb.IsFriendReq{User1: a, User2: b})
+	if err != nil || friends.GetInUser1Friends() || friends.GetInUser2Friends() {
+		t.Fatalf("block created friendship %+v err=%v", friends, err)
+	}
+	if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: a, ToUserId: b, HandleResult: 1}); !isCode(err, codes.PermissionDenied, errorcode.RelationBlocked) {
+		t.Fatalf("agree while blocked code=%v err=%v", status.Code(err), err)
+	}
+	if agrees.Load() != 0 {
+		t.Fatalf("agree webhook ran %d times", agrees.Load())
+	}
+	pending, err := srv.GetRecvFriendRequests(ctx, &relationpb.GetRecvFriendRequestsReq{UserId: b, HandleResults: []int32{0}})
+	if err != nil || pending.GetTotal() != 1 {
+		t.Fatalf("pending after blocked agree %+v err=%v", pending, err)
+	}
+	if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: a, ToUserId: b, HandleResult: -1}); err != nil {
+		t.Fatalf("refuse while blocked: %v", err)
+	}
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: "again"}); !isCode(err, codes.PermissionDenied, errorcode.RelationBlocked) {
+		t.Fatalf("send while blocker code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: b, ToUserId: a, Message: "back"}); !isCode(err, codes.PermissionDenied, errorcode.RelationBlocked) {
+		t.Fatalf("send while blocked code=%v err=%v", status.Code(err), err)
+	}
+	refused, err := srv.GetRecvFriendRequests(ctx, &relationpb.GetRecvFriendRequestsReq{UserId: b, HandleResults: []int32{-1}})
+	if err != nil || refused.GetTotal() != 1 {
+		t.Fatalf("refused request overwritten %+v err=%v", refused, err)
+	}
+
+	if _, err := srv.UnblockUser(ctx, &relationpb.UnblockUserReq{UserId: a, BlockedUserId: b}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: "please"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: a, ToUserId: b, HandleResult: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if agrees.Load() != 1 {
+		t.Fatalf("agree webhook %d", agrees.Load())
+	}
+	friends, err = srv.IsFriend(ctx, &relationpb.IsFriendReq{User1: a, User2: b})
+	if err != nil || !friends.GetInUser1Friends() || !friends.GetInUser2Friends() {
+		t.Fatalf("friends after unblock %+v err=%v", friends, err)
+	}
+	if _, err := srv.BlockUser(ctx, &relationpb.BlockUserReq{UserId: a, BlockedUserId: b}); err != nil {
+		t.Fatal(err)
+	}
+	friends, err = srv.IsFriend(ctx, &relationpb.IsFriendReq{User1: a, User2: b})
+	if err != nil || !friends.GetInUser1Friends() || !friends.GetInUser2Friends() {
+		t.Fatalf("block removed friends %+v err=%v", friends, err)
 	}
 }
 

@@ -26,23 +26,27 @@ func (s *Server) RespondFriendApply(ctx context.Context, req *relationpb.Respond
 	}
 	switch req.GetHandleResult() {
 	case model.HandleAgree:
-		// 2. 同意前 webhook。回调拒绝则中断。
+		// 2. 任一方拉黑则拒绝。申请保持待处理，不发同意回调。
+		if err := s.rejectIfBlocked(ctx, from, to); err != nil {
+			return nil, err
+		}
+		// 3. 同意前 webhook。回调拒绝则中断。
 		if err := s.beforeAddFriendAgree(ctx, from, to, handleMsg, model.HandleAgree); err != nil {
 			return nil, err
 		}
-		// 3. 把申请标为同意，并写入双方好友关系。
+		// 4. 把申请标为同意，并写入双方好友关系。
 		if err := s.store.AgreeFriendRequest(ctx, from, to, handleMsg, s.now()); err != nil {
 			return nil, friendRequestErr(err)
 		}
-		// 4. 同意后 webhook。通知申请人尚未接入。
+		// 5. 同意后 webhook。通知申请人尚未接入。
 		s.afterAddFriendAgree(ctx, from, to, handleMsg, model.HandleAgree)
 		return &relationpb.RespondFriendApplyResp{}, nil
 	case model.HandleRefuse:
-		// 5. 把申请标为拒绝。
+		// 6. 把申请标为拒绝。拒绝不查黑名单。
 		if err := s.store.RefuseFriendRequest(ctx, from, to, handleMsg, s.now()); err != nil {
 			return nil, friendRequestErr(err)
 		}
-		// 6. 通知申请人申请被拒绝。尚未接入。
+		// 7. 通知申请人申请被拒绝。尚未接入。
 		return &relationpb.RespondFriendApplyResp{}, nil
 	default:
 		return nil, errorcode.ErrRelationInvalidHandle

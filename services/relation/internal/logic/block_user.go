@@ -19,6 +19,9 @@ func (s *Server) BlockUser(ctx context.Context, req *relationpb.BlockUserReq) (*
 	if err != nil {
 		return nil, err
 	}
+	if owner == block {
+		return nil, errorcode.ErrRelationCannotBlockYourself
+	}
 	// 2. 拉黑前 webhook。回调拒绝则中断。
 	if err := s.webhookBeforeAddBlack(ctx, owner, block); err != nil {
 		return nil, err
@@ -36,4 +39,16 @@ func (s *Server) BlockUser(ctx context.Context, req *relationpb.BlockUserReq) (*
 	}
 	// 5. 通知对方已被拉黑。尚未接入。
 	return &relationpb.BlockUserResp{}, nil
+}
+
+// rejectIfBlocked stops a friend request or an agreement when either user has blocked the other.
+func (s *Server) rejectIfBlocked(ctx context.Context, user1, user2 string) error {
+	in1, in2, err := s.store.CheckBlack(ctx, user1, user2)
+	if err != nil {
+		return errorcode.ErrInternal.WithMsg("check black")
+	}
+	if in1 || in2 {
+		return errorcode.ErrRelationBlocked
+	}
+	return nil
 }

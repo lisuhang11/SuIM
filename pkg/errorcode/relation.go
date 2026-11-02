@@ -19,6 +19,8 @@ const (
 	RelationNothingToUpdate      Code = 3013
 	RelationInvalidPage          Code = 3014
 	RelationGroupFriendForbidden Code = 3015
+	RelationBlocked              Code = 3016
+	RelationCannotBlockYourself  Code = 3017
 )
 
 var (
@@ -37,4 +39,6 @@ var (
 	ErrRelationNothingToUpdate      = Define(RelationNothingToUpdate, codes.InvalidArgument, "remark or is_pinned is required")
 	ErrRelationInvalidPage          = Define(RelationInvalidPage, codes.InvalidArgument, "pagination is invalid")
 	ErrRelationGroupFriendForbidden = Define(RelationGroupFriendForbidden, codes.PermissionDenied, "group members cannot add each other")
+	ErrRelationBlocked              = Define(RelationBlocked, codes.PermissionDenied, "blocked")
+	ErrRelationCannotBlockYourself  = Define(RelationCannotBlockYourself, codes.InvalidArgument, "cannot block yourself")
 )

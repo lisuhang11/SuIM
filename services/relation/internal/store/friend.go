@@ -130,6 +130,28 @@ func (s *Store) RefuseFriendRequest(ctx context.Context, from, to, handleMsg str
 	return tx.Commit()
 }
 
+func (s *Store) TakeFriendRequest(ctx context.Context, from, to string) (model.FriendRequest, error) {
+	var row model.FriendRequest
+	var created, handled sql.NullTime
+	err := s.db.QueryRowContext(ctx, `
+		SELECT from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time
+		FROM friend_request WHERE from_user_id = ? AND to_user_id = ?`, from, to).Scan(
+		&row.FromUserID, &row.ToUserID, &row.HandleResult, &row.ReqMsg, &created, &row.HandlerUserID, &row.HandleMsg, &handled)
+	if errors.Is(err, sql.ErrNoRows) {
+		return row, ErrRequestNotFound
+	}
+	if err != nil {
+		return row, err
+	}
+	if created.Valid {
+		row.CreateTime = created.Time
+	}
+	if handled.Valid {
+		row.HandleTime = handled.Time
+	}
+	return row, nil
+}
+
 func (s *Store) PageRecvFriendRequests(ctx context.Context, userID string, results []int32, offset, limit int) (int, []model.FriendRequest, error) {
 	return s.pageFriendRequests(ctx, "to_user_id", userID, results, offset, limit)
 }

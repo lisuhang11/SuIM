@@ -37,7 +37,8 @@ func (s *Server) BlockUser(ctx context.Context, req *relationpb.BlockUserReq) (*
 		}
 		return nil, errorcode.ErrInternal.WithMsg("add black")
 	}
-	// 5. 通知对方已被拉黑。尚未接入。
+	// 5. 通知对方已被拉黑。
+	s.notifyBlackAdded(ctx, owner, block)
 	return &relationpb.BlockUserResp{}, nil
 }
 

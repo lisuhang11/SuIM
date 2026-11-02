@@ -75,7 +75,8 @@ func (s *Server) SendFriendRequest(ctx context.Context, req *relationpb.SendFrie
 		}
 		return nil, errorcode.ErrInternal.WithMsg("add friend request")
 	}
-	// 9. 通知对方收到好友申请。尚未接入。
+	// 9. 通知对方收到好友申请，并调用添加后 webhook。
+	s.notifyFriendApply(ctx, from, to)
 	s.afterAddFriend(ctx, from, to, msg, fromInfo, toInfo)
 	return &relationpb.SendFriendRequestResp{}, nil
 }

@@ -45,8 +45,9 @@ func (s *Server) UpdateFriend(ctx context.Context, req *relationpb.UpdateFriendR
 		}
 		return nil, errorcode.ErrInternal.WithMsg("update friend")
 	}
-	// 3. 通知好友资料变更。尚未接入。
+	// 3. 备注变更通知对方，并调用备注后 webhook。只改置顶不发这条通知。
 	if remark != nil {
+		s.notifyFriendRemark(ctx, owner, friend)
 		s.afterSetFriendRemark(ctx, owner, friend, *remark)
 	}
 	return &relationpb.UpdateFriendResp{}, nil

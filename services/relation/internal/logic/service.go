@@ -5,10 +5,16 @@ import (
 	"time"
 
 	"github.com/lisuhang11/SuIM/pkg/webhook"
+	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	relationpb "github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
+
+// MsgSender publishes one notification. A nil sender skips notices.
+type MsgSender interface {
+	SendNotification(ctx context.Context, msg *msgpb.MsgData) error
+}
 
 // Users confirms that every user ID exists and can load public profiles.
 type Users interface {
@@ -40,8 +46,16 @@ type Server struct {
 	store  *store.Store
 	users  Users
 	groups Groups
+	sender MsgSender
 	hooks  Hooks
 	now    func() time.Time
+}
+
+// UseSender attaches the msg publisher. A nil sender skips notices, which is only for in-process tests.
+func (s *Server) UseSender(sender MsgSender) {
+	if s != nil {
+		s.sender = sender
+	}
 }
 
 // UseGroups attaches the group rule. A nil client skips the check, which is only for in-process tests.

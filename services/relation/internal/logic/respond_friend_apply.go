@@ -38,7 +38,8 @@ func (s *Server) RespondFriendApply(ctx context.Context, req *relationpb.Respond
 		if err := s.store.AgreeFriendRequest(ctx, from, to, handleMsg, s.now()); err != nil {
 			return nil, friendRequestErr(err)
 		}
-		// 5. 同意后 webhook。通知申请人尚未接入。
+		// 5. 通知申请人已同意，并调用同意后 webhook。
+		s.notifyFriendAgreed(ctx, from, to, handleMsg)
 		s.afterAddFriendAgree(ctx, from, to, handleMsg, model.HandleAgree)
 		return &relationpb.RespondFriendApplyResp{}, nil
 	case model.HandleRefuse:
@@ -46,7 +47,8 @@ func (s *Server) RespondFriendApply(ctx context.Context, req *relationpb.Respond
 		if err := s.store.RefuseFriendRequest(ctx, from, to, handleMsg, s.now()); err != nil {
 			return nil, friendRequestErr(err)
 		}
-		// 7. 通知申请人申请被拒绝。尚未接入。
+		// 7. 通知申请人申请被拒绝。
+		s.notifyFriendRefused(ctx, from, to, handleMsg)
 		return &relationpb.RespondFriendApplyResp{}, nil
 	default:
 		return nil, errorcode.ErrRelationInvalidHandle

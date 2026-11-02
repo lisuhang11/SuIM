@@ -20,11 +20,13 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
+	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/relation/internal/config"
 	"github.com/lisuhang11/SuIM/services/relation/internal/groupclient"
 	"github.com/lisuhang11/SuIM/services/relation/internal/logic"
+	"github.com/lisuhang11/SuIM/services/relation/internal/msgclient"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 	"github.com/lisuhang11/SuIM/services/relation/internal/userclient"
 )
@@ -85,6 +87,14 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("dial group service: %w", err)
 	}
 	defer groupConn.Close()
+	msgConn, err := reg.Dial(ctx, "msg",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial msg service: %w", err)
+	}
+	defer msgConn.Close()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
@@ -112,6 +122,7 @@ func run(cfgPath, migratePath string) error {
 		AfterRemoveBlack:      w.AfterRemoveBlack,
 	})
 	relationServer.UseGroups(groupclient.New(grouppb.NewGroupServiceClient(groupConn)))
+	relationServer.UseSender(msgclient.New(msgpb.NewMsgServiceClient(msgConn)))
 	relationpb.RegisterRelationServiceServer(srv, relationServer)
 
 	id, err := newID()

@@ -22,6 +22,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/idhash"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
+	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/logic"
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
@@ -595,6 +596,163 @@ func TestFriendPageAndIDs(t *testing.T) {
 	if err != nil || len(blacks.GetBlacks()) != 1 || blacks.GetBlacks()[0].GetBlackUser().GetUserId() != c {
 		t.Fatalf("second blacks %+v err=%v", blacks, err)
 	}
+}
+
+func TestFriendNotices(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn)
+	if err != nil {
+		t.Skipf("mysql is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	script, err := os.ReadFile(filepath.Join("..", "..", "migrations", "relation.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx, string(script)); err != nil {
+		t.Fatal(err)
+	}
+	a := fmt.Sprintf("na-%d", time.Now().UnixNano())
+	b := fmt.Sprintf("nb-%d", time.Now().UnixNano())
+	t.Cleanup(func() { cleanupRelation(t, mysqlCfg, a, b) })
+	notices := &noticeLog{}
+	srv := logic.New(st, knownUsers{a: {}, b: {}}, logic.Hooks{})
+	srv.UseSender(notices)
+
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: "hi"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: a, ToUserId: b, HandleResult: -1, HandleMsg: "no"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: "please"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: a, ToUserId: b, HandleResult: 1, HandleMsg: "ok"}); err != nil {
+		t.Fatal(err)
+	}
+	remark := "Ada"
+	if _, err := srv.UpdateFriend(ctx, &relationpb.UpdateFriendReq{OwnerUserId: a, FriendUserId: b, Remark: &remark}); err != nil {
+		t.Fatal(err)
+	}
+	pinned := true
+	if _, err := srv.UpdateFriend(ctx, &relationpb.UpdateFriendReq{OwnerUserId: a, FriendUserId: b, IsPinned: &pinned}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.DeleteFriend(ctx, &relationpb.DeleteFriendReq{UserId: a, FriendId: b}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.BlockUser(ctx, &relationpb.BlockUserReq{UserId: a, BlockedUserId: b}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.UnblockUser(ctx, &relationpb.UnblockUserReq{UserId: a, BlockedUserId: b}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []struct {
+		contentType int32
+		sendID      string
+		recvID      string
+		sendMessage bool
+		offline     bool
+	}{
+		{1203, a, b, false, true},
+		{1202, b, a, false, true},
+		{1203, a, b, false, true},
+		{1201, b, a, true, true},
+		{1206, a, b, false, false},
+		{1205, a, b, false, false},
+		{1207, a, b, false, false},
+		{1208, a, b, false, false},
+	}
+	if len(notices.msgs) != len(want) {
+		t.Fatalf("notices=%d", len(notices.msgs))
+	}
+	for i, item := range want {
+		msg := notices.msgs[i]
+		if msg.GetContentType() != item.contentType || msg.GetSendId() != item.sendID || msg.GetRecvId() != item.recvID || msg.GetSessionType() != 1 || msg.GetMsgFrom() != 200 {
+			t.Fatalf("notice %d %+v", i, msg)
+		}
+		opts := map[string]bool{
+			"isNotNotification": false,
+			"isSendMsg":         item.sendMessage,
+			"unreadCount":       item.sendMessage,
+			"history":           false,
+			"offlinePush":       item.offline,
+		}
+		for key, value := range opts {
+			if msg.Options[key] != value {
+				t.Fatalf("notice %d option %s=%v msg=%+v", i, key, msg.Options[key], msg.Options)
+			}
+		}
+		if item.offline {
+			if msg.GetOfflinePushInfo().GetTitle() == "" {
+				t.Fatalf("notice %d missing offline title", i)
+			}
+		} else if msg.OfflinePushInfo != nil {
+			t.Fatalf("notice %d unexpected offline %+v", i, msg.OfflinePushInfo)
+		}
+	}
+	apply := noticeDetail(t, notices.msgs[0])
+	if apply.FromTo.FromUserID != a || apply.FromTo.ToUserID != b || apply.Request.ReqMsg != "hi" || apply.Request.FromNickname != a {
+		t.Fatalf("apply detail %+v", apply)
+	}
+	agreed := noticeDetail(t, notices.msgs[3])
+	if agreed.FromTo.FromUserID != a || agreed.FromTo.ToUserID != b || agreed.HandleMsg != "ok" || agreed.Request.HandleResult != 1 {
+		t.Fatalf("agree detail %+v", agreed)
+	}
+	remarked := noticeDetail(t, notices.msgs[4])
+	if remarked.FriendVersion == 0 || remarked.FriendVersionID == "" {
+		t.Fatalf("remark detail %+v", remarked)
+	}
+}
+
+type noticeLog struct {
+	msgs []*msgpb.MsgData
+}
+
+func (n *noticeLog) SendNotification(_ context.Context, msg *msgpb.MsgData) error {
+	n.msgs = append(n.msgs, msg)
+	return nil
+}
+
+type noticeBody struct {
+	FromTo struct {
+		FromUserID string `json:"fromUserID"`
+		ToUserID   string `json:"toUserID"`
+	} `json:"fromToUserID"`
+	HandleMsg       string `json:"handleMsg"`
+	FriendVersion   uint64 `json:"friendVersion"`
+	FriendVersionID string `json:"friendVersionID"`
+	Request         struct {
+		ReqMsg       string `json:"reqMsg"`
+		FromNickname string `json:"fromNickname"`
+		HandleResult int32  `json:"handleResult"`
+	} `json:"request"`
+}
+
+func noticeDetail(t *testing.T, msg *msgpb.MsgData) noticeBody {
+	t.Helper()
+	var wrap struct {
+		Detail string `json:"detail"`
+	}
+	if err := json.Unmarshal(msg.GetContent(), &wrap); err != nil {
+		t.Fatal(err)
+	}
+	var body noticeBody
+	if err := json.Unmarshal([]byte(wrap.Detail), &body); err != nil {
+		t.Fatal(err)
+	}
+	return body
 }
 
 type fixedGroups struct{ allowed bool }

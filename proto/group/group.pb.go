@@ -625,9 +625,12 @@ func (x *CreateGroupResp) GetGroup() *GroupInfo {
 
 // --------------- DismissGroup ---------------
 type DismissGroupReq struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	GroupId       string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	OpUserId      string                 `protobuf:"bytes,2,opt,name=op_user_id,json=opUserId,proto3" json:"op_user_id,omitempty"` // 必须为群主
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	GroupId  string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	OpUserId string                 `protobuf:"bytes,2,opt,name=op_user_id,json=opUserId,proto3" json:"op_user_id,omitempty"` // 必须为群主
+	// delete_member 为 true 时删掉全部成员并记入入群版本，不再发解散提示。
+	// 推送侧在 1511 发给现有成员之后用它清成员。
+	DeleteMember  bool `protobuf:"varint,3,opt,name=delete_member,json=deleteMember,proto3" json:"delete_member,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -674,6 +677,13 @@ func (x *DismissGroupReq) GetOpUserId() string {
 		return x.OpUserId
 	}
 	return ""
+}
+
+func (x *DismissGroupReq) GetDeleteMember() bool {
+	if x != nil {
+		return x.DeleteMember
+	}
+	return false
 }
 
 type DismissGroupResp struct {
@@ -3661,11 +3671,12 @@ const file_group_group_proto_rawDesc = "" +
 	"\x02ex\x18\v \x01(\tR\x02ex\"T\n" +
 	"\x0fCreateGroupResp\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12&\n" +
-	"\x05group\x18\x02 \x01(\v2\x10.group.GroupInfoR\x05group\"J\n" +
+	"\x05group\x18\x02 \x01(\v2\x10.group.GroupInfoR\x05group\"o\n" +
 	"\x0fDismissGroupReq\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x1c\n" +
 	"\n" +
-	"op_user_id\x18\x02 \x01(\tR\bopUserId\"\x12\n" +
+	"op_user_id\x18\x02 \x01(\tR\bopUserId\x12#\n" +
+	"\rdelete_member\x18\x03 \x01(\bR\fdeleteMember\"\x12\n" +
 	"\x10DismissGroupResp\"{\n" +
 	"\x15TransferGroupOwnerReq\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x1c\n" +

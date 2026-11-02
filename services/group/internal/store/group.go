@@ -224,6 +224,64 @@ func (s *Store) AddMembers(ctx context.Context, groupID string, members []*model
 	return nil
 }
 
+// DeleteGroupMembers removes every member and records a join-version delete for each.
+// An empty group returns no ids. The group row itself is left unchanged.
+func (s *Store) DeleteGroupMembers(ctx context.Context, groupID string, now time.Time) ([]string, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var status int32
+	err = tx.QueryRowContext(ctx, "SELECT status FROM `group` WHERE group_id = ? FOR UPDATE", groupID).Scan(&status)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := tx.QueryContext(ctx, "SELECT user_id FROM group_member WHERE group_id = ? ORDER BY user_id FOR UPDATE", groupID)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+	if len(ids) == 0 {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM group_member WHERE group_id = ?", groupID); err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		if err := incrJoin(ctx, tx, id, groupID, model.VersionDelete, now); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	if s.cache != nil {
+		s.cache.dropMembers(ctx, groupID, ids...)
+	}
+	return ids, nil
+}
+
 func (s *Store) DeleteMember(ctx context.Context, groupID, userID string, now time.Time) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

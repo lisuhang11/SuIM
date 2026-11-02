@@ -119,6 +119,9 @@ message CreateGroupResp {
 message DismissGroupReq {
   string group_id = 1;
   string op_user_id = 2; // 必须为群主
+  // delete_member 为 true 时删掉全部成员并记入入群版本，不再发解散提示。
+  // 推送侧在 1511 发给现有成员之后用它清成员。
+  bool delete_member = 3;
 }
 message DismissGroupResp {}
 

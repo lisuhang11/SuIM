@@ -522,6 +522,28 @@ func TestGroup(t *testing.T) {
 	if _, err := srv.CancelMuteGroup(ctx, &grouppb.CancelMuteGroupReq{GroupId: gid, OpUserId: c}); !isCode(err, codes.FailedPrecondition, errorcode.GroupDismissed) {
 		t.Fatalf("unmute dismissed code=%v err=%v", status.Code(err), err)
 	}
+	if _, err := srv.DismissGroup(ctx, &grouppb.DismissGroupReq{GroupId: gid, OpUserId: a, DeleteMember: true}); !isCode(err, codes.PermissionDenied, errorcode.GroupNoPermission) {
+		t.Fatalf("outsider clear code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.DismissGroup(ctx, &grouppb.DismissGroupReq{GroupId: gid, OpUserId: c, DeleteMember: true}); err != nil {
+		t.Fatal(err)
+	}
+	empty := oneGroup(t, srv, ctx, gid)
+	if empty.GetStatus() != model.GroupStatusDismissed || empty.GetMemberCount() != 0 {
+		t.Fatalf("cleared group %+v", empty)
+	}
+	left, err := srv.GetJoinedGroups(ctx, &grouppb.GetJoinedGroupsReq{UserId: c, Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, group := range left.GetGroups() {
+		if group.GetGroupId() == gid {
+			t.Fatalf("dismissed group still joined %+v", group)
+		}
+	}
+	if _, err := srv.DismissGroup(ctx, &grouppb.DismissGroupReq{GroupId: gid, OpUserId: c, DeleteMember: true}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestGroupMemberLimit(t *testing.T) {

@@ -10,6 +10,7 @@ const (
 	MsgNotInGroup   Code = 6004
 	MsgMutedInGroup Code = 6005
 	MsgMutedGroup   Code = 6006
+	MsgDismissed    Code = 6007
 )
 
 var (
@@ -19,4 +20,5 @@ var (
 	ErrMsgNotInGroup   = Define(MsgNotInGroup, codes.FailedPrecondition, "not in group")
 	ErrMsgMutedInGroup = Define(MsgMutedInGroup, codes.FailedPrecondition, "muted in group")
 	ErrMsgMutedGroup   = Define(MsgMutedGroup, codes.FailedPrecondition, "group is muted")
+	ErrMsgDismissed    = Define(MsgDismissed, codes.FailedPrecondition, "group dismissed")
 )

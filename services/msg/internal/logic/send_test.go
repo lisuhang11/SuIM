@@ -162,13 +162,41 @@ func TestGroupSendHonorsMute(t *testing.T) {
 	if prod.n != 3 || prod.key != "n_g" {
 		t.Fatalf("publish n=%d key=%s", prod.n, prod.key)
 	}
-
 	bare := New(nil, &fakeProducer{}, nil, nil)
 	_, err := bare.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
 		SendId: "a", GroupId: "g", SessionType: 3, Content: []byte("hi"),
 	}})
 	if code, _ := errorcode.CodeOf(err); code != errorcode.Internal {
 		t.Fatalf("missing group service code %d err %v", code, err)
+	}
+}
+
+func TestGroupSendRejectsDismissed(t *testing.T) {
+	prod := &fakeProducer{}
+	groups := &fakeGroups{speakers: map[string]GroupSpeaker{
+		"g:owner":  {Found: true, InGroup: true, Status: 2, Role: 100},
+		"g:member": {Found: true, InGroup: true, Status: 2, Role: 20},
+	}}
+	srv := New(nil, prod, nil, groups)
+	send := func(user string, contentType int32, notice bool) error {
+		msg := &msgpb.MsgData{SendId: user, GroupId: "g", SessionType: 2, ContentType: contentType, Content: []byte("hi"), ClientMsgId: user + string(rune(contentType))}
+		if notice {
+			msg.Options = map[string]bool{"isNotNotification": false}
+		}
+		_, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: msg})
+		return err
+	}
+	if code, _ := errorcode.CodeOf(send("owner", 101, false)); code != errorcode.MsgDismissed {
+		t.Fatalf("owner code %d", code)
+	}
+	if code, _ := errorcode.CodeOf(send("member", 101, false)); code != errorcode.MsgDismissed {
+		t.Fatalf("member code %d", code)
+	}
+	if code, _ := errorcode.CodeOf(send("member", 1501, true)); code != errorcode.MsgDismissed {
+		t.Fatalf("other notice code %d", code)
+	}
+	if err := send("owner", 1511, true); err != nil {
+		t.Fatal(err)
 	}
 }
 

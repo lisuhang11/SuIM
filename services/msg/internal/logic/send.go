@@ -16,9 +16,11 @@ const (
 	sessionGroup  = 2
 	sessionSuper  = 3
 
-	roleOwner        = 100
-	roleAdmin        = 60
-	groupStatusMuted = 3
+	roleOwner             = 100
+	roleAdmin             = 60
+	groupStatusDismissed  = 2
+	groupStatusMuted      = 3
+	contentGroupDismissed = 1511
 )
 
 // SendMsg checks one message and publishes it to toRedis. msgtransfer assigns the seq.
@@ -99,6 +101,12 @@ func (s *Server) SendMsg(ctx context.Context, req *msgpb.SendMsgReq) (*msgpb.Sen
 }
 
 func (s *Server) authorizeSend(ctx context.Context, msg *msgpb.MsgData) error {
+	// 已解散的群只放行 1511。其他通知和普通消息都拒绝。
+	if msg.SessionType == sessionGroup || msg.SessionType == sessionSuper {
+		if err := s.rejectDismissedGroup(ctx, msg); err != nil {
+			return err
+		}
+	}
 	// 通知不走好友、拉黑和禁言校验，入群申请会发给非好友的群主。
 	if msgconv.IsNotification(msg) {
 		return nil
@@ -133,6 +141,20 @@ func (s *Server) authorizeSingleSend(ctx context.Context, msg *msgpb.MsgData) er
 	}
 	if !senderHasFriend || !receiverHasFriend {
 		return errorcode.ErrMsgNotFriend
+	}
+	return nil
+}
+
+func (s *Server) rejectDismissedGroup(ctx context.Context, msg *msgpb.MsgData) error {
+	if msg.GetContentType() == contentGroupDismissed || msg.GroupId == "" || s.groups == nil {
+		return nil
+	}
+	speaker, err := s.groups.Speaker(ctx, msg.GroupId, msg.SendId)
+	if err != nil {
+		return errorcode.ErrInternal.WithMsg("check group")
+	}
+	if speaker.Found && speaker.Status == groupStatusDismissed {
+		return errorcode.ErrMsgDismissed
 	}
 	return nil
 }

@@ -36,6 +36,11 @@ type GroupDirectory interface {
 	Joined(ctx context.Context, userID string) ([]JoinedGroup, error)
 }
 
+// DismissedMembers removes every member after the dismiss notice has been pushed.
+type DismissedMembers interface {
+	ClearDismissedMembers(ctx context.Context, groupID, opUserID string) error
+}
+
 // JoinedGroups is the group service's joined-group incremental log and the full page behind it.
 type JoinedGroups interface {
 	IncrementalJoined(ctx context.Context, userID, versionID string, version uint64) (*grouppb.GetIncrementalJoinGroupsResp, error)
@@ -186,6 +191,21 @@ func (s *Server) Deliver(ctx context.Context, msg *msgpb.MsgData, conversationID
 			}
 			_ = client.write(Resp{ReqIdentifier: reqPushMsg, Data: body})
 		}
+	}
+	// 成员名单已经取走，再删已解散群的成员行。只处理 1511 的通知副本。
+	s.clearDismissedMembers(ctx, msg, conversationID)
+}
+
+func (s *Server) clearDismissedMembers(ctx context.Context, msg *msgpb.MsgData, conversationID string) {
+	if msg == nil || msg.ContentType != 1511 || msg.GroupId == "" || msg.SendId == "" || !msgconv.IsNotificationConversation(conversationID) {
+		return
+	}
+	cleaner, ok := s.groups.(DismissedMembers)
+	if !ok {
+		return
+	}
+	if err := cleaner.ClearDismissedMembers(ctx, msg.GroupId, msg.SendId); err != nil {
+		slog.Warn("clear dismissed members", "err", err, "groupID", msg.GroupId)
 	}
 }
 

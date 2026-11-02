@@ -45,6 +45,17 @@ type JoinedGroup struct {
 	Super bool
 }
 
+// ClearDismissedMembers deletes every member after the dismiss notice has been pushed.
+func (c *GroupClient) ClearDismissedMembers(ctx context.Context, groupID, opUserID string) error {
+	ctx = rpcctx.WithUser(ctx, opUserID)
+	_, err := c.client.DismissGroup(ctx, &grouppb.DismissGroupReq{
+		GroupId:      groupID,
+		OpUserId:     opUserID,
+		DeleteMember: true,
+	})
+	return err
+}
+
 func (c *GroupClient) MemberUserIDs(ctx context.Context, groupID, userID string) ([]string, error) {
 	ctx = rpcctx.WithUser(ctx, userID)
 	resp, err := c.client.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: groupID, UserId: userID})

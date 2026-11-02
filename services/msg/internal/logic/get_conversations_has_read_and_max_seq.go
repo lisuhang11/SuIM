@@ -8,10 +8,13 @@ import (
 )
 
 func (s *Server) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *msgpb.GetConversationsHasReadAndMaxSeqReq) (*msgpb.GetConversationsHasReadAndMaxSeqResp, error) {
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
 	ids := req.GetConversationIds()
-	var err error
 	if len(ids) == 0 {
-		ids, err = s.conversationIDs(ctx, req.GetUserId())
+		ids, err = s.conversationIDs(ctx, userID)
 		if err != nil {
 			return nil, errorcode.ErrInternal.WithMsg("query conversations")
 		}
@@ -19,7 +22,7 @@ func (s *Server) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *msgp
 	out := &msgpb.GetConversationsHasReadAndMaxSeqResp{Seqs: map[string]*msgpb.Seqs{}}
 	// 1. 只有客户端要求时才查置顶。会话表不存在时仍返回序号。
 	if req.GetReturnPinned() && s.store != nil {
-		pinned, err := s.store.PinnedConversationIDs(ctx, req.GetUserId())
+		pinned, err := s.store.PinnedConversationIDs(ctx, userID)
 		if err != nil {
 			return nil, errorcode.ErrInternal.WithMsg("query pinned conversations")
 		}
@@ -28,13 +31,13 @@ func (s *Server) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *msgp
 	if s.store == nil || len(ids) == 0 {
 		return out, nil
 	}
-	state, err := s.store.SeqState(ctx, req.GetUserId(), ids)
+	state, err := s.store.SeqState(ctx, userID, ids)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("query read seq")
 	}
 	for id, item := range state {
 		if _, group := groupIDFromConversation(id); group {
-			if _, _, err := s.visibleSeqs(ctx, req.GetUserId(), id); err != nil {
+			if _, _, err := s.visibleSeqs(ctx, userID, id); err != nil {
 				if code, ok := errorcode.CodeOf(err); ok && code == errorcode.NoPermission {
 					continue
 				}

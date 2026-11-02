@@ -8,13 +8,17 @@ import (
 )
 
 func (s *Server) PullMessageBySeqs(ctx context.Context, req *msgpb.PullMessageBySeqsReq) (*msgpb.PushMessages, error) {
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
 	out := &msgpb.PushMessages{Msgs: map[string]*msgpb.PullMsgs{}, NotificationMsgs: map[string]*msgpb.PullMsgs{}}
 	for _, item := range req.GetSeqRanges() {
 		if item == nil || item.ConversationId == "" {
 			continue
 		}
 		// 1. 单聊只允许会话双方。群会话允许当前成员，以及离开时记下水位的人。
-		minSeq, maxSeq, err := s.visibleSeqs(ctx, req.GetUserId(), item.ConversationId)
+		minSeq, maxSeq, err := s.visibleSeqs(ctx, userID, item.ConversationId)
 		if err != nil {
 			return nil, err
 		}

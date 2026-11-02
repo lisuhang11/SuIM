@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/msg/internal/logic"
@@ -46,6 +47,7 @@ func NewGroupClient(client grouppb.GroupServiceClient) *GroupClient {
 }
 
 func (c *GroupClient) Joined(ctx context.Context, userID string) ([]logic.JoinedGroup, error) {
+	ctx = rpcctx.WithUser(ctx, userID)
 	var out []logic.JoinedGroup
 	for offset := int32(0); ; offset += pageLimit {
 		resp, err := c.client.GetJoinedGroups(ctx, &grouppb.GetJoinedGroupsReq{
@@ -70,6 +72,7 @@ func (c *GroupClient) Joined(ctx context.Context, userID string) ([]logic.Joined
 }
 
 func (c *GroupClient) Speaker(ctx context.Context, groupID, userID string) (logic.GroupSpeaker, error) {
+	ctx = rpcctx.WithUser(ctx, userID)
 	resp, err := c.client.GetGroupMember(ctx, &grouppb.GetGroupMemberReq{GroupId: groupID, UserId: userID})
 	if err != nil {
 		if code, ok := errorcode.CodeOf(err); ok && code == errorcode.GroupNotFound {

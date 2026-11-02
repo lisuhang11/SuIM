@@ -9,7 +9,8 @@
 //	POST /user/register_phone
 //
 // Token required. Send it in the token header, or as Authorization: Bearer.
-// The token user must be the actor in the request body.
+// The token user is stored on the request context and sent to group as the operator.
+// A user id in the body, when present, must be that user.
 //
 //	POST /user/get
 //	POST /user/get_users
@@ -80,6 +81,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relation"
@@ -207,6 +209,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		ctx := context.WithValue(r.Context(), ctxKey{}, session{userID: userID, token: token})
+		ctx = rpcctx.WithUser(ctx, userID)
 		next(w, r.WithContext(ctx))
 	}
 }

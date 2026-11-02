@@ -10,8 +10,8 @@ import (
 )
 
 func (s *Server) DeleteFriend(ctx context.Context, req *relationpb.DeleteFriendReq) (*relationpb.DeleteFriendResp, error) {
-	// 1. 校验双方 userID。调用方必须是关系拥有者，操作者身份尚未从上下文接入。
-	owner, err := normalizeUserID(req.GetUserId())
+	// 1. 校验双方 userID。关系拥有者取上下文里的用户。
+	owner, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

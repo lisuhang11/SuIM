@@ -12,7 +12,11 @@ func (s *Server) GetGroupMemberUserIDs(ctx context.Context, req *grouppb.GetGrou
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireMember(ctx, groupID, req.GetUserId()); err != nil {
+	userID, err := bindActor(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireMember(ctx, groupID, userID); err != nil {
 		return nil, err
 	}
 	if _, err := s.store.TakeGroup(ctx, groupID); err != nil {

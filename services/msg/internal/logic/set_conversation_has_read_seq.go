@@ -10,9 +10,12 @@ import (
 
 // SetConversationHasReadSeq stores the cursor and tells the caller's other devices.
 func (s *Server) SetConversationHasReadSeq(ctx context.Context, req *msgpb.SetConversationHasReadSeqReq) (*msgpb.SetConversationHasReadSeqResp, error) {
-	userID := strings.TrimSpace(req.GetUserId())
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
 	conversationID := strings.TrimSpace(req.GetConversationId())
-	if userID == "" || conversationID == "" || req.GetHasReadSeq() < 0 {
+	if conversationID == "" || req.GetHasReadSeq() < 0 {
 		return nil, errorcode.ErrMsgInvalidArgs.WithMsg("has read seq is invalid")
 	}
 	if _, _, _, _, err := s.authorizeRead(ctx, userID, conversationID); err != nil {

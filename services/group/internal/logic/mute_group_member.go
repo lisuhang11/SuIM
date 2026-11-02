@@ -10,7 +10,11 @@ import (
 
 // MuteGroupMember 禁言一名成员。群主不能被禁言，管理员只有群主能禁言。
 func (s *Server) MuteGroupMember(ctx context.Context, req *grouppb.MuteGroupMemberReq) (*grouppb.MuteGroupMemberResp, error) {
-	groupID, op, userID, err := muteUsers(req.GetGroupId(), req.GetOpUserId(), req.GetUserId())
+	op, err := bindActor(ctx, req.GetOpUserId())
+	if err != nil {
+		return nil, err
+	}
+	groupID, op, userID, err := muteUsers(req.GetGroupId(), op, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

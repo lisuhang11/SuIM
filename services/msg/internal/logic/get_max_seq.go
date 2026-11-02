@@ -9,7 +9,11 @@ import (
 
 func (s *Server) GetMaxSeq(ctx context.Context, req *msgpb.GetMaxSeqReq) (*msgpb.GetMaxSeqResp, error) {
 	// 1. 汇总这个用户已经有消息的会话，再加上仍在其中的群会话。
-	ids, err := s.conversationIDs(ctx, req.GetUserId())
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	ids, err := s.conversationIDs(ctx, userID)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("query conversations")
 	}

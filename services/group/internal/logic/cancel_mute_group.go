@@ -8,7 +8,11 @@ import (
 
 // CancelMuteGroup 解除全员禁言。已解散的群保持解散，不会被改回正常。
 func (s *Server) CancelMuteGroup(ctx context.Context, req *grouppb.CancelMuteGroupReq) (*grouppb.CancelMuteGroupResp, error) {
-	groupID, op, err := muteOperator(req.GetGroupId(), req.GetOpUserId())
+	op, err := bindActor(ctx, req.GetOpUserId())
+	if err != nil {
+		return nil, err
+	}
+	groupID, op, err := muteOperator(req.GetGroupId(), op)
 	if err != nil {
 		return nil, err
 	}

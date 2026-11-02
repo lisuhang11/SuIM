@@ -10,9 +10,12 @@ import (
 
 // MarkMsgsAsRead marks the listed sequences. The last sequence is the new read cursor.
 func (s *Server) MarkMsgsAsRead(ctx context.Context, req *msgpb.MarkMsgsAsReadReq) (*msgpb.MarkMsgsAsReadResp, error) {
-	userID := strings.TrimSpace(req.GetUserId())
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
 	conversationID := strings.TrimSpace(req.GetConversationId())
-	if userID == "" || conversationID == "" || len(req.GetSeqs()) == 0 {
+	if conversationID == "" || len(req.GetSeqs()) == 0 {
 		return nil, errorcode.ErrMsgInvalidArgs.WithMsg("seqs are required")
 	}
 	kind, session, peer, groupID, err := s.authorizeRead(ctx, userID, conversationID)

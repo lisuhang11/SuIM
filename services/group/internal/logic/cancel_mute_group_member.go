@@ -8,7 +8,11 @@ import (
 
 // CancelMuteGroupMember 解除一名成员的禁言。权限和禁言相同。
 func (s *Server) CancelMuteGroupMember(ctx context.Context, req *grouppb.CancelMuteGroupMemberReq) (*grouppb.CancelMuteGroupMemberResp, error) {
-	groupID, op, userID, err := muteUsers(req.GetGroupId(), req.GetOpUserId(), req.GetUserId())
+	op, err := bindActor(ctx, req.GetOpUserId())
+	if err != nil {
+		return nil, err
+	}
+	groupID, op, userID, err := muteUsers(req.GetGroupId(), op, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/third/internal/model"
 )
 
-func (s *Server) reuse(ctx context.Context, req *thirdpb.InitiateMultipartUploadReq, hash string) (*thirdpb.InitiateMultipartUploadResp, bool, error) {
+func (s *Server) reuse(ctx context.Context, req *thirdpb.InitiateMultipartUploadReq, userID, hash string) (*thirdpb.InitiateMultipartUploadResp, bool, error) {
 	existing, err := s.objects.FindByHash(ctx, hash)
 	if errors.Is(err, model.ErrNotFound) {
 		return nil, false, nil
@@ -39,7 +39,7 @@ func (s *Server) reuse(ctx context.Context, req *thirdpb.InitiateMultipartUpload
 	}
 	if err := s.bind(ctx, &model.Object{
 		Name:        req.GetName(),
-		UserID:      req.GetUserId(),
+		UserID:      userID,
 		Hash:        hash,
 		StorageKey:  existing.StorageKey,
 		Size:        existing.Size,
@@ -92,9 +92,9 @@ func (s *Server) finishParts(ctx context.Context, sess *model.Session, sums []st
 	return s.parts.Finish(ctx, sess.ObjectKey, sess.StoreUploadID, ordered)
 }
 
-func (s *Server) completeExisting(ctx context.Context, req *thirdpb.CompleteMultipartUploadReq, hash string) (*thirdpb.CompleteMultipartUploadResp, error) {
+func (s *Server) completeExisting(ctx context.Context, req *thirdpb.CompleteMultipartUploadReq, userID, hash string) (*thirdpb.CompleteMultipartUploadResp, error) {
 	obj, err := s.objects.FindByName(ctx, req.GetName())
-	if errors.Is(err, model.ErrNotFound) || (err == nil && (obj.UserID != req.GetUserId() || obj.Hash != hash)) {
+	if errors.Is(err, model.ErrNotFound) || (err == nil && (obj.UserID != userID || obj.Hash != hash)) {
 		return nil, errorcode.ErrThirdNotFound
 	}
 	if err != nil {

@@ -13,14 +13,18 @@ func (s *Server) CompleteFormData(ctx context.Context, req *thirdpb.CompleteForm
 	if err := checkMeta("", "", req.GetUrlPrefix()); err != nil {
 		return nil, err
 	}
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
 	ticket, err := s.open(req.GetId())
 	if err != nil {
 		return nil, err
 	}
-	if ticket.UserID != req.GetUserId() {
+	if ticket.UserID != userID {
 		return nil, errorcode.ErrNoPermission
 	}
-	if err := checkName(req.GetUserId(), ticket.Name); err != nil {
+	if err := checkName(userID, ticket.Name); err != nil {
 		return nil, err
 	}
 	if !validDirectKey(ticket.Key) {

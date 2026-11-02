@@ -19,7 +19,7 @@ type memberEdit struct {
 // SetGroupMemberInfo 修改群成员的昵称、头像、角色和扩展字段。
 // 不能把任何人设成群主。任命或调整他人角色只留给群主，管理员只能把自己降为普通成员。
 func (s *Server) SetGroupMemberInfo(ctx context.Context, req *grouppb.SetGroupMemberInfoReq) (*grouppb.SetGroupMemberInfoResp, error) {
-	op, err := normalizeUserID(req.GetOpUserId())
+	op, err := bindActor(ctx, req.GetOpUserId())
 	if err != nil {
 		return nil, err
 	}

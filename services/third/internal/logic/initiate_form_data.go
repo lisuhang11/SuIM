@@ -2,14 +2,17 @@ package logic
 
 import (
 	"context"
-	"strings"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 )
 
 func (s *Server) InitiateFormData(ctx context.Context, req *thirdpb.InitiateFormDataReq) (*thirdpb.InitiateFormDataResp, error) {
-	if err := checkName(req.GetUserId(), req.GetName()); err != nil {
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	if err := checkName(userID, req.GetName()); err != nil {
 		return nil, err
 	}
 	if err := checkMeta(req.GetContentType(), req.GetCause(), ""); err != nil {
@@ -21,10 +24,7 @@ func (s *Server) InitiateFormData(ctx context.Context, req *thirdpb.InitiateForm
 	if req.GetSize() > s.limits.MaxPartSize {
 		return nil, errorcode.ErrThirdTooLarge
 	}
-	if strings.Contains(req.GetUserId(), "/") || strings.Contains(req.GetUserId(), `\`) {
-		return nil, errorcode.ErrThirdInvalidArgs.WithMsg("user_id is invalid")
-	}
-	key, err := directKey(req.GetUserId(), req.GetName(), s.now())
+	key, err := directKey(userID, req.GetName(), s.now())
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (s *Server) InitiateFormData(ctx context.Context, req *thirdpb.InitiateForm
 		ContentType: req.GetContentType(),
 		Cause:       req.GetCause(),
 		Key:         key,
-		UserID:      req.GetUserId(),
+		UserID:      userID,
 	})
 	if err != nil {
 		return nil, err

@@ -20,6 +20,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
@@ -72,12 +73,18 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial user service: %w", err)
 	}
 	defer userConn.Close()
-	msgConn, err := reg.Dial(ctx, "msg", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	msgConn, err := reg.Dial(ctx, "msg",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
 	if err != nil {
 		return fmt.Errorf("dial msg service: %w", err)
 	}
 	defer msgConn.Close()
-	groupConn, err := reg.Dial(ctx, "group", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	groupConn, err := reg.Dial(ctx, "group",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
 	if err != nil {
 		return fmt.Errorf("dial group service: %w", err)
 	}

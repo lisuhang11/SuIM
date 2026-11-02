@@ -15,7 +15,7 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 	if err != nil {
 		return nil, err
 	}
-	op, err := normalizeUserID(req.GetOpUserId())
+	op, err := bindActor(ctx, req.GetOpUserId())
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 		return nil, err
 	}
 
-	// 1. 群未解散，操作者必须已在群内。调用方身份尚未从上下文读取。
+	// 1. 群未解散，操作者必须已在群内。操作者取上下文里的用户。
 	group, err := s.activeGroup(ctx, groupID)
 	if err != nil {
 		return nil, err

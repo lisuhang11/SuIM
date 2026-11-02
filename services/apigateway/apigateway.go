@@ -17,6 +17,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relation"
@@ -59,22 +60,34 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial user service: %w", err)
 	}
 	defer userConn.Close()
-	relationConn, err := reg.Dial(ctx, "relation", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	relationConn, err := reg.Dial(ctx, "relation",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
 	if err != nil {
 		return fmt.Errorf("dial relation service: %w", err)
 	}
 	defer relationConn.Close()
-	groupConn, err := reg.Dial(ctx, "group", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	groupConn, err := reg.Dial(ctx, "group",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
 	if err != nil {
 		return fmt.Errorf("dial group service: %w", err)
 	}
 	defer groupConn.Close()
-	conversationConn, err := reg.Dial(ctx, "conversation", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conversationConn, err := reg.Dial(ctx, "conversation",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
 	if err != nil {
 		return fmt.Errorf("dial conversation service: %w", err)
 	}
 	defer conversationConn.Close()
-	thirdConn, err := reg.Dial(ctx, "third", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	thirdConn, err := reg.Dial(ctx, "third",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
 	if err != nil {
 		return fmt.Errorf("dial third service: %w", err)
 	}

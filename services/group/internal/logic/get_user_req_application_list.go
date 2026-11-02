@@ -8,7 +8,7 @@ import (
 
 // GetUserReqApplicationList 返回用户自己发出的入群申请。
 func (s *Server) GetUserReqApplicationList(ctx context.Context, req *grouppb.GetUserReqApplicationListReq) (*grouppb.GetUserReqApplicationListResp, error) {
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := bindActor(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

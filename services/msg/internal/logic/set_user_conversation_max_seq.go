@@ -8,6 +8,9 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
+// SetUserConversationMaxSeq writes each user's history ceiling.
+// user_ids are the people being capped. The operator is the caller in the context,
+// such as the member who kicked them, and is not one of those ids.
 func (s *Server) SetUserConversationMaxSeq(ctx context.Context, req *msgpb.SetUserConversationMaxSeqReq) (*msgpb.SetUserConversationMaxSeqResp, error) {
 	conversationID := strings.TrimSpace(req.GetConversationId())
 	if conversationID == "" || req.GetMaxSeq() < 0 {

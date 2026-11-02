@@ -8,8 +8,8 @@ import (
 )
 
 func (s *Server) GetIncrementalFriends(ctx context.Context, req *relationpb.GetIncrementalFriendsReq) (*relationpb.GetIncrementalFriendsResp, error) {
-	// 1. 校验用户。调用方必须是本人，操作者身份尚未从上下文接入。
-	userID, err := normalizeUserID(req.GetUserId())
+	// 1. 校验用户。调用方必须是上下文里的本人。
+	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

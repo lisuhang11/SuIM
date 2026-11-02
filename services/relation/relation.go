@@ -17,6 +17,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/proto/user"
@@ -86,7 +87,7 @@ func run(cfgPath, migratePath string) error {
 		defer hooks.Close()
 	}
 
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
 	w := cfg.Webhooks
 	relationpb.RegisterRelationServiceServer(srv, logic.New(st, userclient.New(userpb.NewUserServiceClient(userConn)), logic.Hooks{
 		Client:                hooks,

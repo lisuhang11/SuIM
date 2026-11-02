@@ -10,9 +10,12 @@ import (
 
 // MarkConversationAsRead advances the read cursor. Single chat also marks each sequence.
 func (s *Server) MarkConversationAsRead(ctx context.Context, req *msgpb.MarkConversationAsReadReq) (*msgpb.MarkConversationAsReadResp, error) {
-	userID := strings.TrimSpace(req.GetUserId())
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
 	conversationID := strings.TrimSpace(req.GetConversationId())
-	if userID == "" || conversationID == "" || req.GetHasReadSeq() < 0 {
+	if conversationID == "" || req.GetHasReadSeq() < 0 {
 		return nil, errorcode.ErrMsgInvalidArgs.WithMsg("has read seq is invalid")
 	}
 	kind, session, peer, _, err := s.authorizeRead(ctx, userID, conversationID)

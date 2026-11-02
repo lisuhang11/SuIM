@@ -8,7 +8,7 @@ import (
 )
 
 func (s *Server) GetIncrementalConversation(ctx context.Context, req *conversationpb.GetIncrementalConversationReq) (*conversationpb.GetIncrementalConversationResp, error) {
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

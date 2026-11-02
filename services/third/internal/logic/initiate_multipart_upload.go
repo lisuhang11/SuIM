@@ -9,11 +9,15 @@ import (
 )
 
 func (s *Server) InitiateMultipartUpload(ctx context.Context, req *thirdpb.InitiateMultipartUploadReq) (*thirdpb.InitiateMultipartUploadResp, error) {
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
 	hash, err := normalizeHash(req.GetHash())
 	if err != nil {
 		return nil, err
 	}
-	if err := checkName(req.GetUserId(), req.GetName()); err != nil {
+	if err := checkName(userID, req.GetName()); err != nil {
 		return nil, err
 	}
 	if err := checkMeta(req.GetContentType(), req.GetCause(), req.GetUrlPrefix()); err != nil {
@@ -28,7 +32,7 @@ func (s *Server) InitiateMultipartUpload(ctx context.Context, req *thirdpb.Initi
 	}
 
 	key := objectKey(hash)
-	if resp, done, err := s.reuse(ctx, req, hash); done || err != nil {
+	if resp, done, err := s.reuse(ctx, req, userID, hash); done || err != nil {
 		return resp, err
 	}
 
@@ -44,7 +48,7 @@ func (s *Server) InitiateMultipartUpload(ctx context.Context, req *thirdpb.Initi
 	expireAt := s.now().Add(s.expire)
 	sess := &model.Session{
 		ID:            id,
-		UserID:        req.GetUserId(),
+		UserID:        userID,
 		Hash:          hash,
 		Size:          req.GetSize(),
 		PartSize:      partSize,

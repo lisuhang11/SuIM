@@ -10,7 +10,7 @@ import (
 
 func (s *Server) GetFullFriendUserIDs(ctx context.Context, req *relationpb.GetFullFriendUserIDsReq) (*relationpb.GetFullFriendUserIDsResp, error) {
 	// 1. 校验用户。
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

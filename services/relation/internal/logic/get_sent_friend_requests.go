@@ -7,8 +7,12 @@ import (
 )
 
 func (s *Server) GetSentFriendRequests(ctx context.Context, req *relationpb.GetSentFriendRequestsReq) (*relationpb.GetSentFriendRequestsResp, error) {
-	// 1. 校验用户、分页和处理状态。
-	rows, total, err := s.friendRequests(ctx, req.GetUserId(), req.GetOffset(), req.GetLimit(), req.GetHandleResults(), false)
+	// 1. 校验用户、分页和处理状态。用户取上下文里的本人。
+	userID, err := actorID(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	rows, total, err := s.friendRequests(ctx, userID, req.GetOffset(), req.GetLimit(), req.GetHandleResults(), false)
 	if err != nil {
 		return nil, err
 	}

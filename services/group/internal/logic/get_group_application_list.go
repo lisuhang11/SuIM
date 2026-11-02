@@ -8,7 +8,7 @@ import (
 
 // GetGroupApplicationList 返回操作者作为群主或管理员能看到的入群申请。
 func (s *Server) GetGroupApplicationList(ctx context.Context, req *grouppb.GetGroupApplicationListReq) (*grouppb.GetGroupApplicationListResp, error) {
-	userID, err := normalizeUserID(req.GetFromUserId())
+	userID, err := bindActor(ctx, req.GetFromUserId())
 	if err != nil {
 		return nil, err
 	}

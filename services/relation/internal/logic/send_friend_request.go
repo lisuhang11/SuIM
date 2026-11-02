@@ -10,8 +10,8 @@ import (
 )
 
 func (s *Server) SendFriendRequest(ctx context.Context, req *relationpb.SendFriendRequestReq) (*relationpb.SendFriendRequestResp, error) {
-	// 1. 校验双方 userID。调用方必须是申请人，操作者身份尚未从上下文接入。
-	from, err := normalizeUserID(req.GetFromUserId())
+	// 1. 校验双方 userID。申请人取上下文里的用户。
+	from, err := actorID(ctx, req.GetFromUserId())
 	if err != nil {
 		return nil, err
 	}

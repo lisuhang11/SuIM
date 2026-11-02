@@ -11,12 +11,12 @@ import (
 
 // UpdateGroupInfo 群主或管理员修改群名、公告、简介、头像和入群设置。
 func (s *Server) UpdateGroupInfo(ctx context.Context, req *grouppb.UpdateGroupInfoReq) (*grouppb.UpdateGroupInfoResp, error) {
-	// 调用方身份尚未从上下文读取，这里使用请求中的 op_user_id。
+	// 操作者取上下文里的用户。
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {
 		return nil, err
 	}
-	op, err := normalizeUserID(req.GetOpUserId())
+	op, err := bindActor(ctx, req.GetOpUserId())
 	if err != nil {
 		return nil, err
 	}

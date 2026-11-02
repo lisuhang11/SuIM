@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) GetFullOwnerConversationIDs(ctx context.Context, req *conversationpb.GetFullOwnerConversationIDsReq) (*conversationpb.GetFullOwnerConversationIDsResp, error) {
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

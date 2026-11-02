@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/user"
 )
@@ -45,6 +46,7 @@ type JoinedGroup struct {
 }
 
 func (c *GroupClient) MemberUserIDs(ctx context.Context, groupID, userID string) ([]string, error) {
+	ctx = rpcctx.WithUser(ctx, userID)
 	resp, err := c.client.GetGroupMemberUserIDs(ctx, &grouppb.GetGroupMemberUserIDsReq{GroupId: groupID, UserId: userID})
 	if err != nil {
 		return nil, err
@@ -66,6 +68,7 @@ func (c *GroupClient) Joined(ctx context.Context, userID string) ([]JoinedGroup,
 
 // IncrementalJoined reads one page of the user's joined-group version log.
 func (c *GroupClient) IncrementalJoined(ctx context.Context, userID, versionID string, version uint64) (*grouppb.GetIncrementalJoinGroupsResp, error) {
+	ctx = rpcctx.WithUser(ctx, userID)
 	return c.client.GetIncrementalJoinGroups(ctx, &grouppb.GetIncrementalJoinGroupsReq{
 		UserId:    userID,
 		VersionId: versionID,
@@ -75,6 +78,7 @@ func (c *GroupClient) IncrementalJoined(ctx context.Context, userID, versionID s
 
 // ListJoined pages every group the user still belongs to.
 func (c *GroupClient) ListJoined(ctx context.Context, userID string) ([]*grouppb.GroupInfo, error) {
+	ctx = rpcctx.WithUser(ctx, userID)
 	var out []*grouppb.GroupInfo
 	for offset := int32(0); ; offset += pageLimit {
 		resp, err := c.client.GetJoinedGroups(ctx, &grouppb.GetJoinedGroupsReq{

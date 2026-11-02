@@ -17,6 +17,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	svcconfig "github.com/lisuhang11/SuIM/services/conversation/internal/config"
@@ -67,7 +68,10 @@ func run(cfgPath, migratePath string) error {
 	}
 	defer reg.Close()
 
-	msgConn, err := reg.Dial(ctx, "msg", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	msgConn, err := reg.Dial(ctx, "msg",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
 	if err != nil {
 		return fmt.Errorf("dial msg service: %w", err)
 	}
@@ -78,7 +82,7 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
 	conversationpb.RegisterConversationServiceServer(srv, logic.New(st, msgClient{msgpb.NewMsgServiceClient(msgConn)}))
 
 	id, err := newID()

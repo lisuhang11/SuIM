@@ -16,6 +16,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 	"github.com/lisuhang11/SuIM/services/third/internal/blob"
 	svcconfig "github.com/lisuhang11/SuIM/services/third/internal/config"
@@ -90,7 +91,7 @@ func run(cfgPath, migratePath string) error {
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
 	thirdpb.RegisterThirdServiceServer(grpcSrv, svc)
 
 	id, err := newID()

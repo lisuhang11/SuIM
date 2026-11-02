@@ -14,7 +14,7 @@ func (s *Server) DismissGroup(ctx context.Context, req *grouppb.DismissGroupReq)
 	if err != nil {
 		return nil, err
 	}
-	op, err := normalizeUserID(req.GetOpUserId())
+	op, err := bindActor(ctx, req.GetOpUserId())
 	if err != nil {
 		return nil, err
 	}

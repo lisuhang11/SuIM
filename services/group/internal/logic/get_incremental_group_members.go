@@ -13,7 +13,7 @@ func (s *Server) GetIncrementalGroupMembers(ctx context.Context, req *grouppb.Ge
 	if err != nil {
 		return nil, err
 	}
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := bindActor(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

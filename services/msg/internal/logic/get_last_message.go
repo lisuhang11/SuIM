@@ -8,10 +8,13 @@ import (
 )
 
 func (s *Server) GetLastMessage(ctx context.Context, req *msgpb.GetLastMessageReq) (*msgpb.GetLastMessageResp, error) {
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
 	ids := req.GetConversationIds()
-	var err error
 	if len(ids) == 0 {
-		ids, err = s.conversationIDs(ctx, req.GetUserId())
+		ids, err = s.conversationIDs(ctx, userID)
 		if err != nil {
 			return nil, errorcode.ErrInternal.WithMsg("query conversations")
 		}
@@ -21,7 +24,7 @@ func (s *Server) GetLastMessage(ctx context.Context, req *msgpb.GetLastMessageRe
 		if s.store == nil || id == "" {
 			continue
 		}
-		_, maxSeq, err := s.visibleSeqs(ctx, req.GetUserId(), id)
+		_, maxSeq, err := s.visibleSeqs(ctx, userID, id)
 		if err != nil {
 			return nil, err
 		}

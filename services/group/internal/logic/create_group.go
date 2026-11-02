@@ -12,12 +12,12 @@ import (
 
 // CreateGroup 创建群，创建者即群主。未传群类型时为普通群。
 func (s *Server) CreateGroup(ctx context.Context, req *grouppb.CreateGroupReq) (*grouppb.CreateGroupResp, error) {
-	// 1. 1 为普通群，2 为超级群；未传时建普通群。调用方身份尚未从上下文读取，创建者即群主。
+	// 1. 1 为普通群，2 为超级群；未传时建普通群。创建者取上下文里的用户。
 	groupType, err := normalizeGroupType(req.GetGroupType())
 	if err != nil {
 		return nil, err
 	}
-	owner, err := normalizeUserID(req.GetCreatorUserId())
+	owner, err := bindActor(ctx, req.GetCreatorUserId())
 	if err != nil {
 		return nil, err
 	}

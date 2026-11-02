@@ -16,7 +16,7 @@ func (s *Server) RespondFriendApply(ctx context.Context, req *relationpb.Respond
 	if err != nil {
 		return nil, err
 	}
-	to, err := normalizeUserID(req.GetToUserId())
+	to, err := actorID(ctx, req.GetToUserId())
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,7 @@ func (s *Server) JoinGroup(ctx context.Context, req *grouppb.JoinGroupReq) (*gro
 	if err != nil {
 		return nil, err
 	}
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := bindActor(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

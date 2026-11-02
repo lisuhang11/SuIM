@@ -10,7 +10,11 @@ import (
 )
 
 func (s *Server) CompleteMultipartUpload(ctx context.Context, req *thirdpb.CompleteMultipartUploadReq) (*thirdpb.CompleteMultipartUploadResp, error) {
-	if err := checkName(req.GetUserId(), req.GetName()); err != nil {
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	if err := checkName(userID, req.GetName()); err != nil {
 		return nil, err
 	}
 	if err := checkMeta(req.GetContentType(), req.GetCause(), req.GetUrlPrefix()); err != nil {
@@ -23,12 +27,12 @@ func (s *Server) CompleteMultipartUpload(ctx context.Context, req *thirdpb.Compl
 	hash := joinHash(sums)
 	sess, err := s.sessions.GetSession(ctx, req.GetUploadId())
 	if errors.Is(err, model.ErrUploadNotFound) {
-		return s.completeExisting(ctx, req, hash)
+		return s.completeExisting(ctx, req, userID, hash)
 	}
 	if err != nil {
 		return nil, err
 	}
-	if sess.UserID != req.GetUserId() {
+	if sess.UserID != userID {
 		return nil, errorcode.ErrNoPermission
 	}
 	if sess.Name != req.GetName() {
@@ -50,7 +54,7 @@ func (s *Server) CompleteMultipartUpload(ctx context.Context, req *thirdpb.Compl
 	}
 	if err := s.bind(ctx, &model.Object{
 		Name:        req.GetName(),
-		UserID:      req.GetUserId(),
+		UserID:      userID,
 		Hash:        sess.Hash,
 		StorageKey:  sess.ObjectKey,
 		Size:        sess.Size,

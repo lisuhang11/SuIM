@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) GetFullJoinGroupIDs(ctx context.Context, req *grouppb.GetFullJoinGroupIDsReq) (*grouppb.GetFullJoinGroupIDsResp, error) {
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := bindActor(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

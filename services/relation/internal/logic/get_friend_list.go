@@ -9,7 +9,7 @@ import (
 
 func (s *Server) GetFriendList(ctx context.Context, req *relationpb.GetFriendListReq) (*relationpb.GetFriendListResp, error) {
 	// 1. 校验用户和分页。调用方必须是本人，操作者身份尚未从上下文接入。
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

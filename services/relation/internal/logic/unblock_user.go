@@ -9,7 +9,7 @@ import (
 
 func (s *Server) UnblockUser(ctx context.Context, req *relationpb.UnblockUserReq) (*relationpb.UnblockUserResp, error) {
 	// 1. 校验双方 userID。调用方必须是拉黑者，操作者身份尚未从上下文接入。
-	owner, err := normalizeUserID(req.GetUserId())
+	owner, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

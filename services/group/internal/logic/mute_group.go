@@ -8,7 +8,11 @@ import (
 
 // MuteGroup 全员禁言。群主和管理员可以发言，已解散的群不能改状态。
 func (s *Server) MuteGroup(ctx context.Context, req *grouppb.MuteGroupReq) (*grouppb.MuteGroupResp, error) {
-	groupID, op, err := muteOperator(req.GetGroupId(), req.GetOpUserId())
+	op, err := bindActor(ctx, req.GetOpUserId())
+	if err != nil {
+		return nil, err
+	}
+	groupID, op, err := muteOperator(req.GetGroupId(), op)
 	if err != nil {
 		return nil, err
 	}

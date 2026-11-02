@@ -8,7 +8,7 @@ import (
 
 // GetJoinedGroups 分页返回用户已加入的群。
 func (s *Server) GetJoinedGroups(ctx context.Context, req *grouppb.GetJoinedGroupsReq) (*grouppb.GetJoinedGroupsResp, error) {
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := bindActor(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,7 @@ import (
 
 func (s *Server) GetBlackList(ctx context.Context, req *relationpb.GetBlackListReq) (*relationpb.GetBlackListResp, error) {
 	// 1. 校验用户和分页。
-	userID, err := normalizeUserID(req.GetUserId())
+	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
 	}

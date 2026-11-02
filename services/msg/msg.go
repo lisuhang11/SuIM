@@ -19,6 +19,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
@@ -80,12 +81,18 @@ func run(cfgPath, migratePath string) error {
 	}
 	defer reg.Close()
 
-	relationConn, err := reg.Dial(ctx, "relation", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	relationConn, err := reg.Dial(ctx, "relation",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
 	if err != nil {
 		return fmt.Errorf("dial relation service: %w", err)
 	}
 	defer relationConn.Close()
-	groupConn, err := reg.Dial(ctx, "group", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	groupConn, err := reg.Dial(ctx, "group",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
 	if err != nil {
 		return fmt.Errorf("dial group service: %w", err)
 	}
@@ -119,7 +126,7 @@ func run(cfgPath, migratePath string) error {
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
 	msgpb.RegisterMsgServiceServer(grpcSrv, srv)
 
 	id, err := newID()

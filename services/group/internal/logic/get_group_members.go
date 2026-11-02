@@ -12,7 +12,11 @@ func (s *Server) GetGroupMembers(ctx context.Context, req *grouppb.GetGroupMembe
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireMember(ctx, groupID, req.GetUserId()); err != nil {
+	userID, err := bindActor(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireMember(ctx, groupID, userID); err != nil {
 		return nil, err
 	}
 	offset, limit, err := page(req.GetOffset(), req.GetLimit())

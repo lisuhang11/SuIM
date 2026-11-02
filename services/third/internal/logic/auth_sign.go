@@ -10,7 +10,11 @@ import (
 )
 
 func (s *Server) AuthSign(ctx context.Context, req *thirdpb.AuthSignReq) (*thirdpb.AuthSignResp, error) {
-	if req.GetUserId() == "" || !validID(req.GetUploadId()) {
+	userID, err := actorUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	if !validID(req.GetUploadId()) {
 		return nil, errorcode.ErrThirdInvalidArgs.WithMsg("upload_id is invalid")
 	}
 	if len(req.GetPartNumbers()) == 0 || len(req.GetPartNumbers()) > maxSignBatch {
@@ -23,7 +27,7 @@ func (s *Server) AuthSign(ctx context.Context, req *thirdpb.AuthSignReq) (*third
 	if err != nil {
 		return nil, err
 	}
-	if sess.UserID != req.GetUserId() {
+	if sess.UserID != userID {
 		return nil, errorcode.ErrNoPermission
 	}
 	if !s.now().Before(sess.ExpireAt) {

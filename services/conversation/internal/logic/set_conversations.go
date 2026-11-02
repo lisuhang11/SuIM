@@ -14,6 +14,11 @@ func (s *Server) SetConversations(ctx context.Context, req *conversationpb.SetCo
 	if err != nil {
 		return nil, err
 	}
+	for _, owner := range owners {
+		if _, err := actorID(ctx, owner); err != nil {
+			return nil, err
+		}
+	}
 	spec, err := conversationSpec(req.GetConversation())
 	if err != nil {
 		return nil, err

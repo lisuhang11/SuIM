@@ -27,6 +27,11 @@ func (s *Server) SendMsg(ctx context.Context, req *msgpb.SendMsgReq) (*msgpb.Sen
 	if msg == nil {
 		return nil, errorcode.ErrMsgInvalidArgs.WithMsg("msg data is required")
 	}
+	sendID, err := actorUser(ctx, msg.SendId)
+	if err != nil {
+		return nil, err
+	}
+	msg.SendId = sendID
 	// 1. 校验会话类型和正文。序号不在这里分配。
 	switch msg.SessionType {
 	case 1, 4:

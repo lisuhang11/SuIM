@@ -5,6 +5,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	relationpb "github.com/lisuhang11/SuIM/proto/relation"
+	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 )
 
 func (s *Server) GetBlackList(ctx context.Context, req *relationpb.GetBlackListReq) (*relationpb.GetBlackListResp, error) {
@@ -27,4 +28,26 @@ func (s *Server) GetBlackList(ctx context.Context, req *relationpb.GetBlackListR
 		return nil, err
 	}
 	return &relationpb.GetBlackListResp{Blacks: blacks, Total: int32(total)}, nil
+}
+
+func (s *Server) blackInfos(ctx context.Context, rows []model.Black) ([]*relationpb.BlackInfo, error) {
+	ids := make([]string, len(rows))
+	for i, row := range rows {
+		ids[i] = row.BlockUserID
+	}
+	users, err := s.users.GetUsers(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*relationpb.BlackInfo, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, &relationpb.BlackInfo{
+			OwnerUserId:    row.OwnerUserID,
+			CreateTime:     millis(row.CreateTime),
+			BlackUser:      publicUser(row.BlockUserID, users),
+			AddSource:      row.AddSource,
+			OperatorUserId: row.OperatorUserID,
+		})
+	}
+	return out, nil
 }

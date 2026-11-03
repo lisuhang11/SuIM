@@ -5,9 +5,16 @@ import (
 	"errors"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/pkg/webhook"
 	relationpb "github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
+
+type beforeAddBlackReq struct {
+	webhook.CommonCallbackReq
+	OwnerUserID string `json:"ownerUserID"`
+	BlackUserID string `json:"blackUserID"`
+}
 
 func (s *Server) BlockUser(ctx context.Context, req *relationpb.BlockUserReq) (*relationpb.BlockUserResp, error) {
 	// 1. 校验双方 userID。调用方必须是拉黑者，操作者身份尚未从上下文接入。
@@ -52,4 +59,18 @@ func (s *Server) rejectIfBlocked(ctx context.Context, user1, user2 string) error
 		return errorcode.ErrRelationBlocked
 	}
 	return nil
+}
+
+func (s *Server) webhookBeforeAddBlack(ctx context.Context, owner, block string) error {
+	return webhook.WithCondition(ctx, &s.hooks.BeforeAddBlack, func(ctx context.Context) error {
+		if s.hooks.Client == nil {
+			return errorcode.ErrInternal.WithMsg("webhook client is nil")
+		}
+		body := &beforeAddBlackReq{
+			CommonCallbackReq: webhook.CommonCallbackReq{CallbackCommand: webhook.CommandBeforeAddBlack},
+			OwnerUserID:       owner,
+			BlackUserID:       block,
+		}
+		return s.hooks.Client.SyncPost(ctx, body.GetCallbackCommand(), body, &webhook.CommonCallbackResp{}, &s.hooks.BeforeAddBlack)
+	})
 }

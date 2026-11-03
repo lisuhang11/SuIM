@@ -253,19 +253,22 @@ func (s *Store) DeleteFriend(ctx context.Context, owner, friend string, now time
 	return tx.Commit()
 }
 
+// UpdateFriend locks the friend row, then updates it and advances the version in that transaction.
+// A row removed by a concurrent delete returns ErrNotFriend and leaves the version log unchanged.
 func (s *Store) UpdateFriend(ctx context.Context, owner, friend string, remark *string, pinned *bool, now time.Time) error {
-	ok, err := s.isFriend(ctx, owner, friend)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return ErrNotFriend
-	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	var one int
+	err = tx.QueryRowContext(ctx, `SELECT 1 FROM friend WHERE owner_user_id = ? AND friend_user_id = ? FOR UPDATE`, owner, friend).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFriend
+	}
+	if err != nil {
+		return err
+	}
 	sets := make([]string, 0, 2)
 	args := make([]any, 0, 4)
 	if remark != nil {

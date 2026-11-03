@@ -230,5 +230,5 @@ type friendRequestTip struct {
 	CreateTime    int64  `json:"createTime,omitempty"`
 	HandlerUserID string `json:"handlerUserID,omitempty"`
 	HandleMsg     string `json:"handleMsg,omitempty"`
-	HandleTime    int64  `json:"handleTime,omitempty"`
+		HandleTime    int64  `json:"handleTime,omitempty"`
 }

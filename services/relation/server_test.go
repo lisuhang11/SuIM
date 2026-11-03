@@ -310,8 +310,29 @@ func TestBlackAndFriend(t *testing.T) {
 	if _, err := srv.DeleteFriend(ctx, &relationpb.DeleteFriendReq{UserId: a, FriendId: b}); !isCode(err, codes.NotFound, errorcode.RelationNotFriend) {
 		t.Fatalf("second delete code=%v err=%v", status.Code(err), err)
 	}
+	var version uint64
+	var versionID string
+	var state int32
+	if err := db.QueryRowContext(ctx, `SELECT version, id FROM friend_version WHERE owner_user_id = ?`, a).Scan(&version, &versionID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT state FROM friend_version_log WHERE owner_user_id = ? AND elem_id = ?`, a, b).Scan(&state); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := srv.UpdateFriend(ctx, &relationpb.UpdateFriendReq{OwnerUserId: a, FriendUserId: b, Remark: &remark}); !isCode(err, codes.NotFound, errorcode.RelationNotFriend) {
 		t.Fatalf("update missing code=%v err=%v", status.Code(err), err)
+	}
+	var after uint64
+	var afterID string
+	var afterState int32
+	if err := db.QueryRowContext(ctx, `SELECT version, id FROM friend_version WHERE owner_user_id = ?`, a).Scan(&after, &afterID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT state FROM friend_version_log WHERE owner_user_id = ? AND elem_id = ?`, a, b).Scan(&afterState); err != nil {
+		t.Fatal(err)
+	}
+	if after != version || afterID != versionID || afterState != state || afterState != model.VersionDelete {
+		t.Fatalf("deleted friend version %d %s state %d -> %d %s state %d", version, versionID, state, after, afterID, afterState)
 	}
 }
 

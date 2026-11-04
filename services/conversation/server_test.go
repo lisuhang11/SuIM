@@ -178,6 +178,126 @@ func TestConversationSync(t *testing.T) {
 	}
 }
 
+func TestConversationRowsStayInThisService(t *testing.T) {
+	ctx := context.Background()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	mysqlCfg := config.MySQL{
+		Address:     []string{"127.0.0.1:3306"},
+		Username:    env["MYSQL_USER"],
+		Password:    env["MYSQL_PASSWORD"],
+		Database:    env["MYSQL_DATABASE"],
+		MaxOpenConn: 5,
+		MaxIdleConn: 2,
+	}
+	st, err := store.Open(ctx, mysqlDSN(mysqlCfg), mysqlCfg.MaxOpenConn, mysqlCfg.MaxIdleConn)
+	if err != nil {
+		t.Skipf("mysql is not reachable: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	script, err := os.ReadFile(filepath.Join("..", "..", "migrations", "conversation.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx, string(script)); err != nil {
+		t.Fatal(err)
+	}
+	suffix := time.Now().UnixNano()
+	a := fmt.Sprintf("cc-%d", suffix)
+	b := fmt.Sprintf("cd-%d", suffix)
+	t.Cleanup(func() { cleanupConversation(t, mysqlCfg, a, b) })
+	seq := &recordSeq{}
+	srv := logic.New(st, &captureSender{})
+	srv.UseSeq(seq)
+
+	single := fmt.Sprintf("si_rows_%d", suffix)
+	if _, err := srv.CreateSingleChatConversations(ctx, &conversationpb.CreateSingleChatConversationsReq{
+		SendId: a, RecvId: b, ConversationId: single, ConversationType: model.ConversationSingle,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.CreateSingleChatConversations(ctx, &conversationpb.CreateSingleChatConversationsReq{
+		SendId: a, RecvId: b, ConversationId: single, ConversationType: model.ConversationSingle,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.SetConversations(ctx, &conversationpb.SetConversationsReq{
+		UserIds: []string{a},
+		Conversation: &conversationpb.ConversationReq{
+			ConversationId: single, ConversationType: model.ConversationSingle, UserId: b, IsPinned: boolPtr(true),
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pinned, err := srv.GetPinnedConversationIDs(ctx, &conversationpb.GetPinnedConversationIDsReq{UserId: a})
+	if err != nil || len(pinned.GetConversationIds()) != 1 || pinned.GetConversationIds()[0] != single {
+		t.Fatalf("pinned %+v err=%v", pinned, err)
+	}
+	none, err := srv.GetPinnedConversationIDs(ctx, &conversationpb.GetPinnedConversationIDsReq{UserId: b})
+	if err != nil || len(none.GetConversationIds()) != 0 {
+		t.Fatalf("peer pinned %+v err=%v", none, err)
+	}
+
+	groupID := fmt.Sprintf("g%d", suffix%100000000)
+	if _, err := srv.CreateGroupChatConversations(ctx, &conversationpb.CreateGroupChatConversationsReq{
+		GroupId: groupID, UserIds: []string{a, b}, ConversationType: model.ConversationGroup,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if seq.maxCalls != 1 || seq.lastSeq != 0 || len(seq.lastUsers) != 2 {
+		t.Fatalf("group seq %+v", seq)
+	}
+	groupConv := "g_" + groupID
+	if _, err := srv.SetConversationMaxSeq(ctx, &conversationpb.SetConversationMaxSeqReq{
+		ConversationId: groupConv, OwnerUserIds: []string{a}, MaxSeq: 8,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := st.ConversationsByID(ctx, a, []string{groupConv})
+	if err != nil || len(rows) != 1 || rows[0].MaxSeq != 8 || rows[0].GroupID != groupID {
+		t.Fatalf("group row %+v err=%v", rows, err)
+	}
+	if _, err := srv.SetConversationMinSeq(ctx, &conversationpb.SetConversationMinSeqReq{
+		ConversationId: groupConv, OwnerUserIds: []string{a}, MinSeq: 3,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err = st.ConversationsByID(ctx, a, []string{groupConv})
+	if err != nil || len(rows) != 1 || rows[0].MinSeq != 3 || rows[0].MaxSeq != 8 {
+		t.Fatalf("seq row %+v err=%v", rows, err)
+	}
+	notice := fmt.Sprintf("n_rows_%d", suffix)
+	if _, err := srv.CreateSingleChatConversations(ctx, &conversationpb.CreateSingleChatConversationsReq{
+		SendId: a, RecvId: b, ConversationId: notice, ConversationType: model.ConversationNotification,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	recv, err := st.ConversationsByID(ctx, b, []string{notice})
+	send, sendErr := st.ConversationsByID(ctx, a, []string{notice})
+	if err != nil || sendErr != nil || len(recv) != 1 || len(send) != 0 || recv[0].UserID != a {
+		t.Fatalf("notification recv=%+v send=%+v err=%v %v", recv, send, err, sendErr)
+	}
+}
+
+type recordSeq struct {
+	maxCalls  int
+	minCalls  int
+	lastSeq   int64
+	lastUsers []string
+}
+
+func (r *recordSeq) SetUserMaxSeq(_ context.Context, _ string, userIDs []string, seq int64) error {
+	r.maxCalls++
+	r.lastSeq = seq
+	r.lastUsers = append([]string(nil), userIDs...)
+	return nil
+}
+
+func (r *recordSeq) SetUserMinSeq(_ context.Context, _ string, _ []string, seq int64) error {
+	r.minCalls++
+	r.lastSeq = seq
+	return nil
+}
+
 type captureSender struct {
 	msgs []*msgpb.MsgData
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,15 +26,17 @@ type readSeq struct {
 	userSeq        map[string]int64
 }
 
-// SingleChats creates the two rows of a single-chat conversation.
-type SingleChats interface {
-	Ensure(ctx context.Context, conversationID, sendID, recvID string) error
+// Conversations asks the conversation service to create rows. It does not write the conversation table.
+type Conversations interface {
+	Ensure(ctx context.Context, conversationID, sendID, recvID string, sessionType int32) error
+	EnsureGroup(ctx context.Context, groupID, callerID string, sessionType int32) error
 }
 
 // RedisHandler consumes toRedis, assigns sequences, and publishes toMysql plus toPush.
 type RedisHandler struct {
 	transfer *Transfer
-	chats    SingleChats
+	chats    Conversations
+	ready    sync.Map
 	batch    *batcher
 	readCh   chan readSeq
 	readCtx  context.Context
@@ -41,8 +44,8 @@ type RedisHandler struct {
 	wg       sync.WaitGroup
 }
 
-// UseSingleChats stores conversation rows after a single-chat message is sequenced.
-func (h *RedisHandler) UseSingleChats(chats SingleChats) {
+// UseSingleChats creates conversation rows after a chat message is sequenced.
+func (h *RedisHandler) UseSingleChats(chats Conversations) {
 	if h != nil {
 		h.chats = chats
 	}
@@ -255,7 +258,7 @@ func (h *RedisHandler) persist(ctx context.Context, key string, list []*incoming
 		if err != nil {
 			return err
 		}
-		if err := h.ensureSingle(ctx, id, msgs); err != nil {
+		if err := h.ensureConversation(ctx, id, msgs); err != nil {
 			return err
 		}
 		if isNew {
@@ -278,15 +281,48 @@ func (h *RedisHandler) persist(ctx context.Context, key string, list []*incoming
 	return nil
 }
 
-func (h *RedisHandler) ensureSingle(ctx context.Context, conversationID string, msgs []*msgpb.MsgData) error {
+func (h *RedisHandler) ensureConversation(ctx context.Context, conversationID string, msgs []*msgpb.MsgData) error {
 	if h.chats == nil || len(msgs) == 0 || msgs[0] == nil {
 		return nil
 	}
 	msg := msgs[0]
-	if msg.SessionType != model.SessionSingle || msg.SendId == "" || msg.RecvId == "" || msg.SendId == msg.RecvId {
+	switch {
+	case strings.HasPrefix(conversationID, "si_") || strings.HasPrefix(conversationID, "sn_"):
+		if msg.SendId == "" || msg.RecvId == "" || msg.SendId == msg.RecvId {
+			return nil
+		}
+		return h.chats.Ensure(ctx, conversationID, msg.SendId, msg.RecvId, msg.SessionType)
+	case strings.HasPrefix(conversationID, "n_"):
+		if msg.GroupId != "" || msg.SessionType == model.SessionWriteGroup || msg.SessionType == model.SessionReadGroup {
+			return nil
+		}
+		if msg.SendId == "" || msg.RecvId == "" || msg.SendId == msg.RecvId {
+			return nil
+		}
+		return h.ensureOnce(conversationID, func() error {
+			return h.chats.Ensure(ctx, conversationID, msg.SendId, msg.RecvId, model.SessionNotification)
+		})
+	case strings.HasPrefix(conversationID, "g_"), strings.HasPrefix(conversationID, "sg_"):
+		if msg.GroupId == "" || msg.SendId == "" {
+			return nil
+		}
+		return h.ensureOnce(conversationID, func() error {
+			return h.chats.EnsureGroup(ctx, msg.GroupId, msg.SendId, msg.SessionType)
+		})
+	default:
 		return nil
 	}
-	return h.chats.Ensure(ctx, conversationID, msg.SendId, msg.RecvId)
+}
+
+func (h *RedisHandler) ensureOnce(conversationID string, create func() error) error {
+	if _, ok := h.ready.Load(conversationID); ok {
+		return nil
+	}
+	if err := create(); err != nil {
+		return err
+	}
+	h.ready.Store(conversationID, struct{}{})
+	return nil
 }
 
 func (h *RedisHandler) push(ctx context.Context, key string, list []*incoming, idOf func(*msgpb.MsgData) string) error {

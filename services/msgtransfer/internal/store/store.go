@@ -211,23 +211,6 @@ SELECT read_seq FROM seq_user WHERE user_id = ? AND conversation_id = ?`, userID
 	return n, err
 }
 
-// Ensure creates both single-chat conversation rows. A repeated call keeps the existing rows.
-// max_seq on the row stays 0. That field is a per-user visibility cap, not the message cursor.
-func (s *Store) Ensure(ctx context.Context, conversationID, sendID, recvID string) error {
-	if conversationID == "" || sendID == "" || recvID == "" || sendID == recvID {
-		return fmt.Errorf("single conversation is incomplete")
-	}
-	const query = `
-INSERT IGNORE INTO conversation (
-  owner_user_id, conversation_id, conversation_type, user_id, group_id
-) VALUES (?, ?, 1, ?, '')`
-	if _, err := s.db.ExecContext(ctx, query, sendID, conversationID, recvID); err != nil {
-		return err
-	}
-	_, err := s.db.ExecContext(ctx, query, recvID, conversationID, sendID)
-	return err
-}
-
 func duplicateColumn(err error) bool {
 	var me *mysql.MySQLError
 	return errors.As(err, &me) && me.Number == 1060

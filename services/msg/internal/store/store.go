@@ -200,23 +200,6 @@ func (s *Store) SeqBounds(ctx context.Context, userID, conversationID string) (i
 	return minSeq, maxSeq, nil
 }
 
-// PinnedConversationIDs reads conversation.is_pinned. A missing table leaves the seq response intact.
-func (s *Store) PinnedConversationIDs(ctx context.Context, userID string) ([]string, error) {
-	if userID == "" {
-		return nil, nil
-	}
-	rows, err := s.db.QueryContext(ctx, `SELECT conversation_id FROM conversation WHERE owner_user_id = ? AND is_pinned = 1`, userID)
-	if err != nil {
-		var me *mysql.MySQLError
-		if errors.As(err, &me) && me.Number == 1146 {
-			return nil, nil
-		}
-		return nil, err
-	}
-	defer rows.Close()
-	return scanStrings(rows)
-}
-
 func (s *Store) Range(ctx context.Context, conversationID string, begin, end, limit int64) ([]*msgpb.MsgData, error) {
 	if limit <= 0 || limit > 200 {
 		limit = 200
@@ -268,7 +251,8 @@ func (s *Store) UserMaxSeq(ctx context.Context, userID, conversationID string) (
 	return seq, err
 }
 
-// SetUserMaxSeq writes this user's visible ceiling. Zero clears it. The conversation row is updated when it exists.
+// SetUserMaxSeq writes this user's visible ceiling in seq_user. Zero clears it.
+// The conversation row is updated by the conversation service.
 func (s *Store) SetUserMaxSeq(ctx context.Context, conversationID, userID string, seq int64) error {
 	if userID == "" || conversationID == "" || seq < 0 {
 		return fmt.Errorf("user max seq is invalid")
@@ -276,16 +260,17 @@ func (s *Store) SetUserMaxSeq(ctx context.Context, conversationID, userID string
 	_, err := s.db.ExecContext(ctx, `
 INSERT INTO seq_user (user_id, conversation_id, max_seq) VALUES (?, ?, ?) AS new
 ON DUPLICATE KEY UPDATE max_seq = new.max_seq`, userID, conversationID, seq)
-	if err != nil {
-		return err
+	return err
+}
+
+// SetUserMinSeq writes this user's visible floor in seq_user. Zero clears it.
+func (s *Store) SetUserMinSeq(ctx context.Context, conversationID, userID string, seq int64) error {
+	if userID == "" || conversationID == "" || seq < 0 {
+		return fmt.Errorf("user min seq is invalid")
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE conversation SET max_seq = ? WHERE owner_user_id = ? AND conversation_id = ?`, seq, userID, conversationID)
-	if err != nil {
-		var me *mysql.MySQLError
-		if errors.As(err, &me) && me.Number == 1146 {
-			return nil
-		}
-	}
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO seq_user (user_id, conversation_id, min_seq) VALUES (?, ?, ?) AS new
+ON DUPLICATE KEY UPDATE min_seq = new.min_seq`, userID, conversationID, seq)
 	return err
 }
 

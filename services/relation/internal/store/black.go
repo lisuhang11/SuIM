@@ -19,6 +19,23 @@ func (s *Store) CheckBlack(ctx context.Context, user1, user2 string) (bool, bool
 	return in1, in2, nil
 }
 
+func (s *Store) BlackUserIDs(ctx context.Context, owner string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT block_user_id FROM black WHERE owner_user_id = ? ORDER BY create_time ASC, block_user_id ASC`, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (s *Store) isBlack(ctx context.Context, owner, block string) (bool, error) {
 	var one int
 	err := s.db.QueryRowContext(ctx, `SELECT 1 FROM black WHERE owner_user_id = ? AND block_user_id = ?`, owner, block).Scan(&one)

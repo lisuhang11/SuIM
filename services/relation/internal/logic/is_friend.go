@@ -21,8 +21,8 @@ func (s *Server) IsFriend(ctx context.Context, req *relationpb.IsFriendReq) (*re
 	if err := rpcctx.OneOf(ctx, user1, user2); err != nil {
 		return nil, err
 	}
-	// 2. 查询双方好友列表。
-	in1, in2, err := s.store.CheckIn(ctx, user1, user2)
+	// 2. 查询双方好友列表。有缓存时走本地和 Redis，没有则直接查表。
+	in1, in2, err := s.friendship(ctx, user1, user2)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("check friendship")
 	}

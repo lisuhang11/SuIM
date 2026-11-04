@@ -33,6 +33,11 @@ type Groups interface {
 	Speaker(ctx context.Context, groupID, userID string) (GroupSpeaker, error)
 }
 
+// Pinned lists conversation ids the user has pinned. The conversation service owns that table.
+type Pinned interface {
+	PinnedConversationIDs(ctx context.Context, userID string) ([]string, error)
+}
+
 // Relations checks friendship and blocks before a single chat is accepted.
 type Relations interface {
 	IsFriend(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
@@ -47,7 +52,7 @@ type History interface {
 	SeqBounds(ctx context.Context, userID, conversationID string) (minSeq, maxSeq int64, err error)
 	UserMaxSeq(ctx context.Context, userID, conversationID string) (int64, error)
 	SetUserMaxSeq(ctx context.Context, conversationID, userID string, seq int64) error
-	PinnedConversationIDs(ctx context.Context, userID string) ([]string, error)
+	SetUserMinSeq(ctx context.Context, conversationID, userID string, seq int64) error
 	Range(ctx context.Context, conversationID string, begin, end, limit int64) ([]*msgpb.MsgData, error)
 	BySeqs(ctx context.Context, conversationID string, seqs []int64) ([]*msgpb.MsgData, error)
 	Last(ctx context.Context, conversationID string) (*msgpb.MsgData, error)
@@ -87,11 +92,19 @@ type Server struct {
 	publish   mq.Producer
 	relations Relations
 	groups    Groups
+	pinned    Pinned
 	hooks     Hooks
 }
 
 func New(st History, publish mq.Producer, relations Relations, groups Groups) *Server {
 	return &Server{store: st, publish: publish, relations: relations, groups: groups}
+}
+
+// UsePinned reads pinned conversation ids from the conversation service.
+func (s *Server) UsePinned(pinned Pinned) {
+	if s != nil {
+		s.pinned = pinned
+	}
 }
 
 // UseHooks attaches webhook switches. A nil client leaves every callback disabled.

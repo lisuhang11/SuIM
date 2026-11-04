@@ -5,14 +5,16 @@ import (
 	"time"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
+	"github.com/lisuhang11/SuIM/pkg/register"
 )
 
 type Config struct {
-	MySQL              config.MySQL `yaml:"mysql"`
-	Redis              config.Redis `yaml:"redis"`
-	Queue              Queue        `yaml:"queue"`
-	MsgCacheTTLSeconds int          `yaml:"msgCacheTTLSeconds"`
-	Webhooks           Webhooks     `yaml:"webhooks"`
+	MySQL              config.MySQL    `yaml:"mysql"`
+	Redis              config.Redis    `yaml:"redis"`
+	Registry           register.Config `yaml:"registry"`
+	Queue              Queue           `yaml:"queue"`
+	MsgCacheTTLSeconds int             `yaml:"msgCacheTTLSeconds"`
+	Webhooks           Webhooks        `yaml:"webhooks"`
 }
 
 type Queue struct {
@@ -41,6 +43,9 @@ func (c *Config) Validate() error {
 	}
 	if len(c.Redis.Address) == 0 {
 		return fmt.Errorf("redis address is required")
+	}
+	if c.Registry.Type == "" {
+		return fmt.Errorf("registry type is required")
 	}
 	if c.Redis.RedisMode == "" {
 		c.Redis.RedisMode = "standalone"

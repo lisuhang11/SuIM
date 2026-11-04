@@ -68,6 +68,7 @@ func (s *Server) JoinGroup(ctx context.Context, req *grouppb.JoinGroupReq) (*gro
 		if err := s.reopenHistory(ctx, group, []string{userID}); err != nil {
 			return nil, err
 		}
+		s.createGroupConversations(ctx, group, []string{userID})
 		// 进入通知带上新的成员版本。
 		if latest, err := s.store.TakeGroup(ctx, groupID); err == nil {
 			group = latest

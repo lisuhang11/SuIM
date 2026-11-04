@@ -19,10 +19,12 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/group/internal/config"
+	"github.com/lisuhang11/SuIM/services/group/internal/convclient"
 	"github.com/lisuhang11/SuIM/services/group/internal/logic"
 	"github.com/lisuhang11/SuIM/services/group/internal/msgclient"
 	"github.com/lisuhang11/SuIM/services/group/internal/store"
@@ -102,6 +104,15 @@ func run(cfgPath, migratePath string) error {
 	}
 	defer msgConn.Close()
 
+	conversationConn, err := reg.Dial(ctx, "conversation",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial conversation service: %w", err)
+	}
+	defer conversationConn.Close()
+
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
@@ -114,12 +125,14 @@ func run(cfgPath, migratePath string) error {
 	}
 	w := cfg.Webhooks
 	messages := msgclient.New(msgpb.NewMsgServiceClient(msgConn))
+	conversations := convclient.New(conversationpb.NewConversationServiceClient(conversationConn))
 	groupServer := logic.New(
 		st,
 		userclient.New(userpb.NewUserServiceClient(userConn)),
 		messages,
 	)
-	groupServer.UseSeq(messages)
+	groupServer.UseSeq(historySeq{msg: messages, conv: conversations})
+	groupServer.UseConversations(conversations)
 	groupServer.UseQuota(store.NewQuota(rdb))
 	groupServer.UseMemberLimit(cfg.MemberLimit.Normal, cfg.MemberLimit.Super)
 	groupServer.UseHooks(logic.Hooks{
@@ -181,6 +194,20 @@ func run(cfgPath, migratePath string) error {
 		_ = reg.Deregister(offCtx)
 		return err
 	}
+}
+
+// historySeq reads the conversation cursor from msg and writes the per-user ceiling through conversation.
+type historySeq struct {
+	msg  *msgclient.Client
+	conv *convclient.Client
+}
+
+func (h historySeq) ConversationMaxSeq(ctx context.Context, conversationID string) (int64, error) {
+	return h.msg.ConversationMaxSeq(ctx, conversationID)
+}
+
+func (h historySeq) SetConversationMaxSeq(ctx context.Context, conversationID string, userIDs []string, seq int64) error {
+	return h.conv.SetConversationMaxSeq(ctx, conversationID, userIDs, seq)
 }
 
 func mysqlDSN(cfg config.MySQL) string {

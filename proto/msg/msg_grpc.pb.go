@@ -30,6 +30,7 @@ const (
 	MsgService_SetConversationHasReadSeq_FullMethodName        = "/msg.MsgService/SetConversationHasReadSeq"
 	MsgService_GetConversationMaxSeq_FullMethodName            = "/msg.MsgService/GetConversationMaxSeq"
 	MsgService_SetUserConversationMaxSeq_FullMethodName        = "/msg.MsgService/SetUserConversationMaxSeq"
+	MsgService_SetUserConversationMinSeq_FullMethodName        = "/msg.MsgService/SetUserConversationMinSeq"
 )
 
 // MsgServiceClient is the client API for MsgService service.
@@ -54,6 +55,8 @@ type MsgServiceClient interface {
 	GetConversationMaxSeq(ctx context.Context, in *GetConversationMaxSeqReq, opts ...grpc.CallOption) (*GetConversationMaxSeqResp, error)
 	// SetUserConversationMaxSeq writes one user's visible ceiling. Zero clears it.
 	SetUserConversationMaxSeq(ctx context.Context, in *SetUserConversationMaxSeqReq, opts ...grpc.CallOption) (*SetUserConversationMaxSeqResp, error)
+	// SetUserConversationMinSeq writes one user's visible floor. Zero clears it.
+	SetUserConversationMinSeq(ctx context.Context, in *SetUserConversationMinSeqReq, opts ...grpc.CallOption) (*SetUserConversationMinSeqResp, error)
 }
 
 type msgServiceClient struct {
@@ -174,6 +177,16 @@ func (c *msgServiceClient) SetUserConversationMaxSeq(ctx context.Context, in *Se
 	return out, nil
 }
 
+func (c *msgServiceClient) SetUserConversationMinSeq(ctx context.Context, in *SetUserConversationMinSeqReq, opts ...grpc.CallOption) (*SetUserConversationMinSeqResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetUserConversationMinSeqResp)
+	err := c.cc.Invoke(ctx, MsgService_SetUserConversationMinSeq_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServiceServer is the server API for MsgService service.
 // All implementations must embed UnimplementedMsgServiceServer
 // for forward compatibility.
@@ -196,6 +209,8 @@ type MsgServiceServer interface {
 	GetConversationMaxSeq(context.Context, *GetConversationMaxSeqReq) (*GetConversationMaxSeqResp, error)
 	// SetUserConversationMaxSeq writes one user's visible ceiling. Zero clears it.
 	SetUserConversationMaxSeq(context.Context, *SetUserConversationMaxSeqReq) (*SetUserConversationMaxSeqResp, error)
+	// SetUserConversationMinSeq writes one user's visible floor. Zero clears it.
+	SetUserConversationMinSeq(context.Context, *SetUserConversationMinSeqReq) (*SetUserConversationMinSeqResp, error)
 	mustEmbedUnimplementedMsgServiceServer()
 }
 
@@ -238,6 +253,9 @@ func (UnimplementedMsgServiceServer) GetConversationMaxSeq(context.Context, *Get
 }
 func (UnimplementedMsgServiceServer) SetUserConversationMaxSeq(context.Context, *SetUserConversationMaxSeqReq) (*SetUserConversationMaxSeqResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetUserConversationMaxSeq not implemented")
+}
+func (UnimplementedMsgServiceServer) SetUserConversationMinSeq(context.Context, *SetUserConversationMinSeqReq) (*SetUserConversationMinSeqResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetUserConversationMinSeq not implemented")
 }
 func (UnimplementedMsgServiceServer) mustEmbedUnimplementedMsgServiceServer() {}
 func (UnimplementedMsgServiceServer) testEmbeddedByValue()                    {}
@@ -458,6 +476,24 @@ func _MsgService_SetUserConversationMaxSeq_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MsgService_SetUserConversationMinSeq_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetUserConversationMinSeqReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServiceServer).SetUserConversationMinSeq(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MsgService_SetUserConversationMinSeq_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServiceServer).SetUserConversationMinSeq(ctx, req.(*SetUserConversationMinSeqReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MsgService_ServiceDesc is the grpc.ServiceDesc for MsgService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -508,6 +544,10 @@ var MsgService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetUserConversationMaxSeq",
 			Handler:    _MsgService_SetUserConversationMaxSeq_Handler,
+		},
+		{
+			MethodName: "SetUserConversationMinSeq",
+			Handler:    _MsgService_SetUserConversationMinSeq_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

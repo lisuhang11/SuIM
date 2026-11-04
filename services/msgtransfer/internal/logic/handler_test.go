@@ -329,10 +329,14 @@ type memChats struct {
 	n  int
 }
 
-func (m *memChats) Ensure(context.Context, string, string, string) error {
+func (m *memChats) Ensure(context.Context, string, string, string, int32) error {
 	m.mu.Lock()
 	m.n++
 	m.mu.Unlock()
+	return nil
+}
+
+func (m *memChats) EnsureGroup(context.Context, string, string, int32) error {
 	return nil
 }
 

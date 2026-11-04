@@ -17,6 +17,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/relationcache"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
@@ -67,6 +68,23 @@ func run(cfgPath, migratePath string) error {
 	if err := st.Migrate(ctx, string(script)); err != nil {
 		return err
 	}
+
+	rdb, err := store.NewRedis(cfg.Redis)
+	if err != nil {
+		return err
+	}
+	defer rdb.Close()
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		return fmt.Errorf("ping redis: %w", err)
+	}
+	lists, stopLists := relationcache.NewLists(ctx, rdb, relationcache.Config{
+		Topic:         cfg.LocalCache.Topic,
+		SlotNum:       cfg.LocalCache.SlotNum,
+		SlotSize:      cfg.LocalCache.SlotSize,
+		SuccessExpire: time.Duration(cfg.LocalCache.SuccessExpire) * time.Second,
+		FailedExpire:  time.Duration(cfg.LocalCache.FailedExpire) * time.Second,
+	})
+	defer stopLists()
 
 	reg, err := register.New(&cfg.Registry)
 	if err != nil {
@@ -121,6 +139,7 @@ func run(cfgPath, migratePath string) error {
 		BeforeAddBlack:        w.BeforeAddBlack,
 		AfterRemoveBlack:      w.AfterRemoveBlack,
 	})
+	relationServer.UseCache(lists)
 	relationServer.UseGroups(groupclient.New(grouppb.NewGroupServiceClient(groupConn)))
 	relationServer.UseSender(msgclient.New(msgpb.NewMsgServiceClient(msgConn)))
 	relationpb.RegisterRelationServiceServer(srv, relationServer)

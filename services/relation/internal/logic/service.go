@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/lisuhang11/SuIM/pkg/relationcache"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	relationpb "github.com/lisuhang11/SuIM/proto/relation"
@@ -48,6 +49,7 @@ type Server struct {
 	groups Groups
 	sender MsgSender
 	hooks  Hooks
+	lists  *relationcache.Lists
 	now    func() time.Time
 }
 

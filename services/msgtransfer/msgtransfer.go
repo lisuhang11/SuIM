@@ -13,11 +13,19 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
+	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	grouppb "github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/services/msgtransfer/internal/cache"
 	svcconfig "github.com/lisuhang11/SuIM/services/msgtransfer/internal/config"
+	"github.com/lisuhang11/SuIM/services/msgtransfer/internal/conversationclient"
 	"github.com/lisuhang11/SuIM/services/msgtransfer/internal/logic"
 	"github.com/lisuhang11/SuIM/services/msgtransfer/internal/store"
 )
@@ -25,7 +33,7 @@ import (
 func main() {
 	cfgPath := flag.String("c", "services/msgtransfer/etc/msgtransfer.yaml", "config file path")
 	migratePath := flag.String("migrate", "migrations/msg.sql", "sql file applied on startup")
-	conversationMigrate := flag.String("conversation-migrate", "migrations/conversation.sql", "conversation sql applied on startup")
+	conversationMigrate := flag.String("conversation-migrate", "", "ignored; the conversation service owns that schema")
 	flag.Parse()
 	if err := run(*cfgPath, *migratePath, *conversationMigrate); err != nil {
 		slog.Error("msgtransfer stopped", "err", err)
@@ -57,12 +65,8 @@ func run(cfgPath, migratePath, conversationMigrate string) error {
 	if err := st.Migrate(ctx, string(script)); err != nil {
 		return err
 	}
-	conversationScript, err := os.ReadFile(conversationMigrate)
-	if err != nil {
-		return fmt.Errorf("read conversation migration: %w", err)
-	}
-	if err := st.Migrate(ctx, string(conversationScript)); err != nil {
-		return err
+	if conversationMigrate != "" {
+		slog.Info("skipping conversation schema migrate; the conversation service owns it", "path", conversationMigrate)
 	}
 
 	rdb, err := cache.NewRedis(cfg.Redis)
@@ -82,8 +86,33 @@ func run(cfgPath, migratePath, conversationMigrate string) error {
 	hooks := webhook.NewWebhookClient(cfg.Webhooks.URL)
 	defer hooks.Close()
 
+	reg, err := register.New(&cfg.Registry)
+	if err != nil {
+		return err
+	}
+	defer reg.Close()
+	conversationConn, err := reg.Dial(ctx, "conversation",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial conversation service: %w", err)
+	}
+	defer conversationConn.Close()
+	groupConn, err := reg.Dial(ctx, "group",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial group service: %w", err)
+	}
+	defer groupConn.Close()
+
 	redisHandler := logic.NewRedisHandler(transfer, cfg.Queue.BatchSize, cfg.Queue.Workers, cfg.BatchInterval())
-	redisHandler.UseSingleChats(st)
+	redisHandler.UseSingleChats(conversationclient.New(
+		conversationpb.NewConversationServiceClient(conversationConn),
+		grouppb.NewGroupServiceClient(groupConn),
+	))
 	redisHandler.Start(ctx)
 	defer redisHandler.Close()
 	mysqlHandler := logic.NewMySQLHandler(st, hooks, cfg.Webhooks.AfterMsgSaveDB)

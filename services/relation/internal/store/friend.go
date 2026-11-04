@@ -39,41 +39,49 @@ func (s *Store) isFriend(ctx context.Context, owner, friend string) (bool, error
 // AddFriendRequest inserts a pending request. A pending duplicate is rejected.
 // A refused or previously agreed request is reopened, so the same pair can apply again.
 func (s *Store) AddFriendRequest(ctx context.Context, from, to, msg string, now time.Time) error {
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		err = s.addFriendRequest(ctx, from, to, msg, now)
+		if !isDeadlock(err) {
+			return err
+		}
+	}
+	return err
+}
+
+// addFriendRequest writes the pair in one statement. A pending row is left unchanged
+// (zero affected rows). A refused or agreed row is reopened. There is no gap lock
+// taken before the insert, so concurrent inserts of different pairs do not deadlock.
+func (s *Store) addFriendRequest(ctx context.Context, from, to, msg string, now time.Time) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var result int32
-	err = tx.QueryRowContext(ctx, `SELECT handle_result FROM friend_request WHERE from_user_id = ? AND to_user_id = ? FOR UPDATE`, from, to).Scan(&result)
-	if errors.Is(err, sql.ErrNoRows) {
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO friend_request (
-				from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time
-			) VALUES (?, ?, ?, ?, ?, '', '', NULL)`,
-			from, to, model.HandlePending, msg, now.UTC())
-		if err != nil {
-			if isDuplicate(err) {
-				return ErrRequestRepeated
-			}
-			return err
-		}
-		return tx.Commit()
-	}
+	res, err := tx.ExecContext(ctx, `
+		INSERT INTO friend_request (
+			from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time
+		) VALUES (?, ?, ?, ?, ?, '', '', NULL)
+		ON DUPLICATE KEY UPDATE
+			req_msg = IF(handle_result = ?, req_msg, VALUES(req_msg)),
+			create_time = IF(handle_result = ?, create_time, VALUES(create_time)),
+			handler_user_id = IF(handle_result = ?, handler_user_id, ''),
+			handle_msg = IF(handle_result = ?, handle_msg, ''),
+			handle_time = IF(handle_result = ?, handle_time, NULL),
+			handle_result = IF(handle_result = ?, handle_result, VALUES(handle_result))`,
+		from, to, model.HandlePending, msg, now.UTC(),
+		model.HandlePending, model.HandlePending, model.HandlePending,
+		model.HandlePending, model.HandlePending, model.HandlePending)
 	if err != nil {
 		return err
 	}
-	if result == model.HandlePending {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
 		return ErrRequestRepeated
-	}
-	_, err = tx.ExecContext(ctx, `
-		UPDATE friend_request
-		SET handle_result = ?, req_msg = ?, create_time = ?, handler_user_id = '', handle_msg = '', handle_time = NULL
-		WHERE from_user_id = ? AND to_user_id = ?`,
-		model.HandlePending, msg, now.UTC(), from, to)
-	if err != nil {
-		return err
 	}
 	return tx.Commit()
 }
@@ -300,4 +308,14 @@ func (s *Store) UpdateFriend(ctx context.Context, owner, friend string, remark *
 func isDuplicate(err error) bool {
 	var me *mysqldriver.MySQLError
 	return errors.As(err, &me) && me.Number == 1062
+}
+
+func isDeadlock(err error) bool {
+	var me *mysqldriver.MySQLError
+	return errors.As(err, &me) && me.Number == 1213
+}
+
+func duplicateIndex(err error, stmt string) bool {
+	var me *mysqldriver.MySQLError
+	return errors.As(err, &me) && me.Number == 1061 && strings.Contains(stmt, "ADD INDEX")
 }

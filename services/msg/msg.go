@@ -19,8 +19,10 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/register"
+	"github.com/lisuhang11/SuIM/pkg/relationcache"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/proto/relation"
@@ -97,6 +99,14 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("dial group service: %w", err)
 	}
 	defer groupConn.Close()
+	conversationConn, err := reg.Dial(ctx, "conversation",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial conversation service: %w", err)
+	}
+	defer conversationConn.Close()
 
 	publisher := mq.NewRedisProducer(rdb, cfg.Queue.StreamPrefix, mq.TopicToRedis, cfg.Queue.MaxLen)
 	var hooks *webhook.Client
@@ -105,12 +115,15 @@ func run(cfgPath, migratePath string) error {
 		defer hooks.Close()
 	}
 	w := cfg.Webhooks
+	relations, stopRelations := relationcache.NewRPC(ctx, rdb, rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)), relationcache.DefaultConfig())
+	defer stopRelations()
 	srv := logic.New(
 		st,
 		publisher,
-		rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)),
+		relations,
 		rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn)),
 	)
+	srv.UsePinned(rpc.NewConversationClient(conversationpb.NewConversationServiceClient(conversationConn)))
 	srv.UseHooks(logic.Hooks{
 		Client:           hooks,
 		BeforeSendSingle: msgBefore(w.BeforeSendSingle),

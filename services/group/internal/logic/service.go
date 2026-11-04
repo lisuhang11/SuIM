@@ -50,6 +50,7 @@ type Server struct {
 	hooks        Hooks
 	quota        Quota
 	seq          SeqClient
+	convs        GroupConversations
 	memberNormal int
 	memberSuper  int
 	now          func() time.Time

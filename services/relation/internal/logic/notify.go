@@ -70,7 +70,7 @@ func (s *Server) notifyFriendDeleted(ctx context.Context, owner, friend string) 
 
 func (s *Server) notifyFriendRemark(ctx context.Context, owner, friend string) {
 	tips := friendRemarkTips{FromToUserID: &fromToUserID{FromUserID: owner, ToUserID: friend}}
-	if head, err := s.store.FriendVersion(ctx, owner); err != nil {
+	if head, err := s.friendHead(ctx, owner); err != nil {
 		slog.Warn("friend version", "err", err, "userID", owner)
 	} else {
 		tips.FriendVersion = head.Version

@@ -50,9 +50,16 @@ func TestGetSeqMessageBounds(t *testing.T) {
 	}
 }
 
+type pinnedIDs []string
+
+func (p pinnedIDs) PinnedConversationIDs(context.Context, string) ([]string, error) {
+	return []string(p), nil
+}
+
 func TestGetConversationsFillsTimeAndPinned(t *testing.T) {
-	hist := &fakeHistory{max: 5, read: 2, seqTime: 99, pinned: []string{"si_a_b"}}
+	hist := &fakeHistory{max: 5, read: 2, seqTime: 99}
 	srv := New(hist, nil, nil, nil)
+	srv.UsePinned(pinnedIDs{"si_a_b"})
 	resp, err := srv.GetConversationsHasReadAndMaxSeq(context.Background(), &msgpb.GetConversationsHasReadAndMaxSeqReq{
 		UserId:          "a",
 		ConversationIds: []string{"si_a_b"},

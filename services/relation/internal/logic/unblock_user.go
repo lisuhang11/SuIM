@@ -28,6 +28,7 @@ func (s *Server) UnblockUser(ctx context.Context, req *relationpb.UnblockUserReq
 	if err := s.store.DeleteBlack(ctx, owner, block); err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("remove black")
 	}
+	s.dropBlacks(ctx, owner)
 	// 3. 通知对方已取消拉黑，并调用删除后 webhook。
 	s.notifyBlackDeleted(ctx, owner, block)
 	s.webhookAfterRemoveBlack(ctx, owner, block)

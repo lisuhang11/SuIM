@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v3.21.12
-// source: conversation.proto
+// source: conversation/conversation.proto
 
 package conversationpb
 
@@ -1067,5 +1067,5 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "conversation.proto",
+	Metadata: "conversation/conversation.proto",
 }

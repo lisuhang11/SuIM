@@ -26,6 +26,7 @@ func (s *Server) DeleteFriend(ctx context.Context, req *relationpb.DeleteFriendR
 		}
 		return nil, errorcode.ErrInternal.WithMsg("delete friend")
 	}
+	s.dropFriends(ctx, owner)
 	// 3. 通知对方好友已删除，并调用删除后 webhook。
 	s.notifyFriendDeleted(ctx, owner, friend)
 	s.afterDeleteFriend(ctx, owner, friend)

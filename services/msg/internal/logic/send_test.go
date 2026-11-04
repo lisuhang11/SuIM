@@ -335,7 +335,6 @@ type fakeHistory struct {
 	read       int64
 	userMax    int64
 	seqTime    int64
-	pinned     []string
 	begin, end int64
 	readUser   string
 	readConv   string
@@ -380,8 +379,8 @@ func (f *fakeHistory) SetUserMaxSeq(_ context.Context, _, _ string, seq int64) e
 	f.userMax = seq
 	return nil
 }
-func (f *fakeHistory) PinnedConversationIDs(context.Context, string) ([]string, error) {
-	return f.pinned, nil
+func (f *fakeHistory) SetUserMinSeq(context.Context, string, string, int64) error {
+	return nil
 }
 func (f *fakeHistory) Range(_ context.Context, _ string, begin, end, _ int64) ([]*msgpb.MsgData, error) {
 	f.begin, f.end = begin, end

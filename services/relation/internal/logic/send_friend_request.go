@@ -47,7 +47,7 @@ func (s *Server) SendFriendRequest(ctx context.Context, req *relationpb.SendFrie
 		return nil, err
 	}
 	// 5. 已经互为好友则拒绝。单方面关系仍允许再次申请。
-	in1, in2, err := s.store.CheckIn(ctx, from, to)
+	in1, in2, err := s.friendship(ctx, from, to)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("check friendship")
 	}

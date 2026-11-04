@@ -44,6 +44,7 @@ func (s *Server) BlockUser(ctx context.Context, req *relationpb.BlockUserReq) (*
 		}
 		return nil, errorcode.ErrInternal.WithMsg("add black")
 	}
+	s.dropBlacks(ctx, owner)
 	// 5. 通知对方已被拉黑。
 	s.notifyBlackAdded(ctx, owner, block)
 	return &relationpb.BlockUserResp{}, nil
@@ -51,7 +52,7 @@ func (s *Server) BlockUser(ctx context.Context, req *relationpb.BlockUserReq) (*
 
 // rejectIfBlocked stops a friend request or an agreement when either user has blocked the other.
 func (s *Server) rejectIfBlocked(ctx context.Context, user1, user2 string) error {
-	in1, in2, err := s.store.CheckBlack(ctx, user1, user2)
+	in1, in2, err := s.blocked(ctx, user1, user2)
 	if err != nil {
 		return errorcode.ErrInternal.WithMsg("check black")
 	}

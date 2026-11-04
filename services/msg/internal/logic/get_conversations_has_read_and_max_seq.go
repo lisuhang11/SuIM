@@ -20,9 +20,8 @@ func (s *Server) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *msgp
 		}
 	}
 	out := &msgpb.GetConversationsHasReadAndMaxSeqResp{Seqs: map[string]*msgpb.Seqs{}}
-	// 1. 只有客户端要求时才查置顶。会话表不存在时仍返回序号。
-	if req.GetReturnPinned() && s.store != nil {
-		pinned, err := s.store.PinnedConversationIDs(ctx, userID)
+	if req.GetReturnPinned() && s.pinned != nil {
+		pinned, err := s.pinned.PinnedConversationIDs(ctx, userID)
 		if err != nil {
 			return nil, errorcode.ErrInternal.WithMsg("query pinned conversations")
 		}

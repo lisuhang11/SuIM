@@ -38,6 +38,7 @@ func (s *Server) RespondFriendApply(ctx context.Context, req *relationpb.Respond
 		if err := s.store.AgreeFriendRequest(ctx, from, to, handleMsg, s.now()); err != nil {
 			return nil, friendRequestErr(err)
 		}
+		s.dropFriends(ctx, from, to)
 		// 5. 通知申请人已同意，并调用同意后 webhook。
 		s.notifyFriendAgreed(ctx, from, to, handleMsg)
 		s.afterAddFriendAgree(ctx, from, to, handleMsg, model.HandleAgree)

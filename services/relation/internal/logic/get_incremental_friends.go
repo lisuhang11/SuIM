@@ -19,7 +19,7 @@ func (s *Server) GetIncrementalFriends(ctx context.Context, req *relationpb.GetI
 		return nil, err
 	}
 	// 2. 读取当前版本。版本号没变就原样返回。
-	head, err := s.store.FriendVersion(ctx, userID)
+	head, err := s.friendHead(ctx, userID)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("query friend version")
 	}

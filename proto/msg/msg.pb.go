@@ -1901,6 +1901,102 @@ func (*SetUserConversationMaxSeqResp) Descriptor() ([]byte, []int) {
 	return file_msg_msg_proto_rawDescGZIP(), []int{31}
 }
 
+type SetUserConversationMinSeqReq struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	UserIds        []string               `protobuf:"bytes,2,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	MinSeq         int64                  `protobuf:"varint,3,opt,name=min_seq,json=minSeq,proto3" json:"min_seq,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SetUserConversationMinSeqReq) Reset() {
+	*x = SetUserConversationMinSeqReq{}
+	mi := &file_msg_msg_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetUserConversationMinSeqReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetUserConversationMinSeqReq) ProtoMessage() {}
+
+func (x *SetUserConversationMinSeqReq) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_msg_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetUserConversationMinSeqReq.ProtoReflect.Descriptor instead.
+func (*SetUserConversationMinSeqReq) Descriptor() ([]byte, []int) {
+	return file_msg_msg_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *SetUserConversationMinSeqReq) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *SetUserConversationMinSeqReq) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
+func (x *SetUserConversationMinSeqReq) GetMinSeq() int64 {
+	if x != nil {
+		return x.MinSeq
+	}
+	return 0
+}
+
+type SetUserConversationMinSeqResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetUserConversationMinSeqResp) Reset() {
+	*x = SetUserConversationMinSeqResp{}
+	mi := &file_msg_msg_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetUserConversationMinSeqResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetUserConversationMinSeqResp) ProtoMessage() {}
+
+func (x *SetUserConversationMinSeqResp) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_msg_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetUserConversationMinSeqResp.ProtoReflect.Descriptor instead.
+func (*SetUserConversationMinSeqResp) Descriptor() ([]byte, []int) {
+	return file_msg_msg_proto_rawDescGZIP(), []int{33}
+}
+
 type SetAppBackgroundStatusReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -1911,7 +2007,7 @@ type SetAppBackgroundStatusReq struct {
 
 func (x *SetAppBackgroundStatusReq) Reset() {
 	*x = SetAppBackgroundStatusReq{}
-	mi := &file_msg_msg_proto_msgTypes[32]
+	mi := &file_msg_msg_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1923,7 +2019,7 @@ func (x *SetAppBackgroundStatusReq) String() string {
 func (*SetAppBackgroundStatusReq) ProtoMessage() {}
 
 func (x *SetAppBackgroundStatusReq) ProtoReflect() protoreflect.Message {
-	mi := &file_msg_msg_proto_msgTypes[32]
+	mi := &file_msg_msg_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1936,7 +2032,7 @@ func (x *SetAppBackgroundStatusReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetAppBackgroundStatusReq.ProtoReflect.Descriptor instead.
 func (*SetAppBackgroundStatusReq) Descriptor() ([]byte, []int) {
-	return file_msg_msg_proto_rawDescGZIP(), []int{32}
+	return file_msg_msg_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SetAppBackgroundStatusReq) GetUserId() string {
@@ -1963,7 +2059,7 @@ type SubUserOnlineStatus struct {
 
 func (x *SubUserOnlineStatus) Reset() {
 	*x = SubUserOnlineStatus{}
-	mi := &file_msg_msg_proto_msgTypes[33]
+	mi := &file_msg_msg_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1975,7 +2071,7 @@ func (x *SubUserOnlineStatus) String() string {
 func (*SubUserOnlineStatus) ProtoMessage() {}
 
 func (x *SubUserOnlineStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_msg_msg_proto_msgTypes[33]
+	mi := &file_msg_msg_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1988,7 +2084,7 @@ func (x *SubUserOnlineStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubUserOnlineStatus.ProtoReflect.Descriptor instead.
 func (*SubUserOnlineStatus) Descriptor() ([]byte, []int) {
-	return file_msg_msg_proto_rawDescGZIP(), []int{33}
+	return file_msg_msg_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SubUserOnlineStatus) GetSubscribeUserId() []string {
@@ -2015,7 +2111,7 @@ type SubUserOnlineStatusElem struct {
 
 func (x *SubUserOnlineStatusElem) Reset() {
 	*x = SubUserOnlineStatusElem{}
-	mi := &file_msg_msg_proto_msgTypes[34]
+	mi := &file_msg_msg_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2027,7 +2123,7 @@ func (x *SubUserOnlineStatusElem) String() string {
 func (*SubUserOnlineStatusElem) ProtoMessage() {}
 
 func (x *SubUserOnlineStatusElem) ProtoReflect() protoreflect.Message {
-	mi := &file_msg_msg_proto_msgTypes[34]
+	mi := &file_msg_msg_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2040,7 +2136,7 @@ func (x *SubUserOnlineStatusElem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubUserOnlineStatusElem.ProtoReflect.Descriptor instead.
 func (*SubUserOnlineStatusElem) Descriptor() ([]byte, []int) {
-	return file_msg_msg_proto_rawDescGZIP(), []int{34}
+	return file_msg_msg_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *SubUserOnlineStatusElem) GetUserId() string {
@@ -2066,7 +2162,7 @@ type SubUserOnlineStatusTips struct {
 
 func (x *SubUserOnlineStatusTips) Reset() {
 	*x = SubUserOnlineStatusTips{}
-	mi := &file_msg_msg_proto_msgTypes[35]
+	mi := &file_msg_msg_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2078,7 +2174,7 @@ func (x *SubUserOnlineStatusTips) String() string {
 func (*SubUserOnlineStatusTips) ProtoMessage() {}
 
 func (x *SubUserOnlineStatusTips) ProtoReflect() protoreflect.Message {
-	mi := &file_msg_msg_proto_msgTypes[35]
+	mi := &file_msg_msg_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2091,7 +2187,7 @@ func (x *SubUserOnlineStatusTips) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubUserOnlineStatusTips.ProtoReflect.Descriptor instead.
 func (*SubUserOnlineStatusTips) Descriptor() ([]byte, []int) {
-	return file_msg_msg_proto_rawDescGZIP(), []int{35}
+	return file_msg_msg_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *SubUserOnlineStatusTips) GetSubscribers() []*SubUserOnlineStatusElem {
@@ -2259,7 +2355,12 @@ const file_msg_msg_proto_rawDesc = "" +
 	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x19\n" +
 	"\buser_ids\x18\x02 \x03(\tR\auserIds\x12\x17\n" +
 	"\amax_seq\x18\x03 \x01(\x03R\x06maxSeq\"\x1f\n" +
-	"\x1dSetUserConversationMaxSeqResp\"Y\n" +
+	"\x1dSetUserConversationMaxSeqResp\"{\n" +
+	"\x1cSetUserConversationMinSeqReq\x12'\n" +
+	"\x0fconversation_id\x18\x01 \x01(\tR\x0econversationId\x12\x19\n" +
+	"\buser_ids\x18\x02 \x03(\tR\auserIds\x12\x17\n" +
+	"\amin_seq\x18\x03 \x01(\x03R\x06minSeq\"\x1f\n" +
+	"\x1dSetUserConversationMinSeqResp\"Y\n" +
 	"\x19SetAppBackgroundStatusReq\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12#\n" +
 	"\ris_background\x18\x02 \x01(\bR\fisBackground\"q\n" +
@@ -2270,7 +2371,7 @@ const file_msg_msg_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12.\n" +
 	"\x13online_platform_ids\x18\x02 \x03(\x05R\x11onlinePlatformIds\"Y\n" +
 	"\x17SubUserOnlineStatusTips\x12>\n" +
-	"\vsubscribers\x18\x01 \x03(\v2\x1c.msg.SubUserOnlineStatusElemR\vsubscribers2\xe6\x06\n" +
+	"\vsubscribers\x18\x01 \x03(\v2\x1c.msg.SubUserOnlineStatusElemR\vsubscribers2\xca\a\n" +
 	"\n" +
 	"MsgService\x12,\n" +
 	"\aSendMsg\x12\x0f.msg.SendMsgReq\x1a\x10.msg.SendMsgResp\x122\n" +
@@ -2283,7 +2384,8 @@ const file_msg_msg_proto_rawDesc = "" +
 	"\x16MarkConversationAsRead\x12\x1e.msg.MarkConversationAsReadReq\x1a\x1f.msg.MarkConversationAsReadResp\x12b\n" +
 	"\x19SetConversationHasReadSeq\x12!.msg.SetConversationHasReadSeqReq\x1a\".msg.SetConversationHasReadSeqResp\x12V\n" +
 	"\x15GetConversationMaxSeq\x12\x1d.msg.GetConversationMaxSeqReq\x1a\x1e.msg.GetConversationMaxSeqResp\x12b\n" +
-	"\x19SetUserConversationMaxSeq\x12!.msg.SetUserConversationMaxSeqReq\x1a\".msg.SetUserConversationMaxSeqRespB,Z*github.com/lisuhang11/SuIM/proto/msg;msgpbb\x06proto3"
+	"\x19SetUserConversationMaxSeq\x12!.msg.SetUserConversationMaxSeqReq\x1a\".msg.SetUserConversationMaxSeqResp\x12b\n" +
+	"\x19SetUserConversationMinSeq\x12!.msg.SetUserConversationMinSeqReq\x1a\".msg.SetUserConversationMinSeqRespB,Z*github.com/lisuhang11/SuIM/proto/msg;msgpbb\x06proto3"
 
 var (
 	file_msg_msg_proto_rawDescOnce sync.Once
@@ -2297,7 +2399,7 @@ func file_msg_msg_proto_rawDescGZIP() []byte {
 	return file_msg_msg_proto_rawDescData
 }
 
-var file_msg_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
+var file_msg_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_msg_msg_proto_goTypes = []any{
 	(*OfflinePushInfo)(nil),                      // 0: msg.OfflinePushInfo
 	(*MsgData)(nil),                              // 1: msg.MsgData
@@ -2331,35 +2433,37 @@ var file_msg_msg_proto_goTypes = []any{
 	(*GetConversationMaxSeqResp)(nil),            // 29: msg.GetConversationMaxSeqResp
 	(*SetUserConversationMaxSeqReq)(nil),         // 30: msg.SetUserConversationMaxSeqReq
 	(*SetUserConversationMaxSeqResp)(nil),        // 31: msg.SetUserConversationMaxSeqResp
-	(*SetAppBackgroundStatusReq)(nil),            // 32: msg.SetAppBackgroundStatusReq
-	(*SubUserOnlineStatus)(nil),                  // 33: msg.SubUserOnlineStatus
-	(*SubUserOnlineStatusElem)(nil),              // 34: msg.SubUserOnlineStatusElem
-	(*SubUserOnlineStatusTips)(nil),              // 35: msg.SubUserOnlineStatusTips
-	nil,                                          // 36: msg.MsgData.OptionsEntry
-	nil,                                          // 37: msg.PushMessages.MsgsEntry
-	nil,                                          // 38: msg.PushMessages.NotificationMsgsEntry
-	nil,                                          // 39: msg.GetMaxSeqResp.MaxSeqsEntry
-	nil,                                          // 40: msg.GetMaxSeqResp.MinSeqsEntry
-	nil,                                          // 41: msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
-	nil,                                          // 42: msg.GetLastMessageResp.MsgsEntry
+	(*SetUserConversationMinSeqReq)(nil),         // 32: msg.SetUserConversationMinSeqReq
+	(*SetUserConversationMinSeqResp)(nil),        // 33: msg.SetUserConversationMinSeqResp
+	(*SetAppBackgroundStatusReq)(nil),            // 34: msg.SetAppBackgroundStatusReq
+	(*SubUserOnlineStatus)(nil),                  // 35: msg.SubUserOnlineStatus
+	(*SubUserOnlineStatusElem)(nil),              // 36: msg.SubUserOnlineStatusElem
+	(*SubUserOnlineStatusTips)(nil),              // 37: msg.SubUserOnlineStatusTips
+	nil,                                          // 38: msg.MsgData.OptionsEntry
+	nil,                                          // 39: msg.PushMessages.MsgsEntry
+	nil,                                          // 40: msg.PushMessages.NotificationMsgsEntry
+	nil,                                          // 41: msg.GetMaxSeqResp.MaxSeqsEntry
+	nil,                                          // 42: msg.GetMaxSeqResp.MinSeqsEntry
+	nil,                                          // 43: msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
+	nil,                                          // 44: msg.GetLastMessageResp.MsgsEntry
 }
 var file_msg_msg_proto_depIdxs = []int32{
-	36, // 0: msg.MsgData.options:type_name -> msg.MsgData.OptionsEntry
+	38, // 0: msg.MsgData.options:type_name -> msg.MsgData.OptionsEntry
 	0,  // 1: msg.MsgData.offline_push_info:type_name -> msg.OfflinePushInfo
 	1,  // 2: msg.MsgDataToMySQL.msg_data:type_name -> msg.MsgData
 	1,  // 3: msg.PushMsgData.msg_data:type_name -> msg.MsgData
 	1,  // 4: msg.PullMsgs.msgs:type_name -> msg.MsgData
-	37, // 5: msg.PushMessages.msgs:type_name -> msg.PushMessages.MsgsEntry
-	38, // 6: msg.PushMessages.notification_msgs:type_name -> msg.PushMessages.NotificationMsgsEntry
+	39, // 5: msg.PushMessages.msgs:type_name -> msg.PushMessages.MsgsEntry
+	40, // 6: msg.PushMessages.notification_msgs:type_name -> msg.PushMessages.NotificationMsgsEntry
 	1,  // 7: msg.SendMsgReq.msg_data:type_name -> msg.MsgData
 	1,  // 8: msg.SendMsgResp.modify:type_name -> msg.MsgData
-	39, // 9: msg.GetMaxSeqResp.max_seqs:type_name -> msg.GetMaxSeqResp.MaxSeqsEntry
-	40, // 10: msg.GetMaxSeqResp.min_seqs:type_name -> msg.GetMaxSeqResp.MinSeqsEntry
+	41, // 9: msg.GetMaxSeqResp.max_seqs:type_name -> msg.GetMaxSeqResp.MaxSeqsEntry
+	42, // 10: msg.GetMaxSeqResp.min_seqs:type_name -> msg.GetMaxSeqResp.MinSeqsEntry
 	13, // 11: msg.PullMessageBySeqsReq.seq_ranges:type_name -> msg.SeqRange
-	41, // 12: msg.GetConversationsHasReadAndMaxSeqResp.seqs:type_name -> msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
+	43, // 12: msg.GetConversationsHasReadAndMaxSeqResp.seqs:type_name -> msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
 	18, // 13: msg.GetSeqMessageReq.conversations:type_name -> msg.ConversationSeqs
-	42, // 14: msg.GetLastMessageResp.msgs:type_name -> msg.GetLastMessageResp.MsgsEntry
-	34, // 15: msg.SubUserOnlineStatusTips.subscribers:type_name -> msg.SubUserOnlineStatusElem
+	44, // 14: msg.GetLastMessageResp.msgs:type_name -> msg.GetLastMessageResp.MsgsEntry
+	36, // 15: msg.SubUserOnlineStatusTips.subscribers:type_name -> msg.SubUserOnlineStatusElem
 	5,  // 16: msg.PushMessages.MsgsEntry.value:type_name -> msg.PullMsgs
 	5,  // 17: msg.PushMessages.NotificationMsgsEntry.value:type_name -> msg.PullMsgs
 	15, // 18: msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry.value:type_name -> msg.Seqs
@@ -2375,19 +2479,21 @@ var file_msg_msg_proto_depIdxs = []int32{
 	26, // 28: msg.MsgService.SetConversationHasReadSeq:input_type -> msg.SetConversationHasReadSeqReq
 	28, // 29: msg.MsgService.GetConversationMaxSeq:input_type -> msg.GetConversationMaxSeqReq
 	30, // 30: msg.MsgService.SetUserConversationMaxSeq:input_type -> msg.SetUserConversationMaxSeqReq
-	8,  // 31: msg.MsgService.SendMsg:output_type -> msg.SendMsgResp
-	12, // 32: msg.MsgService.GetMaxSeq:output_type -> msg.GetMaxSeqResp
-	6,  // 33: msg.MsgService.PullMessageBySeqs:output_type -> msg.PushMessages
-	6,  // 34: msg.MsgService.GetSeqMessage:output_type -> msg.PushMessages
-	17, // 35: msg.MsgService.GetConversationsHasReadAndMaxSeq:output_type -> msg.GetConversationsHasReadAndMaxSeqResp
-	21, // 36: msg.MsgService.GetLastMessage:output_type -> msg.GetLastMessageResp
-	23, // 37: msg.MsgService.MarkMsgsAsRead:output_type -> msg.MarkMsgsAsReadResp
-	25, // 38: msg.MsgService.MarkConversationAsRead:output_type -> msg.MarkConversationAsReadResp
-	27, // 39: msg.MsgService.SetConversationHasReadSeq:output_type -> msg.SetConversationHasReadSeqResp
-	29, // 40: msg.MsgService.GetConversationMaxSeq:output_type -> msg.GetConversationMaxSeqResp
-	31, // 41: msg.MsgService.SetUserConversationMaxSeq:output_type -> msg.SetUserConversationMaxSeqResp
-	31, // [31:42] is the sub-list for method output_type
-	20, // [20:31] is the sub-list for method input_type
+	32, // 31: msg.MsgService.SetUserConversationMinSeq:input_type -> msg.SetUserConversationMinSeqReq
+	8,  // 32: msg.MsgService.SendMsg:output_type -> msg.SendMsgResp
+	12, // 33: msg.MsgService.GetMaxSeq:output_type -> msg.GetMaxSeqResp
+	6,  // 34: msg.MsgService.PullMessageBySeqs:output_type -> msg.PushMessages
+	6,  // 35: msg.MsgService.GetSeqMessage:output_type -> msg.PushMessages
+	17, // 36: msg.MsgService.GetConversationsHasReadAndMaxSeq:output_type -> msg.GetConversationsHasReadAndMaxSeqResp
+	21, // 37: msg.MsgService.GetLastMessage:output_type -> msg.GetLastMessageResp
+	23, // 38: msg.MsgService.MarkMsgsAsRead:output_type -> msg.MarkMsgsAsReadResp
+	25, // 39: msg.MsgService.MarkConversationAsRead:output_type -> msg.MarkConversationAsReadResp
+	27, // 40: msg.MsgService.SetConversationHasReadSeq:output_type -> msg.SetConversationHasReadSeqResp
+	29, // 41: msg.MsgService.GetConversationMaxSeq:output_type -> msg.GetConversationMaxSeqResp
+	31, // 42: msg.MsgService.SetUserConversationMaxSeq:output_type -> msg.SetUserConversationMaxSeqResp
+	33, // 43: msg.MsgService.SetUserConversationMinSeq:output_type -> msg.SetUserConversationMinSeqResp
+	32, // [32:44] is the sub-list for method output_type
+	20, // [20:32] is the sub-list for method input_type
 	20, // [20:20] is the sub-list for extension type_name
 	20, // [20:20] is the sub-list for extension extendee
 	0,  // [0:20] is the sub-list for field type_name
@@ -2404,7 +2510,7 @@ func file_msg_msg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_msg_msg_proto_rawDesc), len(file_msg_msg_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   43,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

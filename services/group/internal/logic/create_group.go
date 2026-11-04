@@ -115,6 +115,7 @@ func (s *Server) CreateGroup(ctx context.Context, req *grouppb.CreateGroupReq) (
 	if err != nil {
 		return nil, mapStore(err)
 	}
+	s.createGroupConversations(ctx, created, memberUserIDs(members))
 	s.notifyCreated(ctx, owner, created, members)
 	s.afterCreateGroup(ctx, created, members)
 	return &grouppb.CreateGroupResp{GroupId: group.GroupID, Group: groupPB(created)}, nil

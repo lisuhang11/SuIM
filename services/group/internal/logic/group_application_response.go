@@ -72,6 +72,7 @@ func (s *Server) GroupApplicationResponse(ctx context.Context, req *grouppb.Grou
 		if err := s.reopenHistory(ctx, group, []string{from}); err != nil {
 			return nil, err
 		}
+		s.createGroupConversations(ctx, group, []string{from})
 	}
 	request.HandleResult = req.GetHandleResult()
 	request.HandledMsg = handledMsg

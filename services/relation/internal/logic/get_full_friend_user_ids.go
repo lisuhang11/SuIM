@@ -15,11 +15,11 @@ func (s *Server) GetFullFriendUserIDs(ctx context.Context, req *relationpb.GetFu
 		return nil, err
 	}
 	// 2. 读取版本和有序 ID。哈希相同则不回传 ID。
-	head, err := s.store.FriendVersion(ctx, userID)
+	head, err := s.friendHead(ctx, userID)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("query friend version")
 	}
-	ids, err := s.store.FriendUserIDs(ctx, userID)
+	ids, err := s.friendIDs(ctx, userID)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("list friend ids")
 	}

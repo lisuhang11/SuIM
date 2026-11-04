@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS `friend_request` (
     `handler_user_id` VARCHAR(64)  DEFAULT '' COMMENT '处理人 userID',
     `handle_msg`      VARCHAR(512) DEFAULT '' COMMENT '处理留言',
     `handle_time`     DATETIME     DEFAULT NULL COMMENT '处理时间',
-    PRIMARY KEY (`from_user_id`, `to_user_id`)
+    PRIMARY KEY (`from_user_id`, `to_user_id`),
+    INDEX `idx_friend_request_to` (`to_user_id`, `handle_result`, `create_time`, `from_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友申请表';
 
 CREATE TABLE IF NOT EXISTS `black` (
@@ -58,3 +59,6 @@ CREATE TABLE IF NOT EXISTS `friend_version_log` (
 -- Blacks are a full list, same as OpenIM. Drop the unused version tables.
 DROP TABLE IF EXISTS `black_version_log`;
 DROP TABLE IF EXISTS `black_version`;
+
+-- Existing databases already have friend_request. Add the inbox index there too.
+ALTER TABLE `friend_request` ADD INDEX `idx_friend_request_to` (`to_user_id`, `handle_result`, `create_time`, `from_user_id`);

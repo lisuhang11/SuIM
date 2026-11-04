@@ -105,6 +105,7 @@ func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserT
 	if err := s.reopenHistory(ctx, group, userIDs); err != nil {
 		return nil, err
 	}
+	s.createGroupConversations(ctx, group, userIDs)
 	// 4. 邀请通知带上新的成员版本。
 	if latest, err := s.store.TakeGroup(ctx, groupID); err == nil {
 		group = latest

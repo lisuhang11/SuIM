@@ -21,8 +21,8 @@ func (s *Server) IsBlack(ctx context.Context, req *relationpb.IsBlackReq) (*rela
 	if err := rpcctx.OneOf(ctx, user1, user2); err != nil {
 		return nil, err
 	}
-	// 2. 查询双方黑名单。
-	in1, in2, err := s.store.CheckBlack(ctx, user1, user2)
+	// 2. 查询双方黑名单。有缓存时走本地和 Redis，没有则直接查表。
+	in1, in2, err := s.blocked(ctx, user1, user2)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("check black")
 	}

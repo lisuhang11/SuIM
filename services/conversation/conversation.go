@@ -83,7 +83,10 @@ func run(cfgPath, migratePath string) error {
 	}
 
 	srv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
-	conversationpb.RegisterConversationServiceServer(srv, logic.New(st, msgClient{msgpb.NewMsgServiceClient(msgConn)}))
+	messages := msgClient{msgpb.NewMsgServiceClient(msgConn)}
+	conversation := logic.New(st, messages)
+	conversation.UseSeq(messages)
+	conversationpb.RegisterConversationServiceServer(srv, conversation)
 
 	id, err := newID()
 	if err != nil {
@@ -129,6 +132,28 @@ type msgClient struct {
 
 func (c msgClient) SendNotification(ctx context.Context, msg *msgpb.MsgData) error {
 	_, err := c.client.SendMsg(ctx, &msgpb.SendMsgReq{MsgData: msg})
+	return err
+}
+
+func (c msgClient) SetUserMaxSeq(ctx context.Context, conversationID string, userIDs []string, seq int64) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	_, err := c.client.SetUserConversationMaxSeq(ctx, &msgpb.SetUserConversationMaxSeqReq{
+		ConversationId: conversationID,
+		UserIds:        userIDs,
+		MaxSeq:         seq,
+	})
+	return err
+}
+
+func (c msgClient) SetUserMinSeq(ctx context.Context, conversationID string, userIDs []string, seq int64) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	_, err := c.client.SetUserConversationMinSeq(ctx, &msgpb.SetUserConversationMinSeqReq{
+		ConversationId: conversationID,
+		UserIds:        userIDs,
+		MinSeq:         seq,
+	})
 	return err
 }
 

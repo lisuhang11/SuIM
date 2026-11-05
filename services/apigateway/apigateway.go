@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
+	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
@@ -98,13 +99,13 @@ func run(cfgPath string) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 	srv := &http.Server{
-		Handler: api.New(
+		Handler: mw.GzipHandler(cfg.CompressionLevel, api.New(
 			userpb.NewUserServiceClient(userConn),
 			relationpb.NewRelationServiceClient(relationConn),
 			grouppb.NewGroupServiceClient(groupConn),
 			conversationpb.NewConversationServiceClient(conversationConn),
 			thirdpb.NewThirdServiceClient(thirdConn),
-		).Handler(),
+		).Handler()),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,

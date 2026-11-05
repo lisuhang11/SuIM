@@ -7,14 +7,21 @@ import (
 )
 
 type Config struct {
-	ListenIP string          `yaml:"listenIP"`
-	Port     int             `yaml:"port"`
-	Registry register.Config `yaml:"registry"`
+	ListenIP string `yaml:"listenIP"`
+	Port     int    `yaml:"port"`
+	// CompressionLevel matches OpenIM: -1 off, 0 default, 1 smallest, 2 fastest.
+	CompressionLevel int             `yaml:"compressionLevel"`
+	Registry         register.Config `yaml:"registry"`
 }
 
 func (c *Config) Validate() error {
 	if c.Port <= 0 {
 		return fmt.Errorf("port is required")
+	}
+	switch c.CompressionLevel {
+	case -1, 0, 1, 2:
+	default:
+		return fmt.Errorf("compressionLevel must be -1, 0, 1, or 2")
 	}
 	if c.ListenIP == "" {
 		c.ListenIP = "0.0.0.0"

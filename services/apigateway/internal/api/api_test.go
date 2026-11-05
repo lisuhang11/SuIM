@@ -2,8 +2,10 @@ package api
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +15,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/pkg/mw"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relation"
@@ -373,6 +376,29 @@ func serve(t *testing.T, register func(*grpc.Server)) net.Listener {
 		_ = lis.Close()
 	})
 	return lis
+}
+
+func TestGzipHealth(t *testing.T) {
+	h := mw.GzipHandler(0, New(nil, nil, nil, nil, nil).Handler())
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK || rr.Header().Get("Content-Encoding") != "gzip" || rr.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("status %d encoding %q origin %q", rr.Code, rr.Header().Get("Content-Encoding"), rr.Header().Get("Access-Control-Allow-Origin"))
+	}
+	zr, err := gzip.NewReader(rr.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	body, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(body, []byte(`"status":"ok"`)) {
+		t.Fatalf("body %s", body)
+	}
 }
 
 func TestCORSPreflight(t *testing.T) {

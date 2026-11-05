@@ -30,6 +30,7 @@ type Server struct {
 	store     *store.Store
 	issuer    *token.Issuer
 	tokens    localcache.Cache[*model.Token]
+	profiles  *Profiles
 	hooks     Hooks
 	now       func() time.Time
 	newID     func() (string, error)
@@ -46,6 +47,26 @@ func New(st *store.Store, issuer *token.Issuer, tokens localcache.Cache[*model.T
 		tokens: tokens,
 		now:    time.Now,
 		newID:  NewID,
+	}
+}
+
+// UseProfiles turns on the user-row cache. A nil cache keeps every read on MySQL.
+func (s *Server) UseProfiles(profiles *Profiles) {
+	if s != nil {
+		s.profiles = profiles
+	}
+}
+
+func (s *Server) userByID(ctx context.Context, id string) (*model.User, error) {
+	if s.profiles == nil {
+		return s.store.GetUserByID(ctx, id)
+	}
+	return s.profiles.Get(ctx, id)
+}
+
+func (s *Server) dropProfile(ctx context.Context, userID string) {
+	if s.profiles != nil {
+		s.profiles.Drop(ctx, userID)
 	}
 }
 

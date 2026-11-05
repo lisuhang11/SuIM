@@ -2,9 +2,12 @@ package logic
 
 import (
 	"context"
+	"errors"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	userpb "github.com/lisuhang11/SuIM/proto/user"
+	"github.com/lisuhang11/SuIM/services/user/internal/model"
+	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
 func (s *Server) GetUsersByIDs(ctx context.Context, req *userpb.GetUsersByIDsReq) (*userpb.GetUsersByIDsResp, error) {
@@ -27,7 +30,7 @@ func (s *Server) GetUsersByIDs(ctx context.Context, req *userpb.GetUsersByIDsReq
 	if err != nil {
 		return nil, err
 	}
-	users, err := s.store.GetUsersByIDs(ctx, ids)
+	users, err := s.usersByIDs(ctx, ids)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("query users")
 	}
@@ -36,4 +39,22 @@ func (s *Server) GetUsersByIDs(ctx context.Context, req *userpb.GetUsersByIDsReq
 		resp.Users[user.UserID] = projectUser(user, viewer)
 	}
 	return resp, nil
+}
+
+func (s *Server) usersByIDs(ctx context.Context, ids []string) ([]*model.User, error) {
+	if s.profiles == nil {
+		return s.store.GetUsersByIDs(ctx, ids)
+	}
+	users := make([]*model.User, 0, len(ids))
+	for _, id := range ids {
+		user, err := s.profiles.Get(ctx, id)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, nil
 }

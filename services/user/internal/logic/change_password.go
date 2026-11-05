@@ -49,5 +49,6 @@ func (s *Server) ChangePassword(ctx context.Context, req *userpb.ChangePasswordR
 		}
 		return nil, errorcode.ErrInternal.WithMsg("change password")
 	}
+	s.dropProfile(ctx, id)
 	return &userpb.ChangePasswordResp{}, nil
 }

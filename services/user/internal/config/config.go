@@ -10,16 +10,17 @@ import (
 )
 
 type Config struct {
-	ListenIP   string          `yaml:"listenIP"`
-	RegisterIP string          `yaml:"registerIP"`
-	Port       int             `yaml:"port"`
-	MySQL      config.MySQL    `yaml:"mysql"`
-	Redis      config.Redis    `yaml:"redis"`
-	JWT        config.JWT      `yaml:"jwt"`
-	LocalCache LocalCache      `yaml:"localCache"`
-	Registry   register.Config `yaml:"registry"`
-	Webhooks   Webhooks        `yaml:"webhooks"`
-	SMS        SMS             `yaml:"sms"`
+	ListenIP     string          `yaml:"listenIP"`
+	RegisterIP   string          `yaml:"registerIP"`
+	Port         int             `yaml:"port"`
+	MySQL        config.MySQL    `yaml:"mysql"`
+	Redis        config.Redis    `yaml:"redis"`
+	JWT          config.JWT      `yaml:"jwt"`
+	LocalCache   LocalCache      `yaml:"localCache"`
+	ProfileCache LocalCache      `yaml:"profileCache"`
+	Registry     register.Config `yaml:"registry"`
+	Webhooks     Webhooks        `yaml:"webhooks"`
+	SMS          SMS             `yaml:"sms"`
 }
 
 type SMS struct {
@@ -85,6 +86,11 @@ func (c *Config) Validate() error {
 	}
 	if c.JWT.Secret == "" || c.JWT.ExpireSeconds <= 0 {
 		return fmt.Errorf("jwt secret and expireSeconds are required")
+	}
+	if !c.ProfileCache.Enable() {
+		c.ProfileCache = LocalCache{
+			Topic: "suim:user:profile:delete", SlotNum: 100, SlotSize: 2000, SuccessExpire: 300, FailedExpire: 5,
+		}
 	}
 	if c.Registry.Type == "" {
 		return fmt.Errorf("registry type is required")

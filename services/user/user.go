@@ -79,6 +79,8 @@ func run(cfgPath, migratePath string) error {
 	}
 	tokenCache, stopCache := logic.NewTokenCache(ctx, rdb, cfg.LocalCache)
 	defer stopCache()
+	profiles, stopProfiles := logic.NewProfileCache(ctx, rdb, st, cfg.ProfileCache)
+	defer stopProfiles()
 
 	var hooks *webhook.Client
 	if cfg.Webhooks.URL != "" {
@@ -87,6 +89,7 @@ func run(cfgPath, migratePath string) error {
 	}
 	w := cfg.Webhooks
 	userServer := logic.New(st, token.NewIssuer(cfg.JWT), tokenCache)
+	userServer.UseProfiles(profiles)
 	userServer.UseHooks(logic.Hooks{
 		Client:                 hooks,
 		BeforeUserRegister:     w.BeforeUserRegister,

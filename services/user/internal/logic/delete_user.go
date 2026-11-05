@@ -24,6 +24,7 @@ func (s *Server) DeleteUser(ctx context.Context, req *userpb.DeleteUserReq) (*us
 		}
 		return nil, errorcode.ErrInternal.WithMsg("delete user")
 	}
+	s.dropProfile(ctx, id)
 	// 3. 跨服务清理尚未接入。
 	//    relation rpc: 删除该用户的好友关系。
 	//    group rpc: 将该用户移出所有群。

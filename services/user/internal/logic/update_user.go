@@ -51,6 +51,7 @@ func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserReq) (*us
 		}
 		return nil, errorcode.ErrInternal.WithMsg("update user")
 	}
+	s.dropProfile(ctx, id)
 	// 5. 账号被停用时作废全部会话。
 	//    kafka: 通知 msggateway 断开该用户全部平台的在线连接。尚未接入。
 	if old.IsActive && patch.IsActive != nil && !*patch.IsActive {

@@ -25,7 +25,7 @@ func (s *Server) SearchUsers(ctx context.Context, req *userpb.SearchUsersReq) (*
 	if err != nil {
 		return nil, err
 	}
-	user, err := s.store.GetUserByID(ctx, id)
+	user, err := s.userByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return &userpb.SearchUsersResp{}, nil

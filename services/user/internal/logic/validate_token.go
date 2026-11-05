@@ -18,7 +18,7 @@ func (s *Server) ValidateToken(ctx context.Context, req *userpb.ValidateTokenReq
 		return nil, err
 	}
 	// 2. 查用户，停用账号视为无效。
-	user, err := s.store.GetUserByID(ctx, claims.UserID)
+	user, err := s.userByID(ctx, claims.UserID)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return nil, errorcode.ErrUserInvalidToken

@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
+	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
@@ -82,7 +83,7 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	srv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor))
 	messages := msgClient{msgpb.NewMsgServiceClient(msgConn)}
 	conversation := logic.New(st, messages)
 	conversation.UseSeq(messages)

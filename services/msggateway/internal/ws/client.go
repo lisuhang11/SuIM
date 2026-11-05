@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"runtime/debug"
 	"sync/atomic"
 
 	"github.com/gorilla/websocket"
@@ -31,7 +33,12 @@ type Client struct {
 }
 
 func (c *Client) readLoop() {
-	defer c.close()
+	defer func() {
+		if rec := recover(); rec != nil {
+			slog.Error("websocket read panic", "err", rec, "userID", c.userID, "stack", string(debug.Stack()))
+		}
+		c.close()
+	}()
 	for {
 		typ, data, err := c.conn.Read()
 		if err != nil {

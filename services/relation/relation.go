@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
+	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/relationcache"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
@@ -125,7 +126,7 @@ func run(cfgPath, migratePath string) error {
 		defer hooks.Close()
 	}
 
-	srv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor))
 	w := cfg.Webhooks
 	relationServer := logic.New(st, userclient.New(userpb.NewUserServiceClient(userConn)), logic.Hooks{
 		Client:                hooks,

@@ -18,6 +18,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
+	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/relationcache"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
@@ -139,7 +140,7 @@ func run(cfgPath, migratePath string) error {
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
-	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
+	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor))
 	msgpb.RegisterMsgServiceServer(grpcSrv, srv)
 
 	id, err := newID()

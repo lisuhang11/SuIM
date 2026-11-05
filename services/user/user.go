@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
+	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/user"
@@ -109,7 +110,7 @@ func run(cfgPath, migratePath string) error {
 	}
 	userServer.UseSMS(sender, captcha, policy, cfg.SMS.Pepper)
 
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.UnaryInterceptor(mw.UnaryRecover))
 	userpb.RegisterUserServiceServer(srv, userServer)
 
 	id, err := logic.NewID()

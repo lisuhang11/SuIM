@@ -180,12 +180,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /object/complete_multipart_upload", s.auth(s.completeMultipartUpload))
 	mux.HandleFunc("POST /object/initiate_form_data", s.auth(s.initiateFormData))
 	mux.HandleFunc("POST /object/complete_form_data", s.auth(s.completeFormData))
-	return mw.CorsHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return mw.RecoverHandler(mw.CorsHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, code: http.StatusOK}
 		mux.ServeHTTP(sw, r)
 		slog.Info("http", "method", r.Method, "path", r.URL.Path, "status", sw.code, "dur", time.Since(start))
-	}))
+	})))
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {

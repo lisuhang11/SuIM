@@ -127,13 +127,13 @@ func run(cfgPath string) error {
 	mux.HandleFunc("POST /msg/read_seqs", server.HandleReadSeqs)
 	mux.HandleFunc("POST /msg/set_conversation_has_read_seq", server.HandleSetConversationHasReadSeq)
 	mux.Handle("/", server)
-	wsSrv := &http.Server{Handler: mw.CorsHandler(mux), ReadHeaderTimeout: 5 * time.Second}
+	wsSrv := &http.Server{Handler: mw.RecoverHandler(mw.CorsHandler(mux)), ReadHeaderTimeout: 5 * time.Second}
 	rpcLis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.RPCPort))
 	if err != nil {
 		_ = wsLis.Close()
 		return fmt.Errorf("listen rpc: %w", err)
 	}
-	rpcSrv := grpc.NewServer()
+	rpcSrv := grpc.NewServer(grpc.UnaryInterceptor(mw.UnaryRecover))
 	gatewaypb.RegisterMsgGatewayServer(rpcSrv, server)
 
 	id, err := newID()

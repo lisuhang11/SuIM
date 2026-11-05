@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
+	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -155,7 +156,7 @@ func run(cfgPath, migratePath string) error {
 		AfterSetGroupMemberInfo:  w.AfterSetGroupMemberInfo,
 	})
 
-	srv := grpc.NewServer(grpc.UnaryInterceptor(rpcctx.ServerInterceptor))
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor))
 	grouppb.RegisterGroupServiceServer(srv, groupServer)
 
 	id, err := newID()

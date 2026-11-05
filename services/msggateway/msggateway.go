@@ -19,6 +19,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
+	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -126,7 +127,7 @@ func run(cfgPath string) error {
 	mux.HandleFunc("POST /msg/read_seqs", server.HandleReadSeqs)
 	mux.HandleFunc("POST /msg/set_conversation_has_read_seq", server.HandleSetConversationHasReadSeq)
 	mux.Handle("/", server)
-	wsSrv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	wsSrv := &http.Server{Handler: mw.CorsHandler(mux), ReadHeaderTimeout: 5 * time.Second}
 	rpcLis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.RPCPort))
 	if err != nil {
 		_ = wsLis.Close()

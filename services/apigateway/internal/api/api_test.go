@@ -375,6 +375,25 @@ func serve(t *testing.T, register func(*grpc.Server)) net.Listener {
 	return lis
 }
 
+func TestCORSPreflight(t *testing.T) {
+	h := New(nil, nil, nil, nil, nil).Handler()
+	req := httptest.NewRequest(http.MethodOptions, "/user/get", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	req.Header.Set("Access-Control-Request-Headers", "authorization")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK || rr.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("preflight %d origin %q body %s", rr.Code, rr.Header().Get("Access-Control-Allow-Origin"), rr.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/user/get", bytes.NewBufferString(`{}`))
+	rr = httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized || rr.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("missing token %d origin %q", rr.Code, rr.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
 func dial(t *testing.T, lis net.Listener) *grpc.ClientConn {
 	t.Helper()
 	conn, err := grpc.NewClient(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))

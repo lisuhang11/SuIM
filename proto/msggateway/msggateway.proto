@@ -4,7 +4,7 @@ package msggateway;
 
 option go_package = "github.com/lisuhang11/SuIM/proto/msggateway;msggatewaypb";
 
-// MsgGateway reports which users are connected to this process.
+// MsgGateway reports online platforms from the shared Redis record.
 service MsgGateway {
   rpc GetUsersOnlineStatus(GetUsersOnlineStatusReq) returns (GetUsersOnlineStatusResp);
 }

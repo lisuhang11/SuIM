@@ -72,6 +72,28 @@ func (h *Hub) Clients(userID string) []*Client {
 	return out
 }
 
+// Presence is one user's platforms connected to this process.
+type Presence struct {
+	UserID    string
+	Platforms []int32
+}
+
+func (h *Hub) Snapshot() []Presence {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	out := make([]Presence, 0, len(h.users))
+	for userID, platforms := range h.users {
+		ids := make([]int32, 0, len(platforms))
+		for platformID := range platforms {
+			ids = append(ids, int32(platformID))
+		}
+		if len(ids) > 0 {
+			out = append(out, Presence{UserID: userID, Platforms: ids})
+		}
+	}
+	return out
+}
+
 func (h *Hub) Platforms(userID string) []int32 {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

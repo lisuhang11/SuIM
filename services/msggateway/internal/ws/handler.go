@@ -237,11 +237,13 @@ func (s *Server) subscribe(c *Client, req *Req) error {
 		}
 	}
 	s.hub.SetSubs(c, in.SubscribeUserId, in.UnsubscribeUserId)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	tips := &msgpb.SubUserOnlineStatusTips{}
 	for _, userID := range in.SubscribeUserId {
 		tips.Subscribers = append(tips.Subscribers, &msgpb.SubUserOnlineStatusElem{
 			UserId:            userID,
-			OnlinePlatformIds: s.hub.Platforms(userID),
+			OnlinePlatformIds: s.platforms(ctx, userID),
 		})
 	}
 	body, err := proto.Marshal(tips)

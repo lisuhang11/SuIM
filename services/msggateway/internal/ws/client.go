@@ -132,6 +132,9 @@ func (c *Client) close() {
 		return
 	}
 	c.server.hub.Remove(c)
+	if !c.server.stillLocal(c.userID, c.platformID) {
+		c.server.report(c.userID, nil, []int32{int32(c.platformID)})
+	}
 	_ = c.conn.Close()
 	c.server.notifyOnline(c.userID)
 	if c.kicked.Load() {

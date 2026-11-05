@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/msgconv"
+	"github.com/lisuhang11/SuIM/pkg/online"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
@@ -71,6 +72,7 @@ type Server struct {
 	messages Messages
 	maxConn  int64
 	hooks    Hooks
+	online   *online.Status
 	upgrader websocket.Upgrader
 }
 
@@ -88,6 +90,7 @@ type Options struct {
 	Joined           JoinedGroups
 	GroupSync        GroupSyncCache
 	Messages         Messages
+	Online           *online.Status
 	MaxConn          int64
 	HandshakeTimeout time.Duration
 	Hooks            Hooks
@@ -107,6 +110,7 @@ func New(opts Options) *Server {
 		joined:   opts.Joined,
 		syncLog:  opts.GroupSync,
 		messages: opts.Messages,
+		online:   opts.Online,
 		maxConn:  opts.MaxConn,
 		hooks:    opts.Hooks,
 		upgrader: websocket.Upgrader{
@@ -166,6 +170,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		old.Kick()
 	}
 	go client.readLoop()
+	s.report(client.userID, []int32{int32(client.platformID)}, nil)
 	s.notifyOnline(client.userID)
 	s.afterUserOnline(client)
 }
@@ -227,22 +232,22 @@ func (s *Server) recipients(ctx context.Context, msg *msgpb.MsgData) []string {
 }
 
 func (s *Server) notifyOnline(userID string) {
-	body, err := proto.Marshal(&msgpb.SubUserOnlineStatusTips{Subscribers: []*msgpb.SubUserOnlineStatusElem{{
-		UserId:            userID,
-		OnlinePlatformIds: s.hub.Platforms(userID),
-	}}})
-	if err != nil {
-		return
-	}
-	for _, watcher := range s.hub.Watchers(userID) {
-		_ = watcher.write(Resp{ReqIdentifier: reqSubUserOnline, Data: body})
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	s.pushOnline(userID, s.platforms(ctx, userID))
 }
 
-func (s *Server) GetUsersOnlineStatus(_ context.Context, req *gatewaypb.GetUsersOnlineStatusReq) (*gatewaypb.GetUsersOnlineStatusResp, error) {
+func (s *Server) GetUsersOnlineStatus(ctx context.Context, req *gatewaypb.GetUsersOnlineStatusReq) (*gatewaypb.GetUsersOnlineStatusResp, error) {
 	var ids []string
 	if req != nil {
 		ids = req.UserIds
+	}
+	if s.online != nil {
+		users, err := s.onlineUsers(ctx, ids)
+		if err != nil {
+			return nil, err
+		}
+		return &gatewaypb.GetUsersOnlineStatusResp{Users: users}, nil
 	}
 	users := s.hub.Users(ids)
 	resp := &gatewaypb.GetUsersOnlineStatusResp{}

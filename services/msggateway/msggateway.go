@@ -20,6 +20,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/mw"
+	"github.com/lisuhang11/SuIM/pkg/online"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -104,6 +105,7 @@ func run(cfgPath string) error {
 		Joined:           groupClient,
 		GroupSync:        ws.NewRedisGroupSync(rdb),
 		Messages:         rpc.NewMsgClient(msgpb.NewMsgServiceClient(msgConn)),
+		Online:           online.New(rdb),
 		MaxConn:          cfg.MaxConn,
 		HandshakeTimeout: time.Duration(cfg.HandshakeTimeoutSec) * time.Second,
 		Hooks: ws.Hooks{
@@ -154,6 +156,8 @@ func run(cfgPath string) error {
 
 	pushConsumer := mq.NewRedisConsumer(rdb, cfg.Queue.StreamPrefix, mq.TopicToPush, "msggateway")
 	pushConsumer.ConsumeNew()
+	go server.WatchOnline(ctx)
+	go server.RenewOnline(ctx)
 
 	errCh := make(chan error, 3)
 	go func() {
@@ -181,6 +185,9 @@ func run(cfgPath string) error {
 	defer shutdownCancel()
 	_ = wsSrv.Shutdown(shutdownCtx)
 	rpcSrv.GracefulStop()
+	dropCtx, dropCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	server.DropOnline(dropCtx)
+	dropCancel()
 	if runErr != nil && !errors.Is(runErr, context.Canceled) && !errors.Is(runErr, http.ErrServerClosed) {
 		return runErr
 	}

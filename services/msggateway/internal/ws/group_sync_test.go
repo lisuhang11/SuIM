@@ -46,7 +46,7 @@ func TestSyncGroupsFullThenDelta(t *testing.T) {
 func postSync(t *testing.T, srv *Server) map[string]any {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/msg/sync_groups", nil)
-	req.Header.Set("token", "t")
+	req.Header.Set("Authorization", "Bearer t")
 	rr := httptest.NewRecorder()
 	srv.HandleSyncGroups(rr, req)
 	if rr.Code != http.StatusOK {

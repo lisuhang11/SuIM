@@ -105,13 +105,11 @@ func httpFromErr(err error) (status, code int, text string) {
 }
 
 func (s *Server) tokenUser(w http.ResponseWriter, r *http.Request) (string, int32, bool) {
-	token := strings.TrimSpace(r.Header.Get("token"))
-	if token == "" {
-		auth := strings.TrimSpace(r.Header.Get("Authorization"))
-		const prefix = "Bearer "
-		if len(auth) > len(prefix) && strings.EqualFold(auth[:len(prefix)], prefix) {
-			token = strings.TrimSpace(auth[len(prefix):])
-		}
+	token := ""
+	auth := strings.TrimSpace(r.Header.Get("Authorization"))
+	const prefix = "Bearer "
+	if len(auth) > len(prefix) && strings.EqualFold(auth[:len(prefix)], prefix) {
+		token = strings.TrimSpace(auth[len(prefix):])
 	}
 	if token == "" || s.tokens == nil {
 		writeHTTP(w, http.StatusUnauthorized, int(errorcode.TokenRequired), errorcode.ErrTokenRequired.Error(), nil)

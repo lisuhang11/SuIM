@@ -8,7 +8,7 @@
 //	POST /user/send_sms_code
 //	POST /user/register_phone
 //
-// Token required. Send it in the token header, or as Authorization: Bearer.
+// Token required. Send it as Authorization: Bearer.
 // The token user is stored on the request context and sent to group as the operator.
 // A user id in the body, when present, must be that user.
 //
@@ -215,9 +215,6 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func tokenFrom(r *http.Request) string {
-	if token := strings.TrimSpace(r.Header.Get("token")); token != "" {
-		return token
-	}
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
 	const prefix = "Bearer "
 	if len(auth) > len(prefix) && strings.EqualFold(auth[:len(prefix)], prefix) {

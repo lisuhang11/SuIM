@@ -94,7 +94,7 @@ func TestHTTPSendText(t *testing.T) {
 	srv := New(Options{Tokens: fakeTokens{}, Messages: messages})
 	body := `{"recv_id":"b","content":" hi ","client_msg_id":"c1","session_type":1,"content_type":101}`
 	req := httptest.NewRequest(http.MethodPost, "/msg/send", strings.NewReader(body))
-	req.Header.Set("token", "t")
+	req.Header.Set("Authorization", "Bearer t")
 	rr := httptest.NewRecorder()
 	srv.HandleSend(rr, req)
 	if rr.Code != http.StatusOK {
@@ -117,7 +117,7 @@ func TestHTTPPullText(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/msg/pull", strings.NewReader(
 		`{"conversation_id":"si_a_b","limit":20}`))
-	req.Header.Set("token", "t")
+	req.Header.Set("Authorization", "Bearer t")
 	rr := httptest.NewRecorder()
 	srv.HandlePull(rr, req)
 	if rr.Code != http.StatusOK {
@@ -146,7 +146,7 @@ func TestHTTPMarkConversationUsesTokenUser(t *testing.T) {
 	srv := New(Options{Tokens: fakeTokens{}, Messages: messages})
 	req := httptest.NewRequest(http.MethodPost, "/msg/mark_conversation_as_read", strings.NewReader(
 		`{"user_id":"a","conversation_id":"si_a_b","has_read_seq":4,"seqs":[3]}`))
-	req.Header.Set("token", "t")
+	req.Header.Set("Authorization", "Bearer t")
 	rr := httptest.NewRecorder()
 	srv.HandleMarkConversationAsRead(rr, req)
 	if rr.Code != http.StatusOK {
@@ -161,7 +161,7 @@ func TestHTTPSendRejectsStranger(t *testing.T) {
 	srv := New(Options{Tokens: fakeTokens{}, Messages: &fakeMessages{sendErr: errorcode.ErrMsgNotFriend}})
 	req := httptest.NewRequest(http.MethodPost, "/msg/send", strings.NewReader(
 		`{"recv_id":"b","content":"hi","session_type":1,"content_type":101}`))
-	req.Header.Set("token", "t")
+	req.Header.Set("Authorization", "Bearer t")
 	rr := httptest.NewRecorder()
 	srv.HandleSend(rr, req)
 	if rr.Code != http.StatusPreconditionFailed {

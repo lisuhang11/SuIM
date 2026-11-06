@@ -54,7 +54,7 @@ message InvitationInfo {
   string inviter_user_id = 1;
   string invitee_user_id = 2;
   string room_id = 3;
-  // media_type is "audio". Any other value is rejected.
+  // media_type is "audio" or "video". Any other value is rejected.
   string media_type = 4;
 }
 

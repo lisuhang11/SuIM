@@ -42,27 +42,47 @@ func (c Config) Enabled() bool {
 // Sign returns a microphone-only join token for one user and room.
 // The URL is the LiveKit signal address the client should open.
 func (c Config) Sign(identity, room string, now time.Time) (url, token string, err error) {
+	return c.sign(identity, room, now, []string{"microphone"})
+}
+
+// SignCall returns a join token for a private audio or video call.
+// Video may publish a microphone and a camera. Audio stays microphone-only.
+func (c Config) SignCall(identity, room, media string, now time.Time) (url, token string, err error) {
+	switch media {
+	case "audio":
+		return c.sign(identity, room, now, []string{"microphone"})
+	case "video":
+		return c.sign(identity, room, now, []string{"microphone", "camera"})
+	default:
+		return "", "", fmt.Errorf("unsupported call media")
+	}
+}
+
+func (c Config) sign(identity, room string, now time.Time, sources []string) (url, token string, err error) {
 	if !c.Enabled() {
 		return "", "", fmt.Errorf("livekit is not configured")
 	}
 	if identity == "" || room == "" {
 		return "", "", fmt.Errorf("identity and room are required")
 	}
+	if len(sources) == 0 {
+		return "", "", fmt.Errorf("publish sources are required")
+	}
 	if now.IsZero() {
 		now = time.Now()
 	}
 	yes := true
 	body, err := json.Marshal(claims{
-		Issuer:   c.Key,
-		Subject:  identity,
-		Expires:  now.Add(tokenTTL).Unix(),
+		Issuer:    c.Key,
+		Subject:   identity,
+		Expires:   now.Add(tokenTTL).Unix(),
 		NotBefore: now.Add(-10 * time.Second).Unix(),
 		Video: videoGrant{
 			RoomJoin:          true,
 			Room:              room,
 			CanPublish:        &yes,
 			CanSubscribe:      &yes,
-			CanPublishSources: []string{"microphone"},
+			CanPublishSources: sources,
 		},
 	})
 	if err != nil {
@@ -96,23 +116,40 @@ func encode(b []byte) string {
 
 // Parse checks the HMAC and returns the identity and room. Tests and local checks use it.
 func Parse(secret, token string) (identity, room string, err error) {
+	got, err := parseClaims(secret, token)
+	if err != nil {
+		return "", "", err
+	}
+	return got.Subject, got.Video.Room, nil
+}
+
+// Sources returns the tracks a token is allowed to publish.
+func Sources(secret, token string) ([]string, error) {
+	got, err := parseClaims(secret, token)
+	if err != nil {
+		return nil, err
+	}
+	return got.Video.CanPublishSources, nil
+}
+
+func parseClaims(secret, token string) (claims, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return "", "", fmt.Errorf("invalid livekit token")
+		return claims{}, fmt.Errorf("invalid livekit token")
 	}
 	mac := hmac.New(sha256.New, []byte(secret))
 	_, _ = mac.Write([]byte(parts[0] + "." + parts[1]))
 	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil || !hmac.Equal(sig, mac.Sum(nil)) {
-		return "", "", fmt.Errorf("invalid livekit token")
+		return claims{}, fmt.Errorf("invalid livekit token")
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return "", "", fmt.Errorf("invalid livekit token")
+		return claims{}, fmt.Errorf("invalid livekit token")
 	}
 	var got claims
 	if err := json.Unmarshal(payload, &got); err != nil {
-		return "", "", fmt.Errorf("invalid livekit token")
+		return claims{}, fmt.Errorf("invalid livekit token")
 	}
-	return got.Subject, got.Video.Room, nil
+	return got, nil
 }

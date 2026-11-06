@@ -23,6 +23,25 @@ func TestSignMicrophoneToken(t *testing.T) {
 	if _, _, err := cfg.Sign("", "room-1", now); err == nil {
 		t.Fatal("empty identity was accepted")
 	}
+	sources, err := Sources(cfg.Secret, token)
+	if err != nil || len(sources) != 1 || sources[0] != "microphone" {
+		t.Fatalf("sources %v err %v", sources, err)
+	}
+}
+
+func TestSignCallVideoAllowsCamera(t *testing.T) {
+	cfg := Config{URL: "ws://127.0.0.1:7880", Key: "suim", Secret: strings.Repeat("k", 32)}
+	_, token, err := cfg.SignCall("user-a", "room-1", "video", time.Unix(1_700_000_000, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources, err := Sources(cfg.Secret, token)
+	if err != nil || len(sources) != 2 || sources[0] != "microphone" || sources[1] != "camera" {
+		t.Fatalf("sources %v err %v", sources, err)
+	}
+	if _, _, err := cfg.SignCall("user-a", "room-1", "film", time.Time{}); err == nil {
+		t.Fatal("unknown media was accepted")
+	}
 }
 
 func TestValidateRequiresAllFields(t *testing.T) {

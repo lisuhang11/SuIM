@@ -80,6 +80,9 @@ func TestPrivateVoiceInviteAcceptHangup(t *testing.T) {
 	if err != nil || who != callee || gotRoom != room || accept.GetLiveUrl() != "ws://127.0.0.1:7880" {
 		t.Fatalf("callee token %s room %s url %s err %v", who, gotRoom, accept.GetLiveUrl(), err)
 	}
+	if sources, err := livekit.Sources(secret, accept.GetToken()); err != nil || len(sources) != 1 || sources[0] != "microphone" {
+		t.Fatalf("audio sources %v err %v", sources, err)
+	}
 	callerEvent := waitOp(t, events, room, call.OpAccept)
 	answered := waitOp(t, events, room, call.OpAnswered)
 	who, gotRoom, err = livekit.Parse(secret, callerEvent.Token)
@@ -111,6 +114,50 @@ func TestPrivateVoiceInviteAcceptHangup(t *testing.T) {
 	hung := waitOp(t, events, room, call.OpHangup)
 	if len(hung.Users) != 1 || hung.Users[0] != callee || hung.Token != "" {
 		t.Fatalf("hangup %+v", hung)
+	}
+}
+
+func TestPrivateVideoTokenAllowsCamera(t *testing.T) {
+	rdb := openRedis(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	secret := strings.Repeat("s", 32)
+	svc := New(call.New(rdb), relations{friends: true}, livekit.Config{
+		URL: "ws://127.0.0.1:7880", Key: "suim", Secret: secret,
+	})
+	events := make(chan call.Event, 4)
+	before, err := rdb.PubSubNumSub(ctx, call.Channel).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go call.New(rdb).Subscribe(ctx, func(ev call.Event) { events <- ev })
+	waitSubscribers(t, ctx, rdb, before[call.Channel])
+
+	caller, callee := "vv"+strconv.FormatInt(time.Now().UnixNano(), 36), "vw"+strconv.FormatInt(time.Now().UnixNano(), 36)
+	t.Cleanup(func() {
+		bg := context.Background()
+		_ = rdb.Del(bg, call.Prefix+"busy:"+caller, call.Prefix+"busy:"+callee).Err()
+	})
+	invited, err := svc.SignalMessageAssemble(rpcctx.WithUser(ctx, caller), &rtcpb.SignalMessageAssembleReq{SignalReq: inviteMedia(callee, call.MediaVideo)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	room := invited.GetSignalResp().GetInvite().GetRoomId()
+	t.Cleanup(func() {
+		_, _ = call.New(rdb).Hangup(context.Background(), caller, room)
+	})
+	_ = waitOp(t, events, room, call.OpRing)
+	accepted, err := svc.SignalMessageAssemble(rpcctx.WithUser(ctx, callee), &rtcpb.SignalMessageAssembleReq{
+		ConnId: "accepting", SignalReq: &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_Accept{Accept: &rtcpb.SignalAcceptReq{RoomId: room}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{accepted.GetSignalResp().GetAccept().GetToken(), waitOp(t, events, room, call.OpAccept).Token} {
+		sources, err := livekit.Sources(secret, token)
+		if err != nil || len(sources) != 2 || sources[0] != "microphone" || sources[1] != "camera" {
+			t.Fatalf("sources %v err %v", sources, err)
+		}
 	}
 }
 
@@ -198,11 +245,11 @@ func TestInviteChecksOperatorFriendshipAndVoice(t *testing.T) {
 
 	_, err = New(nil, nil, livekit.Config{}).SignalMessageAssemble(rpcctx.WithUser(context.Background(), "caller-1"), &rtcpb.SignalMessageAssembleReq{
 		SignalReq: &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_Invite{Invite: &rtcpb.SignalInviteReq{
-			Invitation: &rtcpb.InvitationInfo{InviteeUserId: "callee-1", MediaType: call.MediaVideo},
+			Invitation: &rtcpb.InvitationInfo{InviteeUserId: "callee-1", MediaType: "film"},
 		}}},
 	})
-	if code, _ := errorcode.CodeOf(err); code != errorcode.CallInvalid || err.Error() != "voice calls only" {
-		t.Fatalf("video %v", err)
+	if code, _ := errorcode.CodeOf(err); code != errorcode.CallInvalid || err.Error() != "invalid call signal" {
+		t.Fatalf("media %v", err)
 	}
 }
 
@@ -228,8 +275,12 @@ func (r relations) IsBlack(ctx context.Context, _, _ string) (bool, bool, error)
 }
 
 func inviteAudio(callee string) *rtcpb.SignalReq {
+	return inviteMedia(callee, call.MediaAudio)
+}
+
+func inviteMedia(callee, media string) *rtcpb.SignalReq {
 	return &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_Invite{Invite: &rtcpb.SignalInviteReq{
-		Invitation: &rtcpb.InvitationInfo{InviteeUserId: callee, MediaType: call.MediaAudio},
+		Invitation: &rtcpb.InvitationInfo{InviteeUserId: callee, MediaType: media},
 	}}}
 }
 

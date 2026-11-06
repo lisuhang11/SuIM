@@ -68,10 +68,11 @@ func (s *Service) SignalGetTokenByRoomID(ctx context.Context, req *rtcpb.SignalG
 	if !s.media.Enabled() {
 		return nil, errorcode.ErrInternal.WithMsg("livekit is not configured")
 	}
-	if _, err := s.calls.Accepted(ctx, userID, req.GetRoomId()); err != nil {
+	sig, err := s.calls.Accepted(ctx, userID, req.GetRoomId())
+	if err != nil {
 		return nil, err
 	}
-	url, token, err := s.sign(userID, req.GetRoomId())
+	url, token, err := s.sign(userID, req.GetRoomId(), sig.Media)
 	if err != nil || token == "" {
 		return nil, errorcode.ErrInternal.WithMsg("sign call token")
 	}
@@ -106,8 +107,9 @@ func (s *Service) invite(ctx context.Context, caller string, req *rtcpb.SignalIn
 	if req == nil || req.Invitation == nil || req.Invitation.InviteeUserId == "" {
 		return nil, errorcode.ErrCallInvalid
 	}
-	if req.Invitation.MediaType != call.MediaAudio {
-		return nil, errorcode.ErrCallInvalid.WithMsg("voice calls only")
+	media := req.Invitation.MediaType
+	if media != call.MediaAudio && media != call.MediaVideo {
+		return nil, errorcode.ErrCallInvalid
 	}
 	invitee := req.Invitation.InviteeUserId
 	if err := s.authorize(ctx, caller, invitee); err != nil {
@@ -116,7 +118,7 @@ func (s *Service) invite(ctx context.Context, caller string, req *rtcpb.SignalIn
 	if s.calls == nil {
 		return nil, errorcode.ErrInternal.WithMsg("call signaling is not configured")
 	}
-	sig, err := s.calls.Invite(ctx, caller, invitee, call.MediaAudio)
+	sig, err := s.calls.Invite(ctx, caller, invitee, media)
 	if err != nil {
 		return nil, err
 	}
@@ -134,12 +136,12 @@ func (s *Service) accept(ctx context.Context, userID, connID, roomID string) (*r
 	if err != nil {
 		return nil, err
 	}
-	calleeURL, calleeToken, err := s.sign(userID, sig.CallID)
+	calleeURL, calleeToken, err := s.sign(userID, sig.CallID, sig.Media)
 	if err != nil {
 		s.abort(ctx, userID, sig)
 		return nil, err
 	}
-	callerURL, callerToken, err := s.sign(sig.CallerID, sig.CallID)
+	callerURL, callerToken, err := s.sign(sig.CallerID, sig.CallID, sig.Media)
 	if err != nil {
 		s.abort(ctx, userID, sig)
 		return nil, err
@@ -203,11 +205,11 @@ func (s *Service) authorize(ctx context.Context, caller, callee string) error {
 	return nil
 }
 
-func (s *Service) sign(identity, room string) (string, string, error) {
+func (s *Service) sign(identity, room, media string) (string, string, error) {
 	if s == nil || !s.media.Enabled() {
 		return "", "", nil
 	}
-	url, token, err := s.media.Sign(identity, room, time.Now())
+	url, token, err := s.media.SignCall(identity, room, media, time.Now())
 	if err != nil {
 		slog.Warn("sign call token", "err", err, "callID", room)
 		return "", "", errorcode.ErrInternal.WithMsg("sign call token")

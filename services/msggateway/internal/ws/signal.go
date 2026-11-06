@@ -5,188 +5,63 @@ import (
 	"log/slog"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/call"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
-// Relations is the friend and blacklist check used before a call rings.
-type Relations interface {
-	IsFriend(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
-	IsBlack(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
+// CallSignals is the rtc service. The gateway authenticates the socket, then forwards frame 1004.
+type CallSignals interface {
+	Assemble(ctx context.Context, userID, connID string, in *msgpb.CallSignal) (*msgpb.CallSignal, error)
 }
 
 func (s *Server) signal(c *Client, req *Req) error {
-	if s == nil || s.calls == nil {
+	if s == nil || s.signals == nil {
 		return c.reply(req, errArgs, "signal messages are not supported", nil)
 	}
 	in := &msgpb.CallSignal{}
 	if len(req.Data) == 0 || proto.Unmarshal(req.Data, in) != nil {
-		return replyCall(c, req, errorcode.ErrCallInvalid, call.Signal{})
+		return replyCall(c, req, errorcode.ErrCallInvalid)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	sig, err := s.applySignal(ctx, c, in)
+	out, err := s.signals.Assemble(ctx, c.userID, c.id, in)
 	if err != nil {
-		return replyCall(c, req, err, sig)
+		return replyCall(c, req, err)
 	}
-	if sig.Op == call.OpAccept && s.livekit.Enabled() {
-		url, token, signErr := s.livekit.Sign(c.userID, sig.CallID, time.Now())
-		if signErr != nil {
-			slog.Warn("sign callee token", "err", signErr, "callID", sig.CallID)
-			_, _ = s.calls.Hangup(ctx, c.userID, sig.CallID)
-			s.publishCall(ctx, sig, call.OpHangup, []string{sig.CallerID, sig.CalleeID}, "")
-			return replyCall(c, req, errorcode.ErrInternal.WithMsg("sign call token"), call.Signal{})
-		}
-		sig.URL = url
-		sig.Token = token
+	if out == nil {
+		return replyCall(c, req, errorcode.ErrInternal.WithMsg("empty rtc response"))
 	}
-	if err := s.fanout(ctx, c, sig); err != nil {
-		sig.URL = ""
-		sig.Token = ""
-		return replyCall(c, req, err, sig)
-	}
-	return replyCall(c, req, nil, sig)
-}
-
-func (s *Server) applySignal(ctx context.Context, c *Client, in *msgpb.CallSignal) (call.Signal, error) {
-	switch in.GetOp() {
-	case msgpb.CallOp_CALL_INVITE:
-		if err := s.authorizeCall(ctx, c.userID, in.GetPeerId()); err != nil {
-			return call.Signal{}, err
-		}
-		return s.calls.Invite(ctx, c.userID, in.GetPeerId(), mediaName(in.GetMedia()))
-	case msgpb.CallOp_CALL_CANCEL:
-		return s.calls.Cancel(ctx, c.userID, in.GetCallId())
-	case msgpb.CallOp_CALL_ACCEPT:
-		return s.calls.Accept(ctx, c.userID, in.GetCallId())
-	case msgpb.CallOp_CALL_REJECT:
-		return s.calls.Reject(ctx, c.userID, in.GetCallId())
-	case msgpb.CallOp_CALL_HANGUP:
-		return s.calls.Hangup(ctx, c.userID, in.GetCallId())
-	default:
-		return call.Signal{}, errorcode.ErrCallInvalid
-	}
-}
-
-func (s *Server) authorizeCall(ctx context.Context, caller, callee string) error {
-	if s.relations == nil {
-		return errorcode.ErrInternal.WithMsg("relation service is not configured")
-	}
-	// Relation rejects a call that does not name the operator. The websocket
-	// already authenticated this connection, so the caller is that operator.
-	ctx = rpcctx.WithUser(ctx, caller)
-	blockedByCaller, blockedByCallee, err := s.relations.IsBlack(ctx, caller, callee)
+	body, err := proto.Marshal(out)
 	if err != nil {
-		return errorcode.ErrInternal.WithMsg("check black")
+		return c.reply(req, errInternal, "marshal call signal", nil)
 	}
-	if blockedByCaller || blockedByCallee {
-		return errorcode.ErrMsgBlocked
-	}
-	callerHasFriend, calleeHasFriend, err := s.relations.IsFriend(ctx, caller, callee)
-	if err != nil {
-		return errorcode.ErrInternal.WithMsg("check friend")
-	}
-	if !callerHasFriend || !calleeHasFriend {
-		return errorcode.ErrMsgNotFriend
-	}
-	return nil
+	return c.reply(req, 0, "", body)
 }
 
-func (s *Server) fanout(ctx context.Context, actor *Client, sig call.Signal) error {
-	switch sig.Op {
-	case call.OpInvite:
-		s.publishCall(ctx, sig, call.OpRing, []string{sig.CalleeID}, "")
-	case call.OpCancel:
-		s.publishCall(ctx, sig, call.OpCancel, []string{sig.CalleeID}, "")
-	case call.OpReject:
-		s.publishCall(ctx, sig, call.OpReject, []string{sig.CallerID}, "")
-	case call.OpAccept:
-		caller := sig
-		caller.URL = ""
-		caller.Token = ""
-		if s.livekit.Enabled() {
-			url, token, err := s.livekit.Sign(sig.CallerID, sig.CallID, time.Now())
-			if err != nil {
-				slog.Warn("sign caller token", "err", err, "callID", sig.CallID)
-				_, _ = s.calls.Hangup(ctx, actor.userID, sig.CallID)
-				s.publishCall(ctx, sig, call.OpHangup, []string{sig.CallerID, sig.CalleeID}, "")
-				return errorcode.ErrInternal.WithMsg("sign call token")
-			}
-			caller.URL = url
-			caller.Token = token
-		}
-		s.publishCall(ctx, caller, call.OpAccept, []string{sig.CallerID}, "")
-		answered := sig
-		answered.URL = ""
-		answered.Token = ""
-		s.publishCall(ctx, answered, call.OpAnswered, []string{sig.CalleeID}, actor.id)
-	case call.OpHangup:
-		peer := sig.CallerID
-		if actor.userID == sig.CallerID {
-			peer = sig.CalleeID
-		}
-		s.publishCall(ctx, sig, call.OpHangup, []string{peer}, "")
+func replyCall(c *Client, req *Req, err error) error {
+	if st, ok := status.FromError(err); ok && st.Code() == codes.Unavailable {
+		return c.reply(req, errInternal, "rtc service is unavailable", nil)
 	}
-	return nil
+	code := errInternal
+	text := "call signaling"
+	if biz, ok := errorcode.CodeOf(err); ok {
+		code = int(biz)
+		text = status.Convert(err).Message()
+	}
+	return c.reply(req, code, text, nil)
 }
 
-func (s *Server) publishCall(ctx context.Context, sig call.Signal, op string, users []string, except string) {
-	out := sig
-	out.Op = op
-	if op != call.OpAccept {
-		out.URL = ""
-		out.Token = ""
-	}
-	if err := s.calls.Publish(ctx, call.Event{
-		Users:  users,
-		Except: except,
-		Op:     out.Op,
-		CallID: out.CallID,
-		Caller: out.CallerID,
-		Callee: out.CalleeID,
-		Media:  out.Media,
-		Reason: out.Reason,
-		URL:    out.URL,
-		Token:  out.Token,
-	}); err != nil {
-		slog.Warn("publish call signal", "err", err, "op", op, "callID", sig.CallID)
-	}
-}
-
-// WatchCall delivers signals published by this process and by other gateways.
+// WatchCall delivers signals published by the rtc service on this process and on other gateways.
 func (s *Server) WatchCall(ctx context.Context) {
 	if s == nil || s.calls == nil {
 		return
 	}
 	s.calls.Subscribe(ctx, s.deliverCall)
-}
-
-// SweepCalls ends ringing calls that nobody answered.
-func (s *Server) SweepCalls(ctx context.Context) {
-	if s == nil || s.calls == nil {
-		return
-	}
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			ended, err := s.calls.Expire(ctx, time.Now())
-			if err != nil {
-				slog.Warn("expire calls", "err", err)
-				continue
-			}
-			for _, sig := range ended {
-				s.publishCall(ctx, sig, call.OpTimeout, []string{sig.CallerID, sig.CalleeID}, "")
-			}
-		}
-	}
 }
 
 func (s *Server) deliverCall(ev call.Event) {
@@ -206,27 +81,6 @@ func (s *Server) deliverCall(ev call.Event) {
 			_ = client.write(Resp{ReqIdentifier: reqCallSignal, Data: body})
 		}
 	}
-}
-
-func replyCall(c *Client, req *Req, err error, sig call.Signal) error {
-	if err == nil {
-		body, marshalErr := proto.Marshal(signalProto(sig))
-		if marshalErr != nil {
-			return c.reply(req, errInternal, "marshal call signal", nil)
-		}
-		return c.reply(req, 0, "", body)
-	}
-	code := errInternal
-	text := "call signaling"
-	if biz, ok := errorcode.CodeOf(err); ok {
-		code = int(biz)
-		text = err.Error()
-	}
-	var body []byte
-	if sig.CallID != "" {
-		body, _ = proto.Marshal(signalProto(sig))
-	}
-	return c.reply(req, code, text, body)
 }
 
 func signalProto(sig call.Signal) *msgpb.CallSignal {
@@ -275,16 +129,5 @@ func callMedia(media string) msgpb.CallMedia {
 		return msgpb.CallMedia_CALL_VIDEO
 	default:
 		return msgpb.CallMedia_CALL_MEDIA_NONE
-	}
-}
-
-func mediaName(media msgpb.CallMedia) string {
-	switch media {
-	case msgpb.CallMedia_CALL_AUDIO:
-		return call.MediaAudio
-	case msgpb.CallMedia_CALL_VIDEO:
-		return call.MediaVideo
-	default:
-		return ""
 	}
 }

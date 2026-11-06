@@ -26,6 +26,12 @@ func TestInviteAcceptHangup(t *testing.T) {
 	if err != nil || accepted.CallerID != caller || accepted.CalleeID != callee || accepted.Media != MediaAudio {
 		t.Fatalf("accept %+v err=%v", accepted, err)
 	}
+	if got, err := board.Accepted(ctx, caller, sig.CallID); err != nil || got.CalleeID != callee || got.Media != MediaAudio {
+		t.Fatalf("accepted read %+v err=%v", got, err)
+	}
+	if _, err := board.Accepted(ctx, "outsider", sig.CallID); !errorIs(err, errorcode.ErrCallNotMember) {
+		t.Fatalf("outsider %v", err)
+	}
 	if _, err := board.Hangup(ctx, caller, sig.CallID); err != nil {
 		t.Fatal(err)
 	}

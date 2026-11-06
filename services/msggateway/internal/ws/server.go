@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -14,7 +13,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/call"
-	"github.com/lisuhang11/SuIM/pkg/livekit"
 	"github.com/lisuhang11/SuIM/pkg/msgconv"
 	"github.com/lisuhang11/SuIM/pkg/online"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -67,19 +65,18 @@ type Messages interface {
 // Server accepts SDK websocket connections and pushes messages that arrive on toPush.
 type Server struct {
 	gatewaypb.UnimplementedMsgGatewayServer
-	hub       *Hub
-	tokens    TokenChecker
-	groups    GroupDirectory
-	joined    JoinedGroups
-	syncLog   GroupSyncCache
-	messages  Messages
-	calls     *call.Board
-	livekit   livekit.Config
-	relations Relations
-	maxConn   int64
-	hooks     Hooks
-	online    *online.Status
-	upgrader  websocket.Upgrader
+	hub      *Hub
+	tokens   TokenChecker
+	groups   GroupDirectory
+	joined   JoinedGroups
+	syncLog  GroupSyncCache
+	messages Messages
+	calls    *call.Board
+	signals  CallSignals
+	maxConn  int64
+	hooks    Hooks
+	online   *online.Status
+	upgrader websocket.Upgrader
 }
 
 // Hooks carries the gateway webhook client and the online status callbacks.
@@ -97,8 +94,7 @@ type Options struct {
 	GroupSync        GroupSyncCache
 	Messages         Messages
 	Calls            *call.Board
-	LiveKit          livekit.Config
-	Relations        Relations
+	Signals          CallSignals
 	Online           *online.Status
 	MaxConn          int64
 	HandshakeTimeout time.Duration
@@ -113,31 +109,22 @@ func New(opts Options) *Server {
 		opts.HandshakeTimeout = 10 * time.Second
 	}
 	return &Server{
-		hub:       NewHub(),
-		tokens:    opts.Tokens,
-		groups:    opts.Groups,
-		joined:    opts.Joined,
-		syncLog:   opts.GroupSync,
-		messages:  opts.Messages,
-		calls:     opts.Calls,
-		livekit:   opts.LiveKit,
-		relations: opts.Relations,
-		online:    opts.Online,
-		maxConn:   opts.MaxConn,
-		hooks:     opts.Hooks,
+		hub:      NewHub(),
+		tokens:   opts.Tokens,
+		groups:   opts.Groups,
+		joined:   opts.Joined,
+		syncLog:  opts.GroupSync,
+		messages: opts.Messages,
+		calls:    opts.Calls,
+		signals:  opts.Signals,
+		online:   opts.Online,
+		maxConn:  opts.MaxConn,
+		hooks:    opts.Hooks,
 		upgrader: websocket.Upgrader{
 			HandshakeTimeout: opts.HandshakeTimeout,
 			CheckOrigin:      func(*http.Request) bool { return true },
 		},
 	}
-}
-
-// SignCallToken signs a microphone-only LiveKit join token for one participant.
-func (s *Server) SignCallToken(identity, room string) (string, string, error) {
-	if s == nil {
-		return "", "", fmt.Errorf("livekit is not configured")
-	}
-	return s.livekit.Sign(identity, room, time.Now())
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

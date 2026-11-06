@@ -20,8 +20,8 @@ const (
 	// Prefix is the production key prefix. A call id lives at Prefix+"id:"+callID,
 	// a busy lock at Prefix+"busy:"+userID, and the ringing index at Prefix+"ringing".
 	Prefix = "suim:call:"
-	// Channel is the production pub/sub channel. Every msggateway delivers the payload
-	// to sockets it still holds.
+	// Channel is the production pub/sub channel. The rtc service publishes.
+	// Every msggateway delivers the payload to sockets it still holds.
 	Channel = Prefix + "signal"
 
 	// OpInvite and the ops below are the signaling steps carried in an event.
@@ -160,6 +160,34 @@ func (b *Board) Accept(ctx context.Context, userID, callID string) (Signal, erro
 // Hangup ends an accepted call. Either participant can hang up.
 func (b *Board) Hangup(ctx context.Context, userID, callID string) (Signal, error) {
 	return b.end(ctx, hangupScript, OpHangup, userID, callID)
+}
+
+// Accepted reads a call that userID has already joined.
+func (b *Board) Accepted(ctx context.Context, userID, callID string) (Signal, error) {
+	sig := Signal{CallID: callID}
+	if b == nil || b.rdb == nil {
+		return sig, errorcode.ErrInternal.WithMsg("call signaling is not configured")
+	}
+	if !validCallID(callID) || !validUser(userID) {
+		return sig, errorcode.ErrCallInvalid
+	}
+	vals, err := b.rdb.HGetAll(ctx, b.callKey(callID)).Result()
+	if err != nil {
+		return sig, err
+	}
+	if len(vals) == 0 {
+		return sig, errorcode.ErrCallNotFound
+	}
+	sig.CallerID = vals["caller"]
+	sig.CalleeID = vals["callee"]
+	sig.Media = vals["media"]
+	if userID != sig.CallerID && userID != sig.CalleeID {
+		return sig, errorcode.ErrCallNotMember
+	}
+	if vals["state"] != stateAccepted {
+		return sig, errorcode.ErrCallState
+	}
+	return sig, nil
 }
 
 // Expire ends ringing calls whose deadline has passed. A lost race returns nothing for that id.

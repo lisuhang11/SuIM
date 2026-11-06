@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package rtc;
+
+option go_package = "github.com/lisuhang11/SuIM/proto/rtc;rtcpb";
+
+// RtcService is the private-call signaling service.
+// OpenIM's RtcService also carries group invitations, custom signals, room webhooks,
+// and call records. Those are not part of this service. Audio bytes stay on LiveKit.
+// msggateway forwards websocket frame 1004 here and delivers frame 2006 from the
+// events this service publishes. The operator is the gateway's authenticated user.
+service RtcService {
+  // SignalMessageAssemble runs one signaling step.
+  // OpenIM wraps the same oneof. Field 2 of that oneof is the group invite and is unused here.
+  rpc SignalMessageAssemble(SignalMessageAssembleReq) returns (SignalMessageAssembleResp);
+  // SignalGetTokenByRoomID signs a new microphone token for someone already in an accepted call.
+  rpc SignalGetTokenByRoomID(SignalGetTokenByRoomIDReq) returns (SignalGetTokenByRoomIDResp);
+}
+
+message SignalMessageAssembleReq {
+  SignalReq signal_req = 1;
+  // conn_id is the websocket that sent this step. CALL_ANSWERED is not pushed back to it,
+  // because that socket already received the accept reply. OpenIM does not carry a connection id.
+  string conn_id = 2;
+}
+
+message SignalMessageAssembleResp {
+  SignalResp signal_resp = 1;
+}
+
+message SignalReq {
+  oneof payload {
+    SignalInviteReq invite = 1;
+    SignalCancelReq cancel = 3;
+    SignalAcceptReq accept = 4;
+    SignalHangUpReq hang_up = 5;
+    SignalRejectReq reject = 6;
+  }
+}
+
+message SignalResp {
+  oneof payload {
+    SignalInviteResp invite = 1;
+    SignalCancelResp cancel = 3;
+    SignalAcceptResp accept = 4;
+    SignalHangUpResp hang_up = 5;
+    SignalRejectResp reject = 6;
+  }
+}
+
+// InvitationInfo is one private call.
+// OpenIM uses a repeated invitee list, a group id, and a busy list because one invitation can ring a group.
+message InvitationInfo {
+  string inviter_user_id = 1;
+  string invitee_user_id = 2;
+  string room_id = 3;
+  // media_type is "audio". Any other value is rejected.
+  string media_type = 4;
+}
+
+message SignalInviteReq {
+  InvitationInfo invitation = 1;
+}
+
+// SignalInviteResp matches OpenIM's invite reply.
+// token and live_url stay empty: a SuIM private call issues tokens only after the invitee accepts.
+// A busy peer is an error, not a partial invitation, so there is no busy-line list.
+message SignalInviteResp {
+  string token = 1;
+  string room_id = 2;
+  string live_url = 3;
+}
+
+message SignalCancelReq {
+  string room_id = 1;
+}
+
+message SignalCancelResp {}
+
+message SignalAcceptReq {
+  string room_id = 1;
+}
+
+// SignalAcceptResp is the invitee's join credential. The inviter's credential is pushed separately.
+message SignalAcceptResp {
+  string token = 1;
+  string room_id = 2;
+  string live_url = 3;
+}
+
+// SignalHangUpReq is OpenIM's SignalHungUpReq.
+message SignalHangUpReq {
+  string room_id = 1;
+}
+
+message SignalHangUpResp {}
+
+message SignalRejectReq {
+  string room_id = 1;
+}
+
+message SignalRejectResp {}
+
+message SignalGetTokenByRoomIDReq {
+  string room_id = 1;
+  string user_id = 2;
+}
+
+message SignalGetTokenByRoomIDResp {
+  string token = 1;
+  string live_url = 2;
+}

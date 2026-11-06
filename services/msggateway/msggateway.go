@@ -28,7 +28,7 @@ import (
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
-	"github.com/lisuhang11/SuIM/proto/relation"
+	rtcpb "github.com/lisuhang11/SuIM/proto/rtc"
 	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/msggateway/internal/config"
 	"github.com/lisuhang11/SuIM/services/msggateway/internal/redisclient"
@@ -85,14 +85,14 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial msg service: %w", err)
 	}
 	defer msgConn.Close()
-	relationConn, err := reg.Dial(ctx, "relation",
+	rtcConn, err := reg.Dial(ctx, "rtc",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
 	)
 	if err != nil {
-		return fmt.Errorf("dial relation service: %w", err)
+		return fmt.Errorf("dial rtc service: %w", err)
 	}
-	defer relationConn.Close()
+	defer rtcConn.Close()
 	groupConn, err := reg.Dial(ctx, "group",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
@@ -116,8 +116,7 @@ func run(cfgPath string) error {
 		GroupSync:        ws.NewRedisGroupSync(rdb),
 		Messages:         rpc.NewMsgClient(msgpb.NewMsgServiceClient(msgConn)),
 		Calls:            call.New(rdb),
-		LiveKit:          cfg.LiveKit,
-		Relations:        rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)),
+		Signals:          rpc.NewRtcClient(rtcpb.NewRtcServiceClient(rtcConn)),
 		Online:           online.New(rdb),
 		MaxConn:          cfg.MaxConn,
 		HandshakeTimeout: time.Duration(cfg.HandshakeTimeoutSec) * time.Second,
@@ -172,7 +171,6 @@ func run(cfgPath string) error {
 	go server.WatchOnline(ctx)
 	go server.RenewOnline(ctx)
 	go server.WatchCall(ctx)
-	go server.SweepCalls(ctx)
 
 	errCh := make(chan error, 3)
 	go func() {

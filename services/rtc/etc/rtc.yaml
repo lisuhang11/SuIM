@@ -1,0 +1,29 @@
+listenIP: 0.0.0.0
+registerIP: 127.0.0.1
+port: 8088
+
+redis:
+  address:
+    - 127.0.0.1:6379
+  username: ""
+  password: suIM123
+  redisMode: standalone
+  db: 0
+  maxRetry: 3
+  poolSize: 10
+
+registry:
+  type: etcd
+  etcd:
+    endpoints:
+      - 127.0.0.1:2379
+    rootDir: /services
+    username: ""
+    password: ""
+    dialTimeout: 5
+    ttl: 10
+
+livekit:
+  url: ws://127.0.0.1:7880
+  key: suim
+  secret: 1fcb7fa34d15c24e3ba7061eb29ccbcb252f775b34245ebda640b6861339a197

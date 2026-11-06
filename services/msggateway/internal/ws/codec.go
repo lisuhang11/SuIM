@@ -26,6 +26,7 @@ const (
 	reqLogoutMsg         = 2003
 	reqSetBackground     = 2004
 	reqSubUserOnline     = 2005
+	reqCallSignal        = 2006
 
 	errArgs     = 1001
 	errToken    = 1502

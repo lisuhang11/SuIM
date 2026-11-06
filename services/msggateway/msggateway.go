@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/lisuhang11/SuIM/pkg/call"
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/mw"
@@ -27,6 +28,7 @@ import (
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
+	"github.com/lisuhang11/SuIM/proto/relation"
 	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/msggateway/internal/config"
 	"github.com/lisuhang11/SuIM/services/msggateway/internal/redisclient"
@@ -83,6 +85,14 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial msg service: %w", err)
 	}
 	defer msgConn.Close()
+	relationConn, err := reg.Dial(ctx, "relation",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial relation service: %w", err)
+	}
+	defer relationConn.Close()
 	groupConn, err := reg.Dial(ctx, "group",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
@@ -105,6 +115,8 @@ func run(cfgPath string) error {
 		Joined:           groupClient,
 		GroupSync:        ws.NewRedisGroupSync(rdb),
 		Messages:         rpc.NewMsgClient(msgpb.NewMsgServiceClient(msgConn)),
+		Calls:            call.New(rdb),
+		Relations:        rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)),
 		Online:           online.New(rdb),
 		MaxConn:          cfg.MaxConn,
 		HandshakeTimeout: time.Duration(cfg.HandshakeTimeoutSec) * time.Second,
@@ -158,6 +170,8 @@ func run(cfgPath string) error {
 	pushConsumer.ConsumeNew()
 	go server.WatchOnline(ctx)
 	go server.RenewOnline(ctx)
+	go server.WatchCall(ctx)
+	go server.SweepCalls(ctx)
 
 	errCh := make(chan error, 3)
 	go func() {

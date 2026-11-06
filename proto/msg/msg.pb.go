@@ -21,6 +21,126 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// CallOp is one step of a voice or video call. Media bytes are not carried here.
+type CallOp int32
+
+const (
+	CallOp_CALL_OP_NONE  CallOp = 0
+	CallOp_CALL_INVITE   CallOp = 1
+	CallOp_CALL_CANCEL   CallOp = 2
+	CallOp_CALL_ACCEPT   CallOp = 3
+	CallOp_CALL_REJECT   CallOp = 4
+	CallOp_CALL_HANGUP   CallOp = 5
+	CallOp_CALL_RING     CallOp = 6
+	CallOp_CALL_TIMEOUT  CallOp = 7
+	CallOp_CALL_BUSY     CallOp = 8
+	CallOp_CALL_ANSWERED CallOp = 9
+)
+
+// Enum value maps for CallOp.
+var (
+	CallOp_name = map[int32]string{
+		0: "CALL_OP_NONE",
+		1: "CALL_INVITE",
+		2: "CALL_CANCEL",
+		3: "CALL_ACCEPT",
+		4: "CALL_REJECT",
+		5: "CALL_HANGUP",
+		6: "CALL_RING",
+		7: "CALL_TIMEOUT",
+		8: "CALL_BUSY",
+		9: "CALL_ANSWERED",
+	}
+	CallOp_value = map[string]int32{
+		"CALL_OP_NONE":  0,
+		"CALL_INVITE":   1,
+		"CALL_CANCEL":   2,
+		"CALL_ACCEPT":   3,
+		"CALL_REJECT":   4,
+		"CALL_HANGUP":   5,
+		"CALL_RING":     6,
+		"CALL_TIMEOUT":  7,
+		"CALL_BUSY":     8,
+		"CALL_ANSWERED": 9,
+	}
+)
+
+func (x CallOp) Enum() *CallOp {
+	p := new(CallOp)
+	*p = x
+	return p
+}
+
+func (x CallOp) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CallOp) Descriptor() protoreflect.EnumDescriptor {
+	return file_msg_msg_proto_enumTypes[0].Descriptor()
+}
+
+func (CallOp) Type() protoreflect.EnumType {
+	return &file_msg_msg_proto_enumTypes[0]
+}
+
+func (x CallOp) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CallOp.Descriptor instead.
+func (CallOp) EnumDescriptor() ([]byte, []int) {
+	return file_msg_msg_proto_rawDescGZIP(), []int{0}
+}
+
+type CallMedia int32
+
+const (
+	CallMedia_CALL_MEDIA_NONE CallMedia = 0
+	CallMedia_CALL_AUDIO      CallMedia = 1
+	CallMedia_CALL_VIDEO      CallMedia = 2
+)
+
+// Enum value maps for CallMedia.
+var (
+	CallMedia_name = map[int32]string{
+		0: "CALL_MEDIA_NONE",
+		1: "CALL_AUDIO",
+		2: "CALL_VIDEO",
+	}
+	CallMedia_value = map[string]int32{
+		"CALL_MEDIA_NONE": 0,
+		"CALL_AUDIO":      1,
+		"CALL_VIDEO":      2,
+	}
+)
+
+func (x CallMedia) Enum() *CallMedia {
+	p := new(CallMedia)
+	*p = x
+	return p
+}
+
+func (x CallMedia) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CallMedia) Descriptor() protoreflect.EnumDescriptor {
+	return file_msg_msg_proto_enumTypes[1].Descriptor()
+}
+
+func (CallMedia) Type() protoreflect.EnumType {
+	return &file_msg_msg_proto_enumTypes[1]
+}
+
+func (x CallMedia) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CallMedia.Descriptor instead.
+func (CallMedia) EnumDescriptor() ([]byte, []int) {
+	return file_msg_msg_proto_rawDescGZIP(), []int{1}
+}
+
 // OfflinePushInfo is the notification payload on MsgData field 20.
 type OfflinePushInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2197,6 +2317,99 @@ func (x *SubUserOnlineStatusTips) GetSubscribers() []*SubUserOnlineStatusElem {
 	return nil
 }
 
+// CallSignal is the websocket payload for frame 1004 and the push frame 2006.
+type CallSignal struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Op            CallOp                 `protobuf:"varint,1,opt,name=op,proto3,enum=msg.CallOp" json:"op,omitempty"`
+	CallId        string                 `protobuf:"bytes,2,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	PeerId        string                 `protobuf:"bytes,3,opt,name=peer_id,json=peerId,proto3" json:"peer_id,omitempty"`
+	Media         CallMedia              `protobuf:"varint,4,opt,name=media,proto3,enum=msg.CallMedia" json:"media,omitempty"`
+	CallerId      string                 `protobuf:"bytes,5,opt,name=caller_id,json=callerId,proto3" json:"caller_id,omitempty"`
+	CalleeId      string                 `protobuf:"bytes,6,opt,name=callee_id,json=calleeId,proto3" json:"callee_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CallSignal) Reset() {
+	*x = CallSignal{}
+	mi := &file_msg_msg_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CallSignal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CallSignal) ProtoMessage() {}
+
+func (x *CallSignal) ProtoReflect() protoreflect.Message {
+	mi := &file_msg_msg_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CallSignal.ProtoReflect.Descriptor instead.
+func (*CallSignal) Descriptor() ([]byte, []int) {
+	return file_msg_msg_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *CallSignal) GetOp() CallOp {
+	if x != nil {
+		return x.Op
+	}
+	return CallOp_CALL_OP_NONE
+}
+
+func (x *CallSignal) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+func (x *CallSignal) GetPeerId() string {
+	if x != nil {
+		return x.PeerId
+	}
+	return ""
+}
+
+func (x *CallSignal) GetMedia() CallMedia {
+	if x != nil {
+		return x.Media
+	}
+	return CallMedia_CALL_MEDIA_NONE
+}
+
+func (x *CallSignal) GetCallerId() string {
+	if x != nil {
+		return x.CallerId
+	}
+	return ""
+}
+
+func (x *CallSignal) GetCalleeId() string {
+	if x != nil {
+		return x.CalleeId
+	}
+	return ""
+}
+
+func (x *CallSignal) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 var File_msg_msg_proto protoreflect.FileDescriptor
 
 const file_msg_msg_proto_rawDesc = "" +
@@ -2371,7 +2584,33 @@ const file_msg_msg_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12.\n" +
 	"\x13online_platform_ids\x18\x02 \x03(\x05R\x11onlinePlatformIds\"Y\n" +
 	"\x17SubUserOnlineStatusTips\x12>\n" +
-	"\vsubscribers\x18\x01 \x03(\v2\x1c.msg.SubUserOnlineStatusElemR\vsubscribers2\xca\a\n" +
+	"\vsubscribers\x18\x01 \x03(\v2\x1c.msg.SubUserOnlineStatusElemR\vsubscribers\"\xd3\x01\n" +
+	"\n" +
+	"CallSignal\x12\x1b\n" +
+	"\x02op\x18\x01 \x01(\x0e2\v.msg.CallOpR\x02op\x12\x17\n" +
+	"\acall_id\x18\x02 \x01(\tR\x06callId\x12\x17\n" +
+	"\apeer_id\x18\x03 \x01(\tR\x06peerId\x12$\n" +
+	"\x05media\x18\x04 \x01(\x0e2\x0e.msg.CallMediaR\x05media\x12\x1b\n" +
+	"\tcaller_id\x18\x05 \x01(\tR\bcallerId\x12\x1b\n" +
+	"\tcallee_id\x18\x06 \x01(\tR\bcalleeId\x12\x16\n" +
+	"\x06reason\x18\a \x01(\tR\x06reason*\xb2\x01\n" +
+	"\x06CallOp\x12\x10\n" +
+	"\fCALL_OP_NONE\x10\x00\x12\x0f\n" +
+	"\vCALL_INVITE\x10\x01\x12\x0f\n" +
+	"\vCALL_CANCEL\x10\x02\x12\x0f\n" +
+	"\vCALL_ACCEPT\x10\x03\x12\x0f\n" +
+	"\vCALL_REJECT\x10\x04\x12\x0f\n" +
+	"\vCALL_HANGUP\x10\x05\x12\r\n" +
+	"\tCALL_RING\x10\x06\x12\x10\n" +
+	"\fCALL_TIMEOUT\x10\a\x12\r\n" +
+	"\tCALL_BUSY\x10\b\x12\x11\n" +
+	"\rCALL_ANSWERED\x10\t*@\n" +
+	"\tCallMedia\x12\x13\n" +
+	"\x0fCALL_MEDIA_NONE\x10\x00\x12\x0e\n" +
+	"\n" +
+	"CALL_AUDIO\x10\x01\x12\x0e\n" +
+	"\n" +
+	"CALL_VIDEO\x10\x022\xca\a\n" +
 	"\n" +
 	"MsgService\x12,\n" +
 	"\aSendMsg\x12\x0f.msg.SendMsgReq\x1a\x10.msg.SendMsgResp\x122\n" +
@@ -2399,104 +2638,110 @@ func file_msg_msg_proto_rawDescGZIP() []byte {
 	return file_msg_msg_proto_rawDescData
 }
 
-var file_msg_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
+var file_msg_msg_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_msg_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_msg_msg_proto_goTypes = []any{
-	(*OfflinePushInfo)(nil),                      // 0: msg.OfflinePushInfo
-	(*MsgData)(nil),                              // 1: msg.MsgData
-	(*TipsComm)(nil),                             // 2: msg.TipsComm
-	(*MsgDataToMySQL)(nil),                       // 3: msg.MsgDataToMySQL
-	(*PushMsgData)(nil),                          // 4: msg.PushMsgData
-	(*PullMsgs)(nil),                             // 5: msg.PullMsgs
-	(*PushMessages)(nil),                         // 6: msg.PushMessages
-	(*SendMsgReq)(nil),                           // 7: msg.SendMsgReq
-	(*SendMsgResp)(nil),                          // 8: msg.SendMsgResp
-	(*DelUserPushTokenReq)(nil),                  // 9: msg.DelUserPushTokenReq
-	(*DelUserPushTokenResp)(nil),                 // 10: msg.DelUserPushTokenResp
-	(*GetMaxSeqReq)(nil),                         // 11: msg.GetMaxSeqReq
-	(*GetMaxSeqResp)(nil),                        // 12: msg.GetMaxSeqResp
-	(*SeqRange)(nil),                             // 13: msg.SeqRange
-	(*PullMessageBySeqsReq)(nil),                 // 14: msg.PullMessageBySeqsReq
-	(*Seqs)(nil),                                 // 15: msg.Seqs
-	(*GetConversationsHasReadAndMaxSeqReq)(nil),  // 16: msg.GetConversationsHasReadAndMaxSeqReq
-	(*GetConversationsHasReadAndMaxSeqResp)(nil), // 17: msg.GetConversationsHasReadAndMaxSeqResp
-	(*ConversationSeqs)(nil),                     // 18: msg.ConversationSeqs
-	(*GetSeqMessageReq)(nil),                     // 19: msg.GetSeqMessageReq
-	(*GetLastMessageReq)(nil),                    // 20: msg.GetLastMessageReq
-	(*GetLastMessageResp)(nil),                   // 21: msg.GetLastMessageResp
-	(*MarkMsgsAsReadReq)(nil),                    // 22: msg.MarkMsgsAsReadReq
-	(*MarkMsgsAsReadResp)(nil),                   // 23: msg.MarkMsgsAsReadResp
-	(*MarkConversationAsReadReq)(nil),            // 24: msg.MarkConversationAsReadReq
-	(*MarkConversationAsReadResp)(nil),           // 25: msg.MarkConversationAsReadResp
-	(*SetConversationHasReadSeqReq)(nil),         // 26: msg.SetConversationHasReadSeqReq
-	(*SetConversationHasReadSeqResp)(nil),        // 27: msg.SetConversationHasReadSeqResp
-	(*GetConversationMaxSeqReq)(nil),             // 28: msg.GetConversationMaxSeqReq
-	(*GetConversationMaxSeqResp)(nil),            // 29: msg.GetConversationMaxSeqResp
-	(*SetUserConversationMaxSeqReq)(nil),         // 30: msg.SetUserConversationMaxSeqReq
-	(*SetUserConversationMaxSeqResp)(nil),        // 31: msg.SetUserConversationMaxSeqResp
-	(*SetUserConversationMinSeqReq)(nil),         // 32: msg.SetUserConversationMinSeqReq
-	(*SetUserConversationMinSeqResp)(nil),        // 33: msg.SetUserConversationMinSeqResp
-	(*SetAppBackgroundStatusReq)(nil),            // 34: msg.SetAppBackgroundStatusReq
-	(*SubUserOnlineStatus)(nil),                  // 35: msg.SubUserOnlineStatus
-	(*SubUserOnlineStatusElem)(nil),              // 36: msg.SubUserOnlineStatusElem
-	(*SubUserOnlineStatusTips)(nil),              // 37: msg.SubUserOnlineStatusTips
-	nil,                                          // 38: msg.MsgData.OptionsEntry
-	nil,                                          // 39: msg.PushMessages.MsgsEntry
-	nil,                                          // 40: msg.PushMessages.NotificationMsgsEntry
-	nil,                                          // 41: msg.GetMaxSeqResp.MaxSeqsEntry
-	nil,                                          // 42: msg.GetMaxSeqResp.MinSeqsEntry
-	nil,                                          // 43: msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
-	nil,                                          // 44: msg.GetLastMessageResp.MsgsEntry
+	(CallOp)(0),                                  // 0: msg.CallOp
+	(CallMedia)(0),                               // 1: msg.CallMedia
+	(*OfflinePushInfo)(nil),                      // 2: msg.OfflinePushInfo
+	(*MsgData)(nil),                              // 3: msg.MsgData
+	(*TipsComm)(nil),                             // 4: msg.TipsComm
+	(*MsgDataToMySQL)(nil),                       // 5: msg.MsgDataToMySQL
+	(*PushMsgData)(nil),                          // 6: msg.PushMsgData
+	(*PullMsgs)(nil),                             // 7: msg.PullMsgs
+	(*PushMessages)(nil),                         // 8: msg.PushMessages
+	(*SendMsgReq)(nil),                           // 9: msg.SendMsgReq
+	(*SendMsgResp)(nil),                          // 10: msg.SendMsgResp
+	(*DelUserPushTokenReq)(nil),                  // 11: msg.DelUserPushTokenReq
+	(*DelUserPushTokenResp)(nil),                 // 12: msg.DelUserPushTokenResp
+	(*GetMaxSeqReq)(nil),                         // 13: msg.GetMaxSeqReq
+	(*GetMaxSeqResp)(nil),                        // 14: msg.GetMaxSeqResp
+	(*SeqRange)(nil),                             // 15: msg.SeqRange
+	(*PullMessageBySeqsReq)(nil),                 // 16: msg.PullMessageBySeqsReq
+	(*Seqs)(nil),                                 // 17: msg.Seqs
+	(*GetConversationsHasReadAndMaxSeqReq)(nil),  // 18: msg.GetConversationsHasReadAndMaxSeqReq
+	(*GetConversationsHasReadAndMaxSeqResp)(nil), // 19: msg.GetConversationsHasReadAndMaxSeqResp
+	(*ConversationSeqs)(nil),                     // 20: msg.ConversationSeqs
+	(*GetSeqMessageReq)(nil),                     // 21: msg.GetSeqMessageReq
+	(*GetLastMessageReq)(nil),                    // 22: msg.GetLastMessageReq
+	(*GetLastMessageResp)(nil),                   // 23: msg.GetLastMessageResp
+	(*MarkMsgsAsReadReq)(nil),                    // 24: msg.MarkMsgsAsReadReq
+	(*MarkMsgsAsReadResp)(nil),                   // 25: msg.MarkMsgsAsReadResp
+	(*MarkConversationAsReadReq)(nil),            // 26: msg.MarkConversationAsReadReq
+	(*MarkConversationAsReadResp)(nil),           // 27: msg.MarkConversationAsReadResp
+	(*SetConversationHasReadSeqReq)(nil),         // 28: msg.SetConversationHasReadSeqReq
+	(*SetConversationHasReadSeqResp)(nil),        // 29: msg.SetConversationHasReadSeqResp
+	(*GetConversationMaxSeqReq)(nil),             // 30: msg.GetConversationMaxSeqReq
+	(*GetConversationMaxSeqResp)(nil),            // 31: msg.GetConversationMaxSeqResp
+	(*SetUserConversationMaxSeqReq)(nil),         // 32: msg.SetUserConversationMaxSeqReq
+	(*SetUserConversationMaxSeqResp)(nil),        // 33: msg.SetUserConversationMaxSeqResp
+	(*SetUserConversationMinSeqReq)(nil),         // 34: msg.SetUserConversationMinSeqReq
+	(*SetUserConversationMinSeqResp)(nil),        // 35: msg.SetUserConversationMinSeqResp
+	(*SetAppBackgroundStatusReq)(nil),            // 36: msg.SetAppBackgroundStatusReq
+	(*SubUserOnlineStatus)(nil),                  // 37: msg.SubUserOnlineStatus
+	(*SubUserOnlineStatusElem)(nil),              // 38: msg.SubUserOnlineStatusElem
+	(*SubUserOnlineStatusTips)(nil),              // 39: msg.SubUserOnlineStatusTips
+	(*CallSignal)(nil),                           // 40: msg.CallSignal
+	nil,                                          // 41: msg.MsgData.OptionsEntry
+	nil,                                          // 42: msg.PushMessages.MsgsEntry
+	nil,                                          // 43: msg.PushMessages.NotificationMsgsEntry
+	nil,                                          // 44: msg.GetMaxSeqResp.MaxSeqsEntry
+	nil,                                          // 45: msg.GetMaxSeqResp.MinSeqsEntry
+	nil,                                          // 46: msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
+	nil,                                          // 47: msg.GetLastMessageResp.MsgsEntry
 }
 var file_msg_msg_proto_depIdxs = []int32{
-	38, // 0: msg.MsgData.options:type_name -> msg.MsgData.OptionsEntry
-	0,  // 1: msg.MsgData.offline_push_info:type_name -> msg.OfflinePushInfo
-	1,  // 2: msg.MsgDataToMySQL.msg_data:type_name -> msg.MsgData
-	1,  // 3: msg.PushMsgData.msg_data:type_name -> msg.MsgData
-	1,  // 4: msg.PullMsgs.msgs:type_name -> msg.MsgData
-	39, // 5: msg.PushMessages.msgs:type_name -> msg.PushMessages.MsgsEntry
-	40, // 6: msg.PushMessages.notification_msgs:type_name -> msg.PushMessages.NotificationMsgsEntry
-	1,  // 7: msg.SendMsgReq.msg_data:type_name -> msg.MsgData
-	1,  // 8: msg.SendMsgResp.modify:type_name -> msg.MsgData
-	41, // 9: msg.GetMaxSeqResp.max_seqs:type_name -> msg.GetMaxSeqResp.MaxSeqsEntry
-	42, // 10: msg.GetMaxSeqResp.min_seqs:type_name -> msg.GetMaxSeqResp.MinSeqsEntry
-	13, // 11: msg.PullMessageBySeqsReq.seq_ranges:type_name -> msg.SeqRange
-	43, // 12: msg.GetConversationsHasReadAndMaxSeqResp.seqs:type_name -> msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
-	18, // 13: msg.GetSeqMessageReq.conversations:type_name -> msg.ConversationSeqs
-	44, // 14: msg.GetLastMessageResp.msgs:type_name -> msg.GetLastMessageResp.MsgsEntry
-	36, // 15: msg.SubUserOnlineStatusTips.subscribers:type_name -> msg.SubUserOnlineStatusElem
-	5,  // 16: msg.PushMessages.MsgsEntry.value:type_name -> msg.PullMsgs
-	5,  // 17: msg.PushMessages.NotificationMsgsEntry.value:type_name -> msg.PullMsgs
-	15, // 18: msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry.value:type_name -> msg.Seqs
-	1,  // 19: msg.GetLastMessageResp.MsgsEntry.value:type_name -> msg.MsgData
-	7,  // 20: msg.MsgService.SendMsg:input_type -> msg.SendMsgReq
-	11, // 21: msg.MsgService.GetMaxSeq:input_type -> msg.GetMaxSeqReq
-	14, // 22: msg.MsgService.PullMessageBySeqs:input_type -> msg.PullMessageBySeqsReq
-	19, // 23: msg.MsgService.GetSeqMessage:input_type -> msg.GetSeqMessageReq
-	16, // 24: msg.MsgService.GetConversationsHasReadAndMaxSeq:input_type -> msg.GetConversationsHasReadAndMaxSeqReq
-	20, // 25: msg.MsgService.GetLastMessage:input_type -> msg.GetLastMessageReq
-	22, // 26: msg.MsgService.MarkMsgsAsRead:input_type -> msg.MarkMsgsAsReadReq
-	24, // 27: msg.MsgService.MarkConversationAsRead:input_type -> msg.MarkConversationAsReadReq
-	26, // 28: msg.MsgService.SetConversationHasReadSeq:input_type -> msg.SetConversationHasReadSeqReq
-	28, // 29: msg.MsgService.GetConversationMaxSeq:input_type -> msg.GetConversationMaxSeqReq
-	30, // 30: msg.MsgService.SetUserConversationMaxSeq:input_type -> msg.SetUserConversationMaxSeqReq
-	32, // 31: msg.MsgService.SetUserConversationMinSeq:input_type -> msg.SetUserConversationMinSeqReq
-	8,  // 32: msg.MsgService.SendMsg:output_type -> msg.SendMsgResp
-	12, // 33: msg.MsgService.GetMaxSeq:output_type -> msg.GetMaxSeqResp
-	6,  // 34: msg.MsgService.PullMessageBySeqs:output_type -> msg.PushMessages
-	6,  // 35: msg.MsgService.GetSeqMessage:output_type -> msg.PushMessages
-	17, // 36: msg.MsgService.GetConversationsHasReadAndMaxSeq:output_type -> msg.GetConversationsHasReadAndMaxSeqResp
-	21, // 37: msg.MsgService.GetLastMessage:output_type -> msg.GetLastMessageResp
-	23, // 38: msg.MsgService.MarkMsgsAsRead:output_type -> msg.MarkMsgsAsReadResp
-	25, // 39: msg.MsgService.MarkConversationAsRead:output_type -> msg.MarkConversationAsReadResp
-	27, // 40: msg.MsgService.SetConversationHasReadSeq:output_type -> msg.SetConversationHasReadSeqResp
-	29, // 41: msg.MsgService.GetConversationMaxSeq:output_type -> msg.GetConversationMaxSeqResp
-	31, // 42: msg.MsgService.SetUserConversationMaxSeq:output_type -> msg.SetUserConversationMaxSeqResp
-	33, // 43: msg.MsgService.SetUserConversationMinSeq:output_type -> msg.SetUserConversationMinSeqResp
-	32, // [32:44] is the sub-list for method output_type
-	20, // [20:32] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	41, // 0: msg.MsgData.options:type_name -> msg.MsgData.OptionsEntry
+	2,  // 1: msg.MsgData.offline_push_info:type_name -> msg.OfflinePushInfo
+	3,  // 2: msg.MsgDataToMySQL.msg_data:type_name -> msg.MsgData
+	3,  // 3: msg.PushMsgData.msg_data:type_name -> msg.MsgData
+	3,  // 4: msg.PullMsgs.msgs:type_name -> msg.MsgData
+	42, // 5: msg.PushMessages.msgs:type_name -> msg.PushMessages.MsgsEntry
+	43, // 6: msg.PushMessages.notification_msgs:type_name -> msg.PushMessages.NotificationMsgsEntry
+	3,  // 7: msg.SendMsgReq.msg_data:type_name -> msg.MsgData
+	3,  // 8: msg.SendMsgResp.modify:type_name -> msg.MsgData
+	44, // 9: msg.GetMaxSeqResp.max_seqs:type_name -> msg.GetMaxSeqResp.MaxSeqsEntry
+	45, // 10: msg.GetMaxSeqResp.min_seqs:type_name -> msg.GetMaxSeqResp.MinSeqsEntry
+	15, // 11: msg.PullMessageBySeqsReq.seq_ranges:type_name -> msg.SeqRange
+	46, // 12: msg.GetConversationsHasReadAndMaxSeqResp.seqs:type_name -> msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry
+	20, // 13: msg.GetSeqMessageReq.conversations:type_name -> msg.ConversationSeqs
+	47, // 14: msg.GetLastMessageResp.msgs:type_name -> msg.GetLastMessageResp.MsgsEntry
+	38, // 15: msg.SubUserOnlineStatusTips.subscribers:type_name -> msg.SubUserOnlineStatusElem
+	0,  // 16: msg.CallSignal.op:type_name -> msg.CallOp
+	1,  // 17: msg.CallSignal.media:type_name -> msg.CallMedia
+	7,  // 18: msg.PushMessages.MsgsEntry.value:type_name -> msg.PullMsgs
+	7,  // 19: msg.PushMessages.NotificationMsgsEntry.value:type_name -> msg.PullMsgs
+	17, // 20: msg.GetConversationsHasReadAndMaxSeqResp.SeqsEntry.value:type_name -> msg.Seqs
+	3,  // 21: msg.GetLastMessageResp.MsgsEntry.value:type_name -> msg.MsgData
+	9,  // 22: msg.MsgService.SendMsg:input_type -> msg.SendMsgReq
+	13, // 23: msg.MsgService.GetMaxSeq:input_type -> msg.GetMaxSeqReq
+	16, // 24: msg.MsgService.PullMessageBySeqs:input_type -> msg.PullMessageBySeqsReq
+	21, // 25: msg.MsgService.GetSeqMessage:input_type -> msg.GetSeqMessageReq
+	18, // 26: msg.MsgService.GetConversationsHasReadAndMaxSeq:input_type -> msg.GetConversationsHasReadAndMaxSeqReq
+	22, // 27: msg.MsgService.GetLastMessage:input_type -> msg.GetLastMessageReq
+	24, // 28: msg.MsgService.MarkMsgsAsRead:input_type -> msg.MarkMsgsAsReadReq
+	26, // 29: msg.MsgService.MarkConversationAsRead:input_type -> msg.MarkConversationAsReadReq
+	28, // 30: msg.MsgService.SetConversationHasReadSeq:input_type -> msg.SetConversationHasReadSeqReq
+	30, // 31: msg.MsgService.GetConversationMaxSeq:input_type -> msg.GetConversationMaxSeqReq
+	32, // 32: msg.MsgService.SetUserConversationMaxSeq:input_type -> msg.SetUserConversationMaxSeqReq
+	34, // 33: msg.MsgService.SetUserConversationMinSeq:input_type -> msg.SetUserConversationMinSeqReq
+	10, // 34: msg.MsgService.SendMsg:output_type -> msg.SendMsgResp
+	14, // 35: msg.MsgService.GetMaxSeq:output_type -> msg.GetMaxSeqResp
+	8,  // 36: msg.MsgService.PullMessageBySeqs:output_type -> msg.PushMessages
+	8,  // 37: msg.MsgService.GetSeqMessage:output_type -> msg.PushMessages
+	19, // 38: msg.MsgService.GetConversationsHasReadAndMaxSeq:output_type -> msg.GetConversationsHasReadAndMaxSeqResp
+	23, // 39: msg.MsgService.GetLastMessage:output_type -> msg.GetLastMessageResp
+	25, // 40: msg.MsgService.MarkMsgsAsRead:output_type -> msg.MarkMsgsAsReadResp
+	27, // 41: msg.MsgService.MarkConversationAsRead:output_type -> msg.MarkConversationAsReadResp
+	29, // 42: msg.MsgService.SetConversationHasReadSeq:output_type -> msg.SetConversationHasReadSeqResp
+	31, // 43: msg.MsgService.GetConversationMaxSeq:output_type -> msg.GetConversationMaxSeqResp
+	33, // 44: msg.MsgService.SetUserConversationMaxSeq:output_type -> msg.SetUserConversationMaxSeqResp
+	35, // 45: msg.MsgService.SetUserConversationMinSeq:output_type -> msg.SetUserConversationMinSeqResp
+	34, // [34:46] is the sub-list for method output_type
+	22, // [22:34] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_msg_msg_proto_init() }
@@ -2509,13 +2754,14 @@ func file_msg_msg_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_msg_msg_proto_rawDesc), len(file_msg_msg_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   45,
+			NumEnums:      2,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_msg_msg_proto_goTypes,
 		DependencyIndexes: file_msg_msg_proto_depIdxs,
+		EnumInfos:         file_msg_msg_proto_enumTypes,
 		MessageInfos:      file_msg_msg_proto_msgTypes,
 	}.Build()
 	File_msg_msg_proto = out.File

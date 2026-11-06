@@ -51,7 +51,7 @@ func (s *Server) dispatch(c *Client, req *Req) error {
 	case reqSubUserOnline:
 		return s.subscribe(c, req)
 	case reqSendSignalMsg:
-		return c.reply(req, errArgs, "signal messages are not supported", nil)
+		return s.signal(c, req)
 	default:
 		return c.reply(req, errArgs, "unsupported request", nil)
 	}

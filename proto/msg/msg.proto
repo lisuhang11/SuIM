@@ -241,3 +241,34 @@ message SubUserOnlineStatusElem {
 message SubUserOnlineStatusTips {
   repeated SubUserOnlineStatusElem subscribers = 1;
 }
+
+// CallOp is one step of a voice or video call. Media bytes are not carried here.
+enum CallOp {
+  CALL_OP_NONE = 0;
+  CALL_INVITE = 1;
+  CALL_CANCEL = 2;
+  CALL_ACCEPT = 3;
+  CALL_REJECT = 4;
+  CALL_HANGUP = 5;
+  CALL_RING = 6;
+  CALL_TIMEOUT = 7;
+  CALL_BUSY = 8;
+  CALL_ANSWERED = 9;
+}
+
+enum CallMedia {
+  CALL_MEDIA_NONE = 0;
+  CALL_AUDIO = 1;
+  CALL_VIDEO = 2;
+}
+
+// CallSignal is the websocket payload for frame 1004 and the push frame 2006.
+message CallSignal {
+  CallOp op = 1;
+  string call_id = 2;
+  string peer_id = 3;
+  CallMedia media = 4;
+  string caller_id = 5;
+  string callee_id = 6;
+  string reason = 7;
+}

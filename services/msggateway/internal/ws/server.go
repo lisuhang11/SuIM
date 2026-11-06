@@ -71,6 +71,7 @@ type Server struct {
 	joined   JoinedGroups
 	syncLog  GroupSyncCache
 	messages Messages
+	// calls only subscribes to signals published by the rtc service.
 	calls    *call.Board
 	signals  CallSignals
 	maxConn  int64
@@ -88,11 +89,12 @@ type Hooks struct {
 }
 
 type Options struct {
-	Tokens           TokenChecker
-	Groups           GroupDirectory
-	Joined           JoinedGroups
-	GroupSync        GroupSyncCache
-	Messages         Messages
+	Tokens    TokenChecker
+	Groups    GroupDirectory
+	Joined    JoinedGroups
+	GroupSync GroupSyncCache
+	Messages  Messages
+	// Calls is the Redis subscription used to deliver frame 2006. Call state stays in the rtc service.
 	Calls            *call.Board
 	Signals          CallSignals
 	Online           *online.Status

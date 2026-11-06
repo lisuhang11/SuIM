@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
+	"github.com/lisuhang11/SuIM/pkg/livekit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 )
@@ -20,6 +21,7 @@ type Config struct {
 	Queue               Queue           `yaml:"queue"`
 	Registry            register.Config `yaml:"registry"`
 	Webhooks            Webhooks        `yaml:"webhooks"`
+	LiveKit             livekit.Config  `yaml:"livekit"`
 }
 
 type Webhooks struct {
@@ -64,6 +66,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Registry.Type == "" {
 		return fmt.Errorf("registry type is required")
+	}
+	if err := c.LiveKit.Validate(); err != nil {
+		return err
 	}
 	w := c.Webhooks
 	return webhook.RequireURL(w.URL, w.AfterOnline.Enable, w.AfterOffline.Enable, w.AfterKickOff.Enable)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/call"
+	"github.com/lisuhang11/SuIM/pkg/livekit"
 	"github.com/lisuhang11/SuIM/pkg/msgconv"
 	"github.com/lisuhang11/SuIM/pkg/online"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -72,6 +74,7 @@ type Server struct {
 	syncLog   GroupSyncCache
 	messages  Messages
 	calls     *call.Board
+	livekit   livekit.Config
 	relations Relations
 	maxConn   int64
 	hooks     Hooks
@@ -94,6 +97,7 @@ type Options struct {
 	GroupSync        GroupSyncCache
 	Messages         Messages
 	Calls            *call.Board
+	LiveKit          livekit.Config
 	Relations        Relations
 	Online           *online.Status
 	MaxConn          int64
@@ -116,6 +120,7 @@ func New(opts Options) *Server {
 		syncLog:   opts.GroupSync,
 		messages:  opts.Messages,
 		calls:     opts.Calls,
+		livekit:   opts.LiveKit,
 		relations: opts.Relations,
 		online:    opts.Online,
 		maxConn:   opts.MaxConn,
@@ -125,6 +130,14 @@ func New(opts Options) *Server {
 			CheckOrigin:      func(*http.Request) bool { return true },
 		},
 	}
+}
+
+// SignCallToken signs a microphone-only LiveKit join token for one participant.
+func (s *Server) SignCallToken(identity, room string) (string, string, error) {
+	if s == nil {
+		return "", "", fmt.Errorf("livekit is not configured")
+	}
+	return s.livekit.Sign(identity, room, time.Now())
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

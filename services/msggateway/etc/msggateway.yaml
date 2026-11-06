@@ -41,3 +41,7 @@ webhooks:
   afterUserKickOff:
     enable: false
     timeout: 5
+livekit:
+  url: ws://127.0.0.1:7880
+  key: suim
+  secret: 1fcb7fa34d15c24e3ba7061eb29ccbcb252f775b34245ebda640b6861339a197

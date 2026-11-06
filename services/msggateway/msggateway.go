@@ -116,6 +116,7 @@ func run(cfgPath string) error {
 		GroupSync:        ws.NewRedisGroupSync(rdb),
 		Messages:         rpc.NewMsgClient(msgpb.NewMsgServiceClient(msgConn)),
 		Calls:            call.New(rdb),
+		LiveKit:          cfg.LiveKit,
 		Relations:        rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)),
 		Online:           online.New(rdb),
 		MaxConn:          cfg.MaxConn,

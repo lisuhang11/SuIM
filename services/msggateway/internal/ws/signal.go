@@ -32,7 +32,22 @@ func (s *Server) signal(c *Client, req *Req) error {
 	if err != nil {
 		return replyCall(c, req, err, sig)
 	}
-	s.fanout(ctx, c, sig)
+	if sig.Op == call.OpAccept && s.livekit.Enabled() {
+		url, token, signErr := s.livekit.Sign(c.userID, sig.CallID, time.Now())
+		if signErr != nil {
+			slog.Warn("sign callee token", "err", signErr, "callID", sig.CallID)
+			_, _ = s.calls.Hangup(ctx, c.userID, sig.CallID)
+			s.publishCall(ctx, sig, call.OpHangup, []string{sig.CallerID, sig.CalleeID}, "")
+			return replyCall(c, req, errorcode.ErrInternal.WithMsg("sign call token"), call.Signal{})
+		}
+		sig.URL = url
+		sig.Token = token
+	}
+	if err := s.fanout(ctx, c, sig); err != nil {
+		sig.URL = ""
+		sig.Token = ""
+		return replyCall(c, req, err, sig)
+	}
 	return replyCall(c, req, nil, sig)
 }
 
@@ -77,7 +92,7 @@ func (s *Server) authorizeCall(ctx context.Context, caller, callee string) error
 	return nil
 }
 
-func (s *Server) fanout(ctx context.Context, actor *Client, sig call.Signal) {
+func (s *Server) fanout(ctx context.Context, actor *Client, sig call.Signal) error {
 	switch sig.Op {
 	case call.OpInvite:
 		s.publishCall(ctx, sig, call.OpRing, []string{sig.CalleeID}, "")
@@ -86,8 +101,25 @@ func (s *Server) fanout(ctx context.Context, actor *Client, sig call.Signal) {
 	case call.OpReject:
 		s.publishCall(ctx, sig, call.OpReject, []string{sig.CallerID}, "")
 	case call.OpAccept:
-		s.publishCall(ctx, sig, call.OpAccept, []string{sig.CallerID}, "")
-		s.publishCall(ctx, sig, call.OpAnswered, []string{sig.CalleeID}, actor.id)
+		caller := sig
+		caller.URL = ""
+		caller.Token = ""
+		if s.livekit.Enabled() {
+			url, token, err := s.livekit.Sign(sig.CallerID, sig.CallID, time.Now())
+			if err != nil {
+				slog.Warn("sign caller token", "err", err, "callID", sig.CallID)
+				_, _ = s.calls.Hangup(ctx, actor.userID, sig.CallID)
+				s.publishCall(ctx, sig, call.OpHangup, []string{sig.CallerID, sig.CalleeID}, "")
+				return errorcode.ErrInternal.WithMsg("sign call token")
+			}
+			caller.URL = url
+			caller.Token = token
+		}
+		s.publishCall(ctx, caller, call.OpAccept, []string{sig.CallerID}, "")
+		answered := sig
+		answered.URL = ""
+		answered.Token = ""
+		s.publishCall(ctx, answered, call.OpAnswered, []string{sig.CalleeID}, actor.id)
 	case call.OpHangup:
 		peer := sig.CallerID
 		if actor.userID == sig.CallerID {
@@ -95,11 +127,16 @@ func (s *Server) fanout(ctx context.Context, actor *Client, sig call.Signal) {
 		}
 		s.publishCall(ctx, sig, call.OpHangup, []string{peer}, "")
 	}
+	return nil
 }
 
 func (s *Server) publishCall(ctx context.Context, sig call.Signal, op string, users []string, except string) {
 	out := sig
 	out.Op = op
+	if op != call.OpAccept {
+		out.URL = ""
+		out.Token = ""
+	}
 	if err := s.calls.Publish(ctx, call.Event{
 		Users:  users,
 		Except: except,
@@ -109,6 +146,8 @@ func (s *Server) publishCall(ctx context.Context, sig call.Signal, op string, us
 		Callee: out.CalleeID,
 		Media:  out.Media,
 		Reason: out.Reason,
+		URL:    out.URL,
+		Token:  out.Token,
 	}); err != nil {
 		slog.Warn("publish call signal", "err", err, "op", op, "callID", sig.CallID)
 	}
@@ -149,6 +188,7 @@ func (s *Server) SweepCalls(ctx context.Context) {
 func (s *Server) deliverCall(ev call.Event) {
 	body, err := proto.Marshal(signalProto(call.Signal{
 		Op: ev.Op, CallID: ev.CallID, CallerID: ev.Caller, CalleeID: ev.Callee, Media: ev.Media, Reason: ev.Reason,
+		URL: ev.URL, Token: ev.Token,
 	}))
 	if err != nil {
 		slog.Warn("marshal call signal", "err", err)
@@ -193,6 +233,8 @@ func signalProto(sig call.Signal) *msgpb.CallSignal {
 		CallerId: sig.CallerID,
 		CalleeId: sig.CalleeID,
 		Reason:   sig.Reason,
+		Url:      sig.URL,
+		Token:    sig.Token,
 	}
 }
 

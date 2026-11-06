@@ -263,6 +263,7 @@ enum CallMedia {
 }
 
 // CallSignal is the websocket payload for frame 1004 and the push frame 2006.
+// url and token are set only on CALL_ACCEPT. Each person gets their own token.
 message CallSignal {
   CallOp op = 1;
   string call_id = 2;
@@ -271,4 +272,6 @@ message CallSignal {
   string caller_id = 5;
   string callee_id = 6;
   string reason = 7;
+  string url = 8;
+  string token = 9;
 }

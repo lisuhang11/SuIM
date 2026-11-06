@@ -53,9 +53,9 @@ func (c Config) Sign(identity, room string, now time.Time) (url, token string, e
 	}
 	yes := true
 	body, err := json.Marshal(claims{
-		Issuer:    c.Key,
-		Subject:   identity,
-		Expires:   now.Add(tokenTTL).Unix(),
+		Issuer:   c.Key,
+		Subject:  identity,
+		Expires:  now.Add(tokenTTL).Unix(),
 		NotBefore: now.Add(-10 * time.Second).Unix(),
 		Video: videoGrant{
 			RoomJoin:          true,

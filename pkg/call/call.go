@@ -48,6 +48,8 @@ const (
 )
 
 // Signal is one signaling step stored or published by the board.
+// URL and Token are filled only when an accepted call is handed to a participant.
+// They are not stored in Redis.
 type Signal struct {
 	Op       string
 	CallID   string
@@ -55,6 +57,8 @@ type Signal struct {
 	CalleeID string
 	Media    string
 	Reason   string
+	URL      string
+	Token    string
 }
 
 // Event is pushed to every gateway. Except is a connection id that should not
@@ -68,6 +72,8 @@ type Event struct {
 	Callee string   `json:"callee"`
 	Media  string   `json:"media"`
 	Reason string   `json:"reason,omitempty"`
+	URL    string   `json:"url,omitempty"`
+	Token  string   `json:"token,omitempty"`
 }
 
 // Board is the shared call record.

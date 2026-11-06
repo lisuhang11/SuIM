@@ -2318,6 +2318,7 @@ func (x *SubUserOnlineStatusTips) GetSubscribers() []*SubUserOnlineStatusElem {
 }
 
 // CallSignal is the websocket payload for frame 1004 and the push frame 2006.
+// url and token are set only on CALL_ACCEPT. Each person gets their own token.
 type CallSignal struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Op            CallOp                 `protobuf:"varint,1,opt,name=op,proto3,enum=msg.CallOp" json:"op,omitempty"`
@@ -2327,6 +2328,8 @@ type CallSignal struct {
 	CallerId      string                 `protobuf:"bytes,5,opt,name=caller_id,json=callerId,proto3" json:"caller_id,omitempty"`
 	CalleeId      string                 `protobuf:"bytes,6,opt,name=callee_id,json=calleeId,proto3" json:"callee_id,omitempty"`
 	Reason        string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
+	Url           string                 `protobuf:"bytes,8,opt,name=url,proto3" json:"url,omitempty"`
+	Token         string                 `protobuf:"bytes,9,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2406,6 +2409,20 @@ func (x *CallSignal) GetCalleeId() string {
 func (x *CallSignal) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *CallSignal) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *CallSignal) GetToken() string {
+	if x != nil {
+		return x.Token
 	}
 	return ""
 }
@@ -2584,7 +2601,7 @@ const file_msg_msg_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12.\n" +
 	"\x13online_platform_ids\x18\x02 \x03(\x05R\x11onlinePlatformIds\"Y\n" +
 	"\x17SubUserOnlineStatusTips\x12>\n" +
-	"\vsubscribers\x18\x01 \x03(\v2\x1c.msg.SubUserOnlineStatusElemR\vsubscribers\"\xd3\x01\n" +
+	"\vsubscribers\x18\x01 \x03(\v2\x1c.msg.SubUserOnlineStatusElemR\vsubscribers\"\xfb\x01\n" +
 	"\n" +
 	"CallSignal\x12\x1b\n" +
 	"\x02op\x18\x01 \x01(\x0e2\v.msg.CallOpR\x02op\x12\x17\n" +
@@ -2593,7 +2610,9 @@ const file_msg_msg_proto_rawDesc = "" +
 	"\x05media\x18\x04 \x01(\x0e2\x0e.msg.CallMediaR\x05media\x12\x1b\n" +
 	"\tcaller_id\x18\x05 \x01(\tR\bcallerId\x12\x1b\n" +
 	"\tcallee_id\x18\x06 \x01(\tR\bcalleeId\x12\x16\n" +
-	"\x06reason\x18\a \x01(\tR\x06reason*\xb2\x01\n" +
+	"\x06reason\x18\a \x01(\tR\x06reason\x12\x10\n" +
+	"\x03url\x18\b \x01(\tR\x03url\x12\x14\n" +
+	"\x05token\x18\t \x01(\tR\x05token*\xb2\x01\n" +
 	"\x06CallOp\x12\x10\n" +
 	"\fCALL_OP_NONE\x10\x00\x12\x0f\n" +
 	"\vCALL_INVITE\x10\x01\x12\x0f\n" +

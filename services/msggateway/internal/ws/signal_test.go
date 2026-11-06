@@ -13,6 +13,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/call"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/livekit"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
@@ -190,6 +191,17 @@ func TestSignalAcceptIssuesLiveKitTokens(t *testing.T) {
 	}
 }
 
+func TestAuthorizeCallForwardsCaller(t *testing.T) {
+	var seen string
+	server := &Server{relations: callerRelations{seen: &seen}}
+	if err := server.authorizeCall(context.Background(), "caller-1", "callee-1"); err != nil {
+		t.Fatal(err)
+	}
+	if seen != "caller-1" {
+		t.Fatalf("operator %q", seen)
+	}
+}
+
 func TestSignalRequiresFriendship(t *testing.T) {
 	server := New(Options{Calls: &call.Board{}, Relations: fakeRelations{}})
 	client := newTestClient(t, server)
@@ -217,6 +229,19 @@ func TestSignalUnsupportedWithoutRedis(t *testing.T) {
 	if resp.ErrCode != errArgs || resp.ErrMsg != "signal messages are not supported" {
 		t.Fatalf("code %d msg %s", resp.ErrCode, resp.ErrMsg)
 	}
+}
+
+type callerRelations struct {
+	seen *string
+}
+
+func (c callerRelations) IsFriend(context.Context, string, string) (bool, bool, error) {
+	return true, true, nil
+}
+
+func (c callerRelations) IsBlack(ctx context.Context, _, _ string) (bool, bool, error) {
+	*c.seen = rpcctx.UserID(ctx)
+	return false, false, nil
 }
 
 type fakeRelations struct {

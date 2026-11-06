@@ -9,6 +9,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/call"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
@@ -75,6 +76,9 @@ func (s *Server) authorizeCall(ctx context.Context, caller, callee string) error
 	if s.relations == nil {
 		return errorcode.ErrInternal.WithMsg("relation service is not configured")
 	}
+	// Relation rejects a call that does not name the operator. The websocket
+	// already authenticated this connection, so the caller is that operator.
+	ctx = rpcctx.WithUser(ctx, caller)
 	blockedByCaller, blockedByCallee, err := s.relations.IsBlack(ctx, caller, callee)
 	if err != nil {
 		return errorcode.ErrInternal.WithMsg("check black")

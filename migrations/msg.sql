@@ -60,6 +60,12 @@ CREATE TABLE IF NOT EXISTS `seq_user` (
   PRIMARY KEY (`user_id`, `conversation_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Older databases were created before the visible floor and ceiling existed.
+-- Zero means unset: the reader uses the conversation bound, then starts at 1.
+ALTER TABLE `seq_conversation` ADD COLUMN `min_seq` BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE `seq_user` ADD COLUMN `min_seq` BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE `seq_user` ADD COLUMN `max_seq` BIGINT NOT NULL DEFAULT 0;
+
 ALTER TABLE `msg` ADD COLUMN `offline_push_title` VARCHAR(255) NOT NULL DEFAULT '';
 ALTER TABLE `msg` ADD COLUMN `offline_push_desc` VARCHAR(1024) NOT NULL DEFAULT '';
 ALTER TABLE `msg` ADD COLUMN `offline_push_ex` VARCHAR(1024) NOT NULL DEFAULT '';

@@ -124,7 +124,9 @@ func run(cfgPath, migratePath string) error {
 		relations,
 		rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn)),
 	)
-	srv.UsePinned(rpc.NewConversationClient(conversationpb.NewConversationServiceClient(conversationConn)))
+	conversations := rpc.NewConversationClient(conversationpb.NewConversationServiceClient(conversationConn))
+	srv.UsePinned(conversations)
+	srv.UseRecv(conversations)
 	srv.UseHooks(logic.Hooks{
 		Client:           hooks,
 		BeforeSendSingle: msgBefore(w.BeforeSendSingle),

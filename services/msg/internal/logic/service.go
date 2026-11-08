@@ -38,6 +38,18 @@ type Pinned interface {
 	PinnedConversationIDs(ctx context.Context, userID string) ([]string, error)
 }
 
+// RecvSetting is one user's receive option for a single conversation.
+// Found is false when that user has no row, which means they still receive messages.
+type RecvSetting struct {
+	Found bool
+	Opt   int32
+}
+
+// SingleRecv reads the receiver's own single-chat receive option.
+type SingleRecv interface {
+	RecvOpt(ctx context.Context, ownerUserID, conversationID string) (RecvSetting, error)
+}
+
 // Relations checks friendship and blocks before a single chat is accepted.
 type Relations interface {
 	IsFriend(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
@@ -93,6 +105,7 @@ type Server struct {
 	relations Relations
 	groups    Groups
 	pinned    Pinned
+	recv      SingleRecv
 	hooks     Hooks
 }
 
@@ -104,6 +117,13 @@ func New(st History, publish mq.Producer, relations Relations, groups Groups) *S
 func (s *Server) UsePinned(pinned Pinned) {
 	if s != nil {
 		s.pinned = pinned
+	}
+}
+
+// UseRecv reads the receiver's single-chat receive option. A nil reader leaves the check off.
+func (s *Server) UseRecv(recv SingleRecv) {
+	if s != nil {
+		s.recv = recv
 	}
 }
 

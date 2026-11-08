@@ -21,6 +21,11 @@ const (
 	groupStatusDismissed  = 2
 	groupStatusMuted      = 3
 	contentGroupDismissed = 1511
+
+	modelReceive      int32 = 0
+	modelNotReceive   int32 = 1
+	modelReceiveQuiet int32 = 2
+	optOfflinePush          = "offlinePush"
 )
 
 // SendMsg checks one message and publishes it to toRedis. msgtransfer assigns the seq.
@@ -142,7 +147,38 @@ func (s *Server) authorizeSingleSend(ctx context.Context, msg *msgpb.MsgData) er
 	if !senderHasFriend || !receiverHasFriend {
 		return errorcode.ErrMsgNotFriend
 	}
-	return nil
+	return s.applySingleRecv(ctx, msg)
+}
+
+// applySingleRecv honors the receiver's own single-chat setting.
+// 0 and a missing row still deliver. 1 drops the message. 2 delivers it and turns offline push off.
+// Read receipts stay deliverable when the receiver has chosen not to receive.
+func (s *Server) applySingleRecv(ctx context.Context, msg *msgpb.MsgData) error {
+	if s.recv == nil || msg == nil {
+		return nil
+	}
+	setting, err := s.recv.RecvOpt(ctx, msg.RecvId, msgconv.ChatConversationID(msg))
+	if err != nil {
+		return errorcode.ErrInternal.WithMsg("check receive option")
+	}
+	if !setting.Found || setting.Opt == modelReceive {
+		return nil
+	}
+	switch setting.Opt {
+	case modelNotReceive:
+		if msg.ContentType == contentHasReadReceipt {
+			return nil
+		}
+		return errorcode.ErrMsgNotReceiving
+	case modelReceiveQuiet:
+		if msg.Options == nil {
+			msg.Options = map[string]bool{}
+		}
+		msg.Options[optOfflinePush] = false
+		return nil
+	default:
+		return nil
+	}
 }
 
 func (s *Server) rejectDismissedGroup(ctx context.Context, msg *msgpb.MsgData) error {

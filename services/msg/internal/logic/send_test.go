@@ -57,6 +57,53 @@ func TestNotificationSkipsRelationCheck(t *testing.T) {
 	}
 }
 
+func TestSingleSendHonorsReceiverQuiet(t *testing.T) {
+	prod := &fakeProducer{}
+	srv := New(nil, prod, &fakeRelations{friend1: true, friend2: true}, nil)
+	srv.UseRecv(&fakeRecv{found: true, opt: 1})
+	_, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", RecvId: "b", SessionType: 1, Content: []byte("hi"), ClientMsgId: "c1",
+	}})
+	if code, _ := errorcode.CodeOf(err); code != errorcode.MsgNotReceiving || prod.n != 0 {
+		t.Fatalf("code %d published %d err %v", code, prod.n, err)
+	}
+
+	prod = &fakeProducer{}
+	srv = New(nil, prod, &fakeRelations{friend1: true, friend2: true}, nil)
+	srv.UseRecv(&fakeRecv{found: true, opt: 1})
+	if _, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", RecvId: "b", SessionType: 1, ContentType: 2200, Content: []byte("read"), ClientMsgId: "c2",
+	}}); err != nil || prod.n != 1 {
+		t.Fatalf("receipt err=%v published=%d", err, prod.n)
+	}
+
+	prod = &fakeProducer{}
+	srv = New(nil, prod, &fakeRelations{friend1: true, friend2: true}, nil)
+	srv.UseRecv(&fakeRecv{found: true, opt: 2})
+	if _, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", RecvId: "b", SessionType: 1, Content: []byte("hi"), ClientMsgId: "c3",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	stored := &msgpb.MsgData{}
+	if err := proto.Unmarshal(prod.body, stored); err != nil {
+		t.Fatal(err)
+	}
+	if push, ok := stored.Options["offlinePush"]; !ok || push {
+		t.Fatalf("offline push stayed on: %+v", stored.Options)
+	}
+
+	prod = &fakeProducer{}
+	srv = New(nil, prod, &fakeRelations{}, nil)
+	srv.UseRecv(&fakeRecv{found: true, opt: 1})
+	if _, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", RecvId: "a", SessionType: 1, Content: []byte("hi"), ClientMsgId: "c4",
+		Options: map[string]bool{"isNotNotification": false},
+	}}); err != nil || prod.n != 1 || prod.key != "n_a_a" {
+		t.Fatalf("notice err=%v n=%d key=%s", err, prod.n, prod.key)
+	}
+}
+
 func TestSingleSendPublishes(t *testing.T) {
 	prod := &fakeProducer{}
 	srv := New(nil, prod, &fakeRelations{friend1: true, friend2: true}, nil)
@@ -285,6 +332,19 @@ func TestRangeIsEnd(t *testing.T) {
 	if !rangeIsEnd(orderDesc, 1, 3, 6) {
 		t.Fatal("descending pull is finished")
 	}
+}
+
+type fakeRecv struct {
+	found bool
+	opt   int32
+	err   error
+}
+
+func (f *fakeRecv) RecvOpt(context.Context, string, string) (RecvSetting, error) {
+	if f.err != nil {
+		return RecvSetting{}, f.err
+	}
+	return RecvSetting{Found: f.found, Opt: f.opt}, nil
 }
 
 type fakeRelations struct {

@@ -18,6 +18,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/idhash"
+	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/services/conversation/internal/logic"
@@ -91,6 +92,16 @@ func TestConversationSync(t *testing.T) {
 	rows, err := st.ConversationsByID(ctx, a, []string{single})
 	if err != nil || len(rows) != 1 || rows[0].MinSeq != 0 || !rows[0].IsPinned {
 		t.Fatalf("created row %+v err=%v", rows, err)
+	}
+	got, err := srv.GetConversation(ctx, &conversationpb.GetConversationReq{OwnerUserId: a, ConversationId: single})
+	if err != nil || got.GetConversation().GetRecvMsgOpt() != 0 || !got.GetConversation().GetIsPinned() {
+		t.Fatalf("get %+v err=%v", got, err)
+	}
+	if _, err := srv.GetConversation(ctx, &conversationpb.GetConversationReq{OwnerUserId: a, ConversationId: "si_missing"}); !isCode(err, codes.NotFound, errorcode.ConversationNotFound) {
+		t.Fatalf("missing code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.GetConversation(rpcctx.WithUser(ctx, b), &conversationpb.GetConversationReq{OwnerUserId: a, ConversationId: single}); !isCode(err, codes.PermissionDenied, errorcode.NoPermission) {
+		t.Fatalf("other owner code=%v err=%v", status.Code(err), err)
 	}
 	base, err := srv.GetIncrementalConversation(ctx, &conversationpb.GetIncrementalConversationReq{UserId: a})
 	if err != nil || !base.GetFull() || base.GetVersionId() != full.GetVersionId() {

@@ -254,6 +254,10 @@ enum CallOp {
   CALL_TIMEOUT = 7;
   CALL_BUSY = 8;
   CALL_ANSWERED = 9;
+  CALL_JOINED = 10;
+  CALL_LEFT = 11;
+  CALL_JOIN = 12;
+  CALL_GROUP = 13;
 }
 
 enum CallMedia {
@@ -263,7 +267,10 @@ enum CallMedia {
 }
 
 // CallSignal is the websocket payload for frame 1004 and the push frame 2006.
-// url and token are set only on CALL_ACCEPT. Each person gets their own token.
+// A private call sets url and token only on CALL_ACCEPT. A group voice call
+// sets them for the host on CALL_INVITE and for each person who joins.
+// group_id marks a group room. user_ids lists the people who have joined.
+// peer_id is the private callee, or the person who joined or left a group room.
 message CallSignal {
   CallOp op = 1;
   string call_id = 2;
@@ -274,4 +281,6 @@ message CallSignal {
   string reason = 7;
   string url = 8;
   string token = 9;
+  string group_id = 10;
+  repeated string user_ids = 11;
 }

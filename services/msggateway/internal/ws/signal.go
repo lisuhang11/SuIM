@@ -67,7 +67,7 @@ func (s *Server) WatchCall(ctx context.Context) {
 func (s *Server) deliverCall(ev call.Event) {
 	body, err := proto.Marshal(signalProto(call.Signal{
 		Op: ev.Op, CallID: ev.CallID, CallerID: ev.Caller, CalleeID: ev.Callee, Media: ev.Media, Reason: ev.Reason,
-		URL: ev.URL, Token: ev.Token,
+		URL: ev.URL, Token: ev.Token, GroupID: ev.Group, Actor: ev.Actor, Roster: ev.Roster,
 	}))
 	if err != nil {
 		slog.Warn("marshal call signal", "err", err)
@@ -87,12 +87,15 @@ func signalProto(sig call.Signal) *msgpb.CallSignal {
 	return &msgpb.CallSignal{
 		Op:       callOp(sig.Op),
 		CallId:   sig.CallID,
+		PeerId:   sig.Actor,
 		Media:    callMedia(sig.Media),
 		CallerId: sig.CallerID,
 		CalleeId: sig.CalleeID,
 		Reason:   sig.Reason,
 		Url:      sig.URL,
 		Token:    sig.Token,
+		GroupId:  sig.GroupID,
+		UserIds:  sig.Roster,
 	}
 }
 
@@ -116,6 +119,10 @@ func callOp(op string) msgpb.CallOp {
 		return msgpb.CallOp_CALL_BUSY
 	case call.OpAnswered:
 		return msgpb.CallOp_CALL_ANSWERED
+	case call.OpJoined:
+		return msgpb.CallOp_CALL_JOINED
+	case call.OpLeft:
+		return msgpb.CallOp_CALL_LEFT
 	default:
 		return msgpb.CallOp_CALL_OP_NONE
 	}

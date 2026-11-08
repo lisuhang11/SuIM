@@ -10,6 +10,8 @@ const (
 	CallNotFound  Code = 8004
 	CallNotMember Code = 8005
 	CallState     Code = 8006
+	CallGroupBusy Code = 8007
+	CallFull      Code = 8008
 )
 
 var (
@@ -19,4 +21,6 @@ var (
 	ErrCallNotFound  = Define(CallNotFound, codes.NotFound, "call not found")
 	ErrCallNotMember = Define(CallNotMember, codes.PermissionDenied, "not in this call")
 	ErrCallState     = Define(CallState, codes.FailedPrecondition, "call is in the wrong state")
+	ErrCallGroupBusy = Define(CallGroupBusy, codes.FailedPrecondition, "group already has a call")
+	ErrCallFull      = Define(CallFull, codes.FailedPrecondition, "too many people in the call")
 )

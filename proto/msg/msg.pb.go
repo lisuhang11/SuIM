@@ -35,21 +35,29 @@ const (
 	CallOp_CALL_TIMEOUT  CallOp = 7
 	CallOp_CALL_BUSY     CallOp = 8
 	CallOp_CALL_ANSWERED CallOp = 9
+	CallOp_CALL_JOINED   CallOp = 10
+	CallOp_CALL_LEFT     CallOp = 11
+	CallOp_CALL_JOIN     CallOp = 12
+	CallOp_CALL_GROUP    CallOp = 13
 )
 
 // Enum value maps for CallOp.
 var (
 	CallOp_name = map[int32]string{
-		0: "CALL_OP_NONE",
-		1: "CALL_INVITE",
-		2: "CALL_CANCEL",
-		3: "CALL_ACCEPT",
-		4: "CALL_REJECT",
-		5: "CALL_HANGUP",
-		6: "CALL_RING",
-		7: "CALL_TIMEOUT",
-		8: "CALL_BUSY",
-		9: "CALL_ANSWERED",
+		0:  "CALL_OP_NONE",
+		1:  "CALL_INVITE",
+		2:  "CALL_CANCEL",
+		3:  "CALL_ACCEPT",
+		4:  "CALL_REJECT",
+		5:  "CALL_HANGUP",
+		6:  "CALL_RING",
+		7:  "CALL_TIMEOUT",
+		8:  "CALL_BUSY",
+		9:  "CALL_ANSWERED",
+		10: "CALL_JOINED",
+		11: "CALL_LEFT",
+		12: "CALL_JOIN",
+		13: "CALL_GROUP",
 	}
 	CallOp_value = map[string]int32{
 		"CALL_OP_NONE":  0,
@@ -62,6 +70,10 @@ var (
 		"CALL_TIMEOUT":  7,
 		"CALL_BUSY":     8,
 		"CALL_ANSWERED": 9,
+		"CALL_JOINED":   10,
+		"CALL_LEFT":     11,
+		"CALL_JOIN":     12,
+		"CALL_GROUP":    13,
 	}
 )
 
@@ -2318,7 +2330,10 @@ func (x *SubUserOnlineStatusTips) GetSubscribers() []*SubUserOnlineStatusElem {
 }
 
 // CallSignal is the websocket payload for frame 1004 and the push frame 2006.
-// url and token are set only on CALL_ACCEPT. Each person gets their own token.
+// A private call sets url and token only on CALL_ACCEPT. A group voice call
+// sets them for the host on CALL_INVITE and for each person who joins.
+// group_id marks a group room. user_ids lists the people who have joined.
+// peer_id is the private callee, or the person who joined or left a group room.
 type CallSignal struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Op            CallOp                 `protobuf:"varint,1,opt,name=op,proto3,enum=msg.CallOp" json:"op,omitempty"`
@@ -2330,6 +2345,8 @@ type CallSignal struct {
 	Reason        string                 `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
 	Url           string                 `protobuf:"bytes,8,opt,name=url,proto3" json:"url,omitempty"`
 	Token         string                 `protobuf:"bytes,9,opt,name=token,proto3" json:"token,omitempty"`
+	GroupId       string                 `protobuf:"bytes,10,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	UserIds       []string               `protobuf:"bytes,11,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2425,6 +2442,20 @@ func (x *CallSignal) GetToken() string {
 		return x.Token
 	}
 	return ""
+}
+
+func (x *CallSignal) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *CallSignal) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
 }
 
 var File_msg_msg_proto protoreflect.FileDescriptor
@@ -2601,7 +2632,7 @@ const file_msg_msg_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12.\n" +
 	"\x13online_platform_ids\x18\x02 \x03(\x05R\x11onlinePlatformIds\"Y\n" +
 	"\x17SubUserOnlineStatusTips\x12>\n" +
-	"\vsubscribers\x18\x01 \x03(\v2\x1c.msg.SubUserOnlineStatusElemR\vsubscribers\"\xfb\x01\n" +
+	"\vsubscribers\x18\x01 \x03(\v2\x1c.msg.SubUserOnlineStatusElemR\vsubscribers\"\xb1\x02\n" +
 	"\n" +
 	"CallSignal\x12\x1b\n" +
 	"\x02op\x18\x01 \x01(\x0e2\v.msg.CallOpR\x02op\x12\x17\n" +
@@ -2612,7 +2643,10 @@ const file_msg_msg_proto_rawDesc = "" +
 	"\tcallee_id\x18\x06 \x01(\tR\bcalleeId\x12\x16\n" +
 	"\x06reason\x18\a \x01(\tR\x06reason\x12\x10\n" +
 	"\x03url\x18\b \x01(\tR\x03url\x12\x14\n" +
-	"\x05token\x18\t \x01(\tR\x05token*\xb2\x01\n" +
+	"\x05token\x18\t \x01(\tR\x05token\x12\x19\n" +
+	"\bgroup_id\x18\n" +
+	" \x01(\tR\agroupId\x12\x19\n" +
+	"\buser_ids\x18\v \x03(\tR\auserIds*\xf1\x01\n" +
 	"\x06CallOp\x12\x10\n" +
 	"\fCALL_OP_NONE\x10\x00\x12\x0f\n" +
 	"\vCALL_INVITE\x10\x01\x12\x0f\n" +
@@ -2623,7 +2657,13 @@ const file_msg_msg_proto_rawDesc = "" +
 	"\tCALL_RING\x10\x06\x12\x10\n" +
 	"\fCALL_TIMEOUT\x10\a\x12\r\n" +
 	"\tCALL_BUSY\x10\b\x12\x11\n" +
-	"\rCALL_ANSWERED\x10\t*@\n" +
+	"\rCALL_ANSWERED\x10\t\x12\x0f\n" +
+	"\vCALL_JOINED\x10\n" +
+	"\x12\r\n" +
+	"\tCALL_LEFT\x10\v\x12\r\n" +
+	"\tCALL_JOIN\x10\f\x12\x0e\n" +
+	"\n" +
+	"CALL_GROUP\x10\r*@\n" +
 	"\tCallMedia\x12\x13\n" +
 	"\x0fCALL_MEDIA_NONE\x10\x00\x12\x0e\n" +
 	"\n" +

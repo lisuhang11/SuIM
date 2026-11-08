@@ -124,10 +124,13 @@ type SignalReq struct {
 	// Types that are valid to be assigned to Payload:
 	//
 	//	*SignalReq_Invite
+	//	*SignalReq_InviteInGroup
 	//	*SignalReq_Cancel
 	//	*SignalReq_Accept
 	//	*SignalReq_HangUp
 	//	*SignalReq_Reject
+	//	*SignalReq_Join
+	//	*SignalReq_GroupCall
 	Payload       isSignalReq_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -179,6 +182,15 @@ func (x *SignalReq) GetInvite() *SignalInviteReq {
 	return nil
 }
 
+func (x *SignalReq) GetInviteInGroup() *SignalInviteInGroupReq {
+	if x != nil {
+		if x, ok := x.Payload.(*SignalReq_InviteInGroup); ok {
+			return x.InviteInGroup
+		}
+	}
+	return nil
+}
+
 func (x *SignalReq) GetCancel() *SignalCancelReq {
 	if x != nil {
 		if x, ok := x.Payload.(*SignalReq_Cancel); ok {
@@ -215,12 +227,34 @@ func (x *SignalReq) GetReject() *SignalRejectReq {
 	return nil
 }
 
+func (x *SignalReq) GetJoin() *SignalJoinReq {
+	if x != nil {
+		if x, ok := x.Payload.(*SignalReq_Join); ok {
+			return x.Join
+		}
+	}
+	return nil
+}
+
+func (x *SignalReq) GetGroupCall() *SignalGroupCallReq {
+	if x != nil {
+		if x, ok := x.Payload.(*SignalReq_GroupCall); ok {
+			return x.GroupCall
+		}
+	}
+	return nil
+}
+
 type isSignalReq_Payload interface {
 	isSignalReq_Payload()
 }
 
 type SignalReq_Invite struct {
 	Invite *SignalInviteReq `protobuf:"bytes,1,opt,name=invite,proto3,oneof"`
+}
+
+type SignalReq_InviteInGroup struct {
+	InviteInGroup *SignalInviteInGroupReq `protobuf:"bytes,2,opt,name=invite_in_group,json=inviteInGroup,proto3,oneof"`
 }
 
 type SignalReq_Cancel struct {
@@ -239,7 +273,17 @@ type SignalReq_Reject struct {
 	Reject *SignalRejectReq `protobuf:"bytes,6,opt,name=reject,proto3,oneof"`
 }
 
+type SignalReq_Join struct {
+	Join *SignalJoinReq `protobuf:"bytes,7,opt,name=join,proto3,oneof"`
+}
+
+type SignalReq_GroupCall struct {
+	GroupCall *SignalGroupCallReq `protobuf:"bytes,8,opt,name=group_call,json=groupCall,proto3,oneof"`
+}
+
 func (*SignalReq_Invite) isSignalReq_Payload() {}
+
+func (*SignalReq_InviteInGroup) isSignalReq_Payload() {}
 
 func (*SignalReq_Cancel) isSignalReq_Payload() {}
 
@@ -249,15 +293,22 @@ func (*SignalReq_HangUp) isSignalReq_Payload() {}
 
 func (*SignalReq_Reject) isSignalReq_Payload() {}
 
+func (*SignalReq_Join) isSignalReq_Payload() {}
+
+func (*SignalReq_GroupCall) isSignalReq_Payload() {}
+
 type SignalResp struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Payload:
 	//
 	//	*SignalResp_Invite
+	//	*SignalResp_InviteInGroup
 	//	*SignalResp_Cancel
 	//	*SignalResp_Accept
 	//	*SignalResp_HangUp
 	//	*SignalResp_Reject
+	//	*SignalResp_Join
+	//	*SignalResp_GroupCall
 	Payload       isSignalResp_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -309,6 +360,15 @@ func (x *SignalResp) GetInvite() *SignalInviteResp {
 	return nil
 }
 
+func (x *SignalResp) GetInviteInGroup() *SignalInviteInGroupResp {
+	if x != nil {
+		if x, ok := x.Payload.(*SignalResp_InviteInGroup); ok {
+			return x.InviteInGroup
+		}
+	}
+	return nil
+}
+
 func (x *SignalResp) GetCancel() *SignalCancelResp {
 	if x != nil {
 		if x, ok := x.Payload.(*SignalResp_Cancel); ok {
@@ -345,12 +405,34 @@ func (x *SignalResp) GetReject() *SignalRejectResp {
 	return nil
 }
 
+func (x *SignalResp) GetJoin() *SignalJoinResp {
+	if x != nil {
+		if x, ok := x.Payload.(*SignalResp_Join); ok {
+			return x.Join
+		}
+	}
+	return nil
+}
+
+func (x *SignalResp) GetGroupCall() *SignalGroupCallResp {
+	if x != nil {
+		if x, ok := x.Payload.(*SignalResp_GroupCall); ok {
+			return x.GroupCall
+		}
+	}
+	return nil
+}
+
 type isSignalResp_Payload interface {
 	isSignalResp_Payload()
 }
 
 type SignalResp_Invite struct {
 	Invite *SignalInviteResp `protobuf:"bytes,1,opt,name=invite,proto3,oneof"`
+}
+
+type SignalResp_InviteInGroup struct {
+	InviteInGroup *SignalInviteInGroupResp `protobuf:"bytes,2,opt,name=invite_in_group,json=inviteInGroup,proto3,oneof"`
 }
 
 type SignalResp_Cancel struct {
@@ -369,7 +451,17 @@ type SignalResp_Reject struct {
 	Reject *SignalRejectResp `protobuf:"bytes,6,opt,name=reject,proto3,oneof"`
 }
 
+type SignalResp_Join struct {
+	Join *SignalJoinResp `protobuf:"bytes,7,opt,name=join,proto3,oneof"`
+}
+
+type SignalResp_GroupCall struct {
+	GroupCall *SignalGroupCallResp `protobuf:"bytes,8,opt,name=group_call,json=groupCall,proto3,oneof"`
+}
+
 func (*SignalResp_Invite) isSignalResp_Payload() {}
+
+func (*SignalResp_InviteInGroup) isSignalResp_Payload() {}
 
 func (*SignalResp_Cancel) isSignalResp_Payload() {}
 
@@ -379,6 +471,10 @@ func (*SignalResp_HangUp) isSignalResp_Payload() {}
 
 func (*SignalResp_Reject) isSignalResp_Payload() {}
 
+func (*SignalResp_Join) isSignalResp_Payload() {}
+
+func (*SignalResp_GroupCall) isSignalResp_Payload() {}
+
 // InvitationInfo is one private call.
 // OpenIM uses a repeated invitee list, a group id, and a busy list because one invitation can ring a group.
 type InvitationInfo struct {
@@ -386,7 +482,7 @@ type InvitationInfo struct {
 	InviterUserId string                 `protobuf:"bytes,1,opt,name=inviter_user_id,json=inviterUserId,proto3" json:"inviter_user_id,omitempty"`
 	InviteeUserId string                 `protobuf:"bytes,2,opt,name=invitee_user_id,json=inviteeUserId,proto3" json:"invitee_user_id,omitempty"`
 	RoomId        string                 `protobuf:"bytes,3,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	// media_type is "audio". Any other value is rejected.
+	// media_type is "audio" or "video". Any other value is rejected.
 	MediaType     string `protobuf:"bytes,4,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -687,6 +783,8 @@ type SignalAcceptResp struct {
 	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
 	RoomId        string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
 	LiveUrl       string                 `protobuf:"bytes,3,opt,name=live_url,json=liveUrl,proto3" json:"live_url,omitempty"`
+	GroupId       string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	UserIds       []string               `protobuf:"bytes,5,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -742,6 +840,394 @@ func (x *SignalAcceptResp) GetLiveUrl() string {
 	return ""
 }
 
+func (x *SignalAcceptResp) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *SignalAcceptResp) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
+// SignalInviteInGroupReq starts a group voice room.
+// The host joins immediately. Each invitee rings until they answer, decline, or time out.
+// media_type must be "audio".
+type SignalInviteInGroupReq struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	GroupId        string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	InviteeUserIds []string               `protobuf:"bytes,2,rep,name=invitee_user_ids,json=inviteeUserIds,proto3" json:"invitee_user_ids,omitempty"`
+	MediaType      string                 `protobuf:"bytes,3,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SignalInviteInGroupReq) Reset() {
+	*x = SignalInviteInGroupReq{}
+	mi := &file_rtc_rtc_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignalInviteInGroupReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignalInviteInGroupReq) ProtoMessage() {}
+
+func (x *SignalInviteInGroupReq) ProtoReflect() protoreflect.Message {
+	mi := &file_rtc_rtc_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignalInviteInGroupReq.ProtoReflect.Descriptor instead.
+func (*SignalInviteInGroupReq) Descriptor() ([]byte, []int) {
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SignalInviteInGroupReq) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *SignalInviteInGroupReq) GetInviteeUserIds() []string {
+	if x != nil {
+		return x.InviteeUserIds
+	}
+	return nil
+}
+
+func (x *SignalInviteInGroupReq) GetMediaType() string {
+	if x != nil {
+		return x.MediaType
+	}
+	return ""
+}
+
+type SignalInviteInGroupResp struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Token          string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	RoomId         string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	LiveUrl        string                 `protobuf:"bytes,3,opt,name=live_url,json=liveUrl,proto3" json:"live_url,omitempty"`
+	GroupId        string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	InviteeUserIds []string               `protobuf:"bytes,5,rep,name=invitee_user_ids,json=inviteeUserIds,proto3" json:"invitee_user_ids,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SignalInviteInGroupResp) Reset() {
+	*x = SignalInviteInGroupResp{}
+	mi := &file_rtc_rtc_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignalInviteInGroupResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignalInviteInGroupResp) ProtoMessage() {}
+
+func (x *SignalInviteInGroupResp) ProtoReflect() protoreflect.Message {
+	mi := &file_rtc_rtc_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignalInviteInGroupResp.ProtoReflect.Descriptor instead.
+func (*SignalInviteInGroupResp) Descriptor() ([]byte, []int) {
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SignalInviteInGroupResp) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *SignalInviteInGroupResp) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *SignalInviteInGroupResp) GetLiveUrl() string {
+	if x != nil {
+		return x.LiveUrl
+	}
+	return ""
+}
+
+func (x *SignalInviteInGroupResp) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *SignalInviteInGroupResp) GetInviteeUserIds() []string {
+	if x != nil {
+		return x.InviteeUserIds
+	}
+	return nil
+}
+
+// SignalJoinReq enters a group voice room that is already open.
+type SignalJoinReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GroupId       string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignalJoinReq) Reset() {
+	*x = SignalJoinReq{}
+	mi := &file_rtc_rtc_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignalJoinReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignalJoinReq) ProtoMessage() {}
+
+func (x *SignalJoinReq) ProtoReflect() protoreflect.Message {
+	mi := &file_rtc_rtc_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignalJoinReq.ProtoReflect.Descriptor instead.
+func (*SignalJoinReq) Descriptor() ([]byte, []int) {
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SignalJoinReq) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+type SignalJoinResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	RoomId        string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	LiveUrl       string                 `protobuf:"bytes,3,opt,name=live_url,json=liveUrl,proto3" json:"live_url,omitempty"`
+	GroupId       string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	UserIds       []string               `protobuf:"bytes,5,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignalJoinResp) Reset() {
+	*x = SignalJoinResp{}
+	mi := &file_rtc_rtc_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignalJoinResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignalJoinResp) ProtoMessage() {}
+
+func (x *SignalJoinResp) ProtoReflect() protoreflect.Message {
+	mi := &file_rtc_rtc_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignalJoinResp.ProtoReflect.Descriptor instead.
+func (*SignalJoinResp) Descriptor() ([]byte, []int) {
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SignalJoinResp) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *SignalJoinResp) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *SignalJoinResp) GetLiveUrl() string {
+	if x != nil {
+		return x.LiveUrl
+	}
+	return ""
+}
+
+func (x *SignalJoinResp) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *SignalJoinResp) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
+// SignalGroupCallReq reads the voice room currently open in a group.
+// An empty room_id means the group has no call.
+type SignalGroupCallReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GroupId       string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignalGroupCallReq) Reset() {
+	*x = SignalGroupCallReq{}
+	mi := &file_rtc_rtc_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignalGroupCallReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignalGroupCallReq) ProtoMessage() {}
+
+func (x *SignalGroupCallReq) ProtoReflect() protoreflect.Message {
+	mi := &file_rtc_rtc_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignalGroupCallReq.ProtoReflect.Descriptor instead.
+func (*SignalGroupCallReq) Descriptor() ([]byte, []int) {
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *SignalGroupCallReq) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+type SignalGroupCallResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	GroupId       string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	CallerUserId  string                 `protobuf:"bytes,3,opt,name=caller_user_id,json=callerUserId,proto3" json:"caller_user_id,omitempty"`
+	UserIds       []string               `protobuf:"bytes,4,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignalGroupCallResp) Reset() {
+	*x = SignalGroupCallResp{}
+	mi := &file_rtc_rtc_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignalGroupCallResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignalGroupCallResp) ProtoMessage() {}
+
+func (x *SignalGroupCallResp) ProtoReflect() protoreflect.Message {
+	mi := &file_rtc_rtc_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignalGroupCallResp.ProtoReflect.Descriptor instead.
+func (*SignalGroupCallResp) Descriptor() ([]byte, []int) {
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *SignalGroupCallResp) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *SignalGroupCallResp) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *SignalGroupCallResp) GetCallerUserId() string {
+	if x != nil {
+		return x.CallerUserId
+	}
+	return ""
+}
+
+func (x *SignalGroupCallResp) GetUserIds() []string {
+	if x != nil {
+		return x.UserIds
+	}
+	return nil
+}
+
 // SignalHangUpReq is OpenIM's SignalHungUpReq.
 type SignalHangUpReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -752,7 +1238,7 @@ type SignalHangUpReq struct {
 
 func (x *SignalHangUpReq) Reset() {
 	*x = SignalHangUpReq{}
-	mi := &file_rtc_rtc_proto_msgTypes[11]
+	mi := &file_rtc_rtc_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -764,7 +1250,7 @@ func (x *SignalHangUpReq) String() string {
 func (*SignalHangUpReq) ProtoMessage() {}
 
 func (x *SignalHangUpReq) ProtoReflect() protoreflect.Message {
-	mi := &file_rtc_rtc_proto_msgTypes[11]
+	mi := &file_rtc_rtc_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -777,7 +1263,7 @@ func (x *SignalHangUpReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignalHangUpReq.ProtoReflect.Descriptor instead.
 func (*SignalHangUpReq) Descriptor() ([]byte, []int) {
-	return file_rtc_rtc_proto_rawDescGZIP(), []int{11}
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SignalHangUpReq) GetRoomId() string {
@@ -795,7 +1281,7 @@ type SignalHangUpResp struct {
 
 func (x *SignalHangUpResp) Reset() {
 	*x = SignalHangUpResp{}
-	mi := &file_rtc_rtc_proto_msgTypes[12]
+	mi := &file_rtc_rtc_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -807,7 +1293,7 @@ func (x *SignalHangUpResp) String() string {
 func (*SignalHangUpResp) ProtoMessage() {}
 
 func (x *SignalHangUpResp) ProtoReflect() protoreflect.Message {
-	mi := &file_rtc_rtc_proto_msgTypes[12]
+	mi := &file_rtc_rtc_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -820,7 +1306,7 @@ func (x *SignalHangUpResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignalHangUpResp.ProtoReflect.Descriptor instead.
 func (*SignalHangUpResp) Descriptor() ([]byte, []int) {
-	return file_rtc_rtc_proto_rawDescGZIP(), []int{12}
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{18}
 }
 
 type SignalRejectReq struct {
@@ -832,7 +1318,7 @@ type SignalRejectReq struct {
 
 func (x *SignalRejectReq) Reset() {
 	*x = SignalRejectReq{}
-	mi := &file_rtc_rtc_proto_msgTypes[13]
+	mi := &file_rtc_rtc_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -844,7 +1330,7 @@ func (x *SignalRejectReq) String() string {
 func (*SignalRejectReq) ProtoMessage() {}
 
 func (x *SignalRejectReq) ProtoReflect() protoreflect.Message {
-	mi := &file_rtc_rtc_proto_msgTypes[13]
+	mi := &file_rtc_rtc_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -857,7 +1343,7 @@ func (x *SignalRejectReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignalRejectReq.ProtoReflect.Descriptor instead.
 func (*SignalRejectReq) Descriptor() ([]byte, []int) {
-	return file_rtc_rtc_proto_rawDescGZIP(), []int{13}
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SignalRejectReq) GetRoomId() string {
@@ -875,7 +1361,7 @@ type SignalRejectResp struct {
 
 func (x *SignalRejectResp) Reset() {
 	*x = SignalRejectResp{}
-	mi := &file_rtc_rtc_proto_msgTypes[14]
+	mi := &file_rtc_rtc_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -887,7 +1373,7 @@ func (x *SignalRejectResp) String() string {
 func (*SignalRejectResp) ProtoMessage() {}
 
 func (x *SignalRejectResp) ProtoReflect() protoreflect.Message {
-	mi := &file_rtc_rtc_proto_msgTypes[14]
+	mi := &file_rtc_rtc_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -900,7 +1386,7 @@ func (x *SignalRejectResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignalRejectResp.ProtoReflect.Descriptor instead.
 func (*SignalRejectResp) Descriptor() ([]byte, []int) {
-	return file_rtc_rtc_proto_rawDescGZIP(), []int{14}
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{20}
 }
 
 type SignalGetTokenByRoomIDReq struct {
@@ -913,7 +1399,7 @@ type SignalGetTokenByRoomIDReq struct {
 
 func (x *SignalGetTokenByRoomIDReq) Reset() {
 	*x = SignalGetTokenByRoomIDReq{}
-	mi := &file_rtc_rtc_proto_msgTypes[15]
+	mi := &file_rtc_rtc_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -925,7 +1411,7 @@ func (x *SignalGetTokenByRoomIDReq) String() string {
 func (*SignalGetTokenByRoomIDReq) ProtoMessage() {}
 
 func (x *SignalGetTokenByRoomIDReq) ProtoReflect() protoreflect.Message {
-	mi := &file_rtc_rtc_proto_msgTypes[15]
+	mi := &file_rtc_rtc_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -938,7 +1424,7 @@ func (x *SignalGetTokenByRoomIDReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignalGetTokenByRoomIDReq.ProtoReflect.Descriptor instead.
 func (*SignalGetTokenByRoomIDReq) Descriptor() ([]byte, []int) {
-	return file_rtc_rtc_proto_rawDescGZIP(), []int{15}
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SignalGetTokenByRoomIDReq) GetRoomId() string {
@@ -965,7 +1451,7 @@ type SignalGetTokenByRoomIDResp struct {
 
 func (x *SignalGetTokenByRoomIDResp) Reset() {
 	*x = SignalGetTokenByRoomIDResp{}
-	mi := &file_rtc_rtc_proto_msgTypes[16]
+	mi := &file_rtc_rtc_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -977,7 +1463,7 @@ func (x *SignalGetTokenByRoomIDResp) String() string {
 func (*SignalGetTokenByRoomIDResp) ProtoMessage() {}
 
 func (x *SignalGetTokenByRoomIDResp) ProtoReflect() protoreflect.Message {
-	mi := &file_rtc_rtc_proto_msgTypes[16]
+	mi := &file_rtc_rtc_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -990,7 +1476,7 @@ func (x *SignalGetTokenByRoomIDResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignalGetTokenByRoomIDResp.ProtoReflect.Descriptor instead.
 func (*SignalGetTokenByRoomIDResp) Descriptor() ([]byte, []int) {
-	return file_rtc_rtc_proto_rawDescGZIP(), []int{16}
+	return file_rtc_rtc_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SignalGetTokenByRoomIDResp) GetToken() string {
@@ -1018,21 +1504,29 @@ const file_rtc_rtc_proto_rawDesc = "" +
 	"\aconn_id\x18\x02 \x01(\tR\x06connId\"M\n" +
 	"\x19SignalMessageAssembleResp\x120\n" +
 	"\vsignal_resp\x18\x01 \x01(\v2\x0f.rtc.SignalRespR\n" +
-	"signalResp\"\x87\x02\n" +
+	"signalResp\"\xb2\x03\n" +
 	"\tSignalReq\x12.\n" +
-	"\x06invite\x18\x01 \x01(\v2\x14.rtc.SignalInviteReqH\x00R\x06invite\x12.\n" +
+	"\x06invite\x18\x01 \x01(\v2\x14.rtc.SignalInviteReqH\x00R\x06invite\x12E\n" +
+	"\x0finvite_in_group\x18\x02 \x01(\v2\x1b.rtc.SignalInviteInGroupReqH\x00R\rinviteInGroup\x12.\n" +
 	"\x06cancel\x18\x03 \x01(\v2\x14.rtc.SignalCancelReqH\x00R\x06cancel\x12.\n" +
 	"\x06accept\x18\x04 \x01(\v2\x14.rtc.SignalAcceptReqH\x00R\x06accept\x12/\n" +
 	"\ahang_up\x18\x05 \x01(\v2\x14.rtc.SignalHangUpReqH\x00R\x06hangUp\x12.\n" +
-	"\x06reject\x18\x06 \x01(\v2\x14.rtc.SignalRejectReqH\x00R\x06rejectB\t\n" +
-	"\apayload\"\x8d\x02\n" +
+	"\x06reject\x18\x06 \x01(\v2\x14.rtc.SignalRejectReqH\x00R\x06reject\x12(\n" +
+	"\x04join\x18\a \x01(\v2\x12.rtc.SignalJoinReqH\x00R\x04join\x128\n" +
+	"\n" +
+	"group_call\x18\b \x01(\v2\x17.rtc.SignalGroupCallReqH\x00R\tgroupCallB\t\n" +
+	"\apayload\"\xbb\x03\n" +
 	"\n" +
 	"SignalResp\x12/\n" +
-	"\x06invite\x18\x01 \x01(\v2\x15.rtc.SignalInviteRespH\x00R\x06invite\x12/\n" +
+	"\x06invite\x18\x01 \x01(\v2\x15.rtc.SignalInviteRespH\x00R\x06invite\x12F\n" +
+	"\x0finvite_in_group\x18\x02 \x01(\v2\x1c.rtc.SignalInviteInGroupRespH\x00R\rinviteInGroup\x12/\n" +
 	"\x06cancel\x18\x03 \x01(\v2\x15.rtc.SignalCancelRespH\x00R\x06cancel\x12/\n" +
 	"\x06accept\x18\x04 \x01(\v2\x15.rtc.SignalAcceptRespH\x00R\x06accept\x120\n" +
 	"\ahang_up\x18\x05 \x01(\v2\x15.rtc.SignalHangUpRespH\x00R\x06hangUp\x12/\n" +
-	"\x06reject\x18\x06 \x01(\v2\x15.rtc.SignalRejectRespH\x00R\x06rejectB\t\n" +
+	"\x06reject\x18\x06 \x01(\v2\x15.rtc.SignalRejectRespH\x00R\x06reject\x12)\n" +
+	"\x04join\x18\a \x01(\v2\x13.rtc.SignalJoinRespH\x00R\x04join\x129\n" +
+	"\n" +
+	"group_call\x18\b \x01(\v2\x18.rtc.SignalGroupCallRespH\x00R\tgroupCallB\t\n" +
 	"\apayload\"\x98\x01\n" +
 	"\x0eInvitationInfo\x12&\n" +
 	"\x0finviter_user_id\x18\x01 \x01(\tR\rinviterUserId\x12&\n" +
@@ -1052,11 +1546,39 @@ const file_rtc_rtc_proto_rawDesc = "" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"\x12\n" +
 	"\x10SignalCancelResp\"*\n" +
 	"\x0fSignalAcceptReq\x12\x17\n" +
-	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"\\\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"\x92\x01\n" +
 	"\x10SignalAcceptResp\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x17\n" +
 	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12\x19\n" +
-	"\blive_url\x18\x03 \x01(\tR\aliveUrl\"*\n" +
+	"\blive_url\x18\x03 \x01(\tR\aliveUrl\x12\x19\n" +
+	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12\x19\n" +
+	"\buser_ids\x18\x05 \x03(\tR\auserIds\"|\n" +
+	"\x16SignalInviteInGroupReq\x12\x19\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12(\n" +
+	"\x10invitee_user_ids\x18\x02 \x03(\tR\x0einviteeUserIds\x12\x1d\n" +
+	"\n" +
+	"media_type\x18\x03 \x01(\tR\tmediaType\"\xa8\x01\n" +
+	"\x17SignalInviteInGroupResp\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x17\n" +
+	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12\x19\n" +
+	"\blive_url\x18\x03 \x01(\tR\aliveUrl\x12\x19\n" +
+	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12(\n" +
+	"\x10invitee_user_ids\x18\x05 \x03(\tR\x0einviteeUserIds\"*\n" +
+	"\rSignalJoinReq\x12\x19\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\"\x90\x01\n" +
+	"\x0eSignalJoinResp\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x17\n" +
+	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12\x19\n" +
+	"\blive_url\x18\x03 \x01(\tR\aliveUrl\x12\x19\n" +
+	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12\x19\n" +
+	"\buser_ids\x18\x05 \x03(\tR\auserIds\"/\n" +
+	"\x12SignalGroupCallReq\x12\x19\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\"\x8a\x01\n" +
+	"\x13SignalGroupCallResp\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x19\n" +
+	"\bgroup_id\x18\x02 \x01(\tR\agroupId\x12$\n" +
+	"\x0ecaller_user_id\x18\x03 \x01(\tR\fcallerUserId\x12\x19\n" +
+	"\buser_ids\x18\x04 \x03(\tR\auserIds\"*\n" +
 	"\x0fSignalHangUpReq\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"\x12\n" +
 	"\x10SignalHangUpResp\"*\n" +
@@ -1086,7 +1608,7 @@ func file_rtc_rtc_proto_rawDescGZIP() []byte {
 	return file_rtc_rtc_proto_rawDescData
 }
 
-var file_rtc_rtc_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_rtc_rtc_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_rtc_rtc_proto_goTypes = []any{
 	(*SignalMessageAssembleReq)(nil),   // 0: rtc.SignalMessageAssembleReq
 	(*SignalMessageAssembleResp)(nil),  // 1: rtc.SignalMessageAssembleResp
@@ -1099,36 +1621,48 @@ var file_rtc_rtc_proto_goTypes = []any{
 	(*SignalCancelResp)(nil),           // 8: rtc.SignalCancelResp
 	(*SignalAcceptReq)(nil),            // 9: rtc.SignalAcceptReq
 	(*SignalAcceptResp)(nil),           // 10: rtc.SignalAcceptResp
-	(*SignalHangUpReq)(nil),            // 11: rtc.SignalHangUpReq
-	(*SignalHangUpResp)(nil),           // 12: rtc.SignalHangUpResp
-	(*SignalRejectReq)(nil),            // 13: rtc.SignalRejectReq
-	(*SignalRejectResp)(nil),           // 14: rtc.SignalRejectResp
-	(*SignalGetTokenByRoomIDReq)(nil),  // 15: rtc.SignalGetTokenByRoomIDReq
-	(*SignalGetTokenByRoomIDResp)(nil), // 16: rtc.SignalGetTokenByRoomIDResp
+	(*SignalInviteInGroupReq)(nil),     // 11: rtc.SignalInviteInGroupReq
+	(*SignalInviteInGroupResp)(nil),    // 12: rtc.SignalInviteInGroupResp
+	(*SignalJoinReq)(nil),              // 13: rtc.SignalJoinReq
+	(*SignalJoinResp)(nil),             // 14: rtc.SignalJoinResp
+	(*SignalGroupCallReq)(nil),         // 15: rtc.SignalGroupCallReq
+	(*SignalGroupCallResp)(nil),        // 16: rtc.SignalGroupCallResp
+	(*SignalHangUpReq)(nil),            // 17: rtc.SignalHangUpReq
+	(*SignalHangUpResp)(nil),           // 18: rtc.SignalHangUpResp
+	(*SignalRejectReq)(nil),            // 19: rtc.SignalRejectReq
+	(*SignalRejectResp)(nil),           // 20: rtc.SignalRejectResp
+	(*SignalGetTokenByRoomIDReq)(nil),  // 21: rtc.SignalGetTokenByRoomIDReq
+	(*SignalGetTokenByRoomIDResp)(nil), // 22: rtc.SignalGetTokenByRoomIDResp
 }
 var file_rtc_rtc_proto_depIdxs = []int32{
 	2,  // 0: rtc.SignalMessageAssembleReq.signal_req:type_name -> rtc.SignalReq
 	3,  // 1: rtc.SignalMessageAssembleResp.signal_resp:type_name -> rtc.SignalResp
 	5,  // 2: rtc.SignalReq.invite:type_name -> rtc.SignalInviteReq
-	7,  // 3: rtc.SignalReq.cancel:type_name -> rtc.SignalCancelReq
-	9,  // 4: rtc.SignalReq.accept:type_name -> rtc.SignalAcceptReq
-	11, // 5: rtc.SignalReq.hang_up:type_name -> rtc.SignalHangUpReq
-	13, // 6: rtc.SignalReq.reject:type_name -> rtc.SignalRejectReq
-	6,  // 7: rtc.SignalResp.invite:type_name -> rtc.SignalInviteResp
-	8,  // 8: rtc.SignalResp.cancel:type_name -> rtc.SignalCancelResp
-	10, // 9: rtc.SignalResp.accept:type_name -> rtc.SignalAcceptResp
-	12, // 10: rtc.SignalResp.hang_up:type_name -> rtc.SignalHangUpResp
-	14, // 11: rtc.SignalResp.reject:type_name -> rtc.SignalRejectResp
-	4,  // 12: rtc.SignalInviteReq.invitation:type_name -> rtc.InvitationInfo
-	0,  // 13: rtc.RtcService.SignalMessageAssemble:input_type -> rtc.SignalMessageAssembleReq
-	15, // 14: rtc.RtcService.SignalGetTokenByRoomID:input_type -> rtc.SignalGetTokenByRoomIDReq
-	1,  // 15: rtc.RtcService.SignalMessageAssemble:output_type -> rtc.SignalMessageAssembleResp
-	16, // 16: rtc.RtcService.SignalGetTokenByRoomID:output_type -> rtc.SignalGetTokenByRoomIDResp
-	15, // [15:17] is the sub-list for method output_type
-	13, // [13:15] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	11, // 3: rtc.SignalReq.invite_in_group:type_name -> rtc.SignalInviteInGroupReq
+	7,  // 4: rtc.SignalReq.cancel:type_name -> rtc.SignalCancelReq
+	9,  // 5: rtc.SignalReq.accept:type_name -> rtc.SignalAcceptReq
+	17, // 6: rtc.SignalReq.hang_up:type_name -> rtc.SignalHangUpReq
+	19, // 7: rtc.SignalReq.reject:type_name -> rtc.SignalRejectReq
+	13, // 8: rtc.SignalReq.join:type_name -> rtc.SignalJoinReq
+	15, // 9: rtc.SignalReq.group_call:type_name -> rtc.SignalGroupCallReq
+	6,  // 10: rtc.SignalResp.invite:type_name -> rtc.SignalInviteResp
+	12, // 11: rtc.SignalResp.invite_in_group:type_name -> rtc.SignalInviteInGroupResp
+	8,  // 12: rtc.SignalResp.cancel:type_name -> rtc.SignalCancelResp
+	10, // 13: rtc.SignalResp.accept:type_name -> rtc.SignalAcceptResp
+	18, // 14: rtc.SignalResp.hang_up:type_name -> rtc.SignalHangUpResp
+	20, // 15: rtc.SignalResp.reject:type_name -> rtc.SignalRejectResp
+	14, // 16: rtc.SignalResp.join:type_name -> rtc.SignalJoinResp
+	16, // 17: rtc.SignalResp.group_call:type_name -> rtc.SignalGroupCallResp
+	4,  // 18: rtc.SignalInviteReq.invitation:type_name -> rtc.InvitationInfo
+	0,  // 19: rtc.RtcService.SignalMessageAssemble:input_type -> rtc.SignalMessageAssembleReq
+	21, // 20: rtc.RtcService.SignalGetTokenByRoomID:input_type -> rtc.SignalGetTokenByRoomIDReq
+	1,  // 21: rtc.RtcService.SignalMessageAssemble:output_type -> rtc.SignalMessageAssembleResp
+	22, // 22: rtc.RtcService.SignalGetTokenByRoomID:output_type -> rtc.SignalGetTokenByRoomIDResp
+	21, // [21:23] is the sub-list for method output_type
+	19, // [19:21] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_rtc_rtc_proto_init() }
@@ -1138,17 +1672,23 @@ func file_rtc_rtc_proto_init() {
 	}
 	file_rtc_rtc_proto_msgTypes[2].OneofWrappers = []any{
 		(*SignalReq_Invite)(nil),
+		(*SignalReq_InviteInGroup)(nil),
 		(*SignalReq_Cancel)(nil),
 		(*SignalReq_Accept)(nil),
 		(*SignalReq_HangUp)(nil),
 		(*SignalReq_Reject)(nil),
+		(*SignalReq_Join)(nil),
+		(*SignalReq_GroupCall)(nil),
 	}
 	file_rtc_rtc_proto_msgTypes[3].OneofWrappers = []any{
 		(*SignalResp_Invite)(nil),
+		(*SignalResp_InviteInGroup)(nil),
 		(*SignalResp_Cancel)(nil),
 		(*SignalResp_Accept)(nil),
 		(*SignalResp_HangUp)(nil),
 		(*SignalResp_Reject)(nil),
+		(*SignalResp_Join)(nil),
+		(*SignalResp_GroupCall)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1156,7 +1696,7 @@ func file_rtc_rtc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rtc_rtc_proto_rawDesc), len(file_rtc_rtc_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

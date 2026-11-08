@@ -18,12 +18,25 @@ type Relations interface {
 	IsBlack(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
 }
 
-// Service owns private-call state. msggateway only forwards the websocket frame.
+// Groups reports whether a user is still a member of a group.
+type Groups interface {
+	InGroup(ctx context.Context, groupID, userID string) (bool, error)
+}
+
+// Service owns call state. msggateway only forwards the websocket frame.
 type Service struct {
 	rtcpb.UnimplementedRtcServiceServer
 	calls     *call.Board
 	relations Relations
+	groups    Groups
 	media     livekit.Config
+}
+
+// UseGroups enables group voice. Without it, a group invite is rejected.
+func (s *Service) UseGroups(groups Groups) {
+	if s != nil {
+		s.groups = groups
+	}
 }
 
 func New(calls *call.Board, relations Relations, media livekit.Config) *Service {
@@ -41,6 +54,8 @@ func (s *Service) SignalMessageAssemble(ctx context.Context, req *rtcpb.SignalMe
 	switch payload := req.SignalReq.Payload.(type) {
 	case *rtcpb.SignalReq_Invite:
 		return s.invite(ctx, userID, payload.Invite)
+	case *rtcpb.SignalReq_InviteInGroup:
+		return s.inviteGroup(ctx, userID, payload.InviteInGroup)
 	case *rtcpb.SignalReq_Cancel:
 		return s.end(ctx, userID, payload.Cancel.GetRoomId(), call.OpCancel)
 	case *rtcpb.SignalReq_Accept:
@@ -49,6 +64,10 @@ func (s *Service) SignalMessageAssemble(ctx context.Context, req *rtcpb.SignalMe
 		return s.end(ctx, userID, payload.HangUp.GetRoomId(), call.OpHangup)
 	case *rtcpb.SignalReq_Reject:
 		return s.end(ctx, userID, payload.Reject.GetRoomId(), call.OpReject)
+	case *rtcpb.SignalReq_Join:
+		return s.joinGroup(ctx, userID, req.GetConnId(), payload.Join.GetGroupId())
+	case *rtcpb.SignalReq_GroupCall:
+		return s.groupCall(ctx, userID, payload.GroupCall.GetGroupId())
 	default:
 		return nil, errorcode.ErrCallInvalid
 	}
@@ -99,6 +118,14 @@ func (s *Service) Sweep(ctx context.Context) {
 			for _, sig := range ended {
 				s.publish(ctx, sig, call.OpTimeout, []string{sig.CallerID, sig.CalleeID}, "")
 			}
+			groupEnded, err := s.calls.ExpireGroup(ctx, time.Now())
+			if err != nil {
+				slog.Warn("expire group calls", "err", err)
+				continue
+			}
+			for _, step := range groupEnded {
+				s.afterGroup(ctx, step, call.OpTimeout, "")
+			}
 		}
 	}
 }
@@ -132,6 +159,13 @@ func (s *Service) accept(ctx context.Context, userID, connID, roomID string) (*r
 	if s == nil || s.calls == nil {
 		return nil, errorcode.ErrInternal.WithMsg("call signaling is not configured")
 	}
+	kind, err := s.calls.Kind(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	if kind == call.KindGroup {
+		return s.acceptGroup(ctx, userID, connID, roomID)
+	}
 	sig, err := s.calls.Accept(ctx, userID, roomID)
 	if err != nil {
 		return nil, err
@@ -164,6 +198,13 @@ func (s *Service) end(ctx context.Context, userID, roomID, op string) (*rtcpb.Si
 		sig call.Signal
 		err error
 	)
+	kind, kindErr := s.calls.Kind(ctx, roomID)
+	if kindErr != nil {
+		return nil, kindErr
+	}
+	if kind == call.KindGroup {
+		return s.endGroup(ctx, userID, roomID, op)
+	}
 	switch op {
 	case call.OpCancel:
 		sig, err = s.calls.Cancel(ctx, userID, roomID)
@@ -245,6 +286,9 @@ func (s *Service) publish(ctx context.Context, sig call.Signal, op string, users
 		Reason: out.Reason,
 		URL:    out.URL,
 		Token:  out.Token,
+		Group:  out.GroupID,
+		Actor:  out.Actor,
+		Roster: out.Roster,
 	}); err != nil {
 		slog.Warn("publish call signal", "err", err, "op", op, "callID", sig.CallID)
 	}

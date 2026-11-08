@@ -21,6 +21,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
+	grouppb "github.com/lisuhang11/SuIM/proto/group"
 	relationpb "github.com/lisuhang11/SuIM/proto/relation"
 	rtcpb "github.com/lisuhang11/SuIM/proto/rtc"
 	svcconfig "github.com/lisuhang11/SuIM/services/rtc/internal/config"
@@ -74,7 +75,17 @@ func run(cfgPath string) error {
 	}
 	defer relationConn.Close()
 
+	groupConn, err := reg.Dial(ctx, "group",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial group service: %w", err)
+	}
+	defer groupConn.Close()
+
 	service := logic.New(call.New(rdb), rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)), cfg.LiveKit)
+	service.UseGroups(rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn)))
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)

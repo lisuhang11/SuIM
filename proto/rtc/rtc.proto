@@ -4,14 +4,14 @@ package rtc;
 
 option go_package = "github.com/lisuhang11/SuIM/proto/rtc;rtcpb";
 
-// RtcService is the private-call signaling service.
-// OpenIM's RtcService also carries group invitations, custom signals, room webhooks,
-// and call records. Those are not part of this service. Audio bytes stay on LiveKit.
+// RtcService is the call signaling service for private calls and group voice.
+// OpenIM's RtcService also carries custom signals, room webhooks, and call records.
+// Those are not part of this service. Audio bytes stay on LiveKit.
 // msggateway forwards websocket frame 1004 here and delivers frame 2006 from the
 // events this service publishes. The operator is the gateway's authenticated user.
 service RtcService {
   // SignalMessageAssemble runs one signaling step.
-  // OpenIM wraps the same oneof. Field 2 of that oneof is the group invite and is unused here.
+  // Field 2 is the group voice invite. A private invite stays on field 1.
   rpc SignalMessageAssemble(SignalMessageAssembleReq) returns (SignalMessageAssembleResp);
   // SignalGetTokenByRoomID signs a new microphone token for someone already in an accepted call.
   rpc SignalGetTokenByRoomID(SignalGetTokenByRoomIDReq) returns (SignalGetTokenByRoomIDResp);
@@ -31,20 +31,26 @@ message SignalMessageAssembleResp {
 message SignalReq {
   oneof payload {
     SignalInviteReq invite = 1;
+    SignalInviteInGroupReq invite_in_group = 2;
     SignalCancelReq cancel = 3;
     SignalAcceptReq accept = 4;
     SignalHangUpReq hang_up = 5;
     SignalRejectReq reject = 6;
+    SignalJoinReq join = 7;
+    SignalGroupCallReq group_call = 8;
   }
 }
 
 message SignalResp {
   oneof payload {
     SignalInviteResp invite = 1;
+    SignalInviteInGroupResp invite_in_group = 2;
     SignalCancelResp cancel = 3;
     SignalAcceptResp accept = 4;
     SignalHangUpResp hang_up = 5;
     SignalRejectResp reject = 6;
+    SignalJoinResp join = 7;
+    SignalGroupCallResp group_call = 8;
   }
 }
 
@@ -86,6 +92,51 @@ message SignalAcceptResp {
   string token = 1;
   string room_id = 2;
   string live_url = 3;
+  string group_id = 4;
+  repeated string user_ids = 5;
+}
+
+// SignalInviteInGroupReq starts a group voice room.
+// The host joins immediately. Each invitee rings until they answer, decline, or time out.
+// media_type must be "audio".
+message SignalInviteInGroupReq {
+  string group_id = 1;
+  repeated string invitee_user_ids = 2;
+  string media_type = 3;
+}
+
+message SignalInviteInGroupResp {
+  string token = 1;
+  string room_id = 2;
+  string live_url = 3;
+  string group_id = 4;
+  repeated string invitee_user_ids = 5;
+}
+
+// SignalJoinReq enters a group voice room that is already open.
+message SignalJoinReq {
+  string group_id = 1;
+}
+
+message SignalJoinResp {
+  string token = 1;
+  string room_id = 2;
+  string live_url = 3;
+  string group_id = 4;
+  repeated string user_ids = 5;
+}
+
+// SignalGroupCallReq reads the voice room currently open in a group.
+// An empty room_id means the group has no call.
+message SignalGroupCallReq {
+  string group_id = 1;
+}
+
+message SignalGroupCallResp {
+  string room_id = 1;
+  string group_id = 2;
+  string caller_user_id = 3;
+  repeated string user_ids = 4;
 }
 
 // SignalHangUpReq is OpenIM's SignalHungUpReq.

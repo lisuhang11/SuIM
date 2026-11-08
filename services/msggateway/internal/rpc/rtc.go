@@ -43,9 +43,18 @@ func signalReq(in *msgpb.CallSignal) (*rtcpb.SignalReq, error) {
 	}
 	switch in.GetOp() {
 	case msgpb.CallOp_CALL_INVITE:
+		if in.GetGroupId() != "" {
+			return &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_InviteInGroup{InviteInGroup: &rtcpb.SignalInviteInGroupReq{
+				GroupId: in.GetGroupId(), InviteeUserIds: in.GetUserIds(), MediaType: mediaType(in.GetMedia()),
+			}}}, nil
+		}
 		return &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_Invite{Invite: &rtcpb.SignalInviteReq{
 			Invitation: &rtcpb.InvitationInfo{InviteeUserId: in.GetPeerId(), MediaType: mediaType(in.GetMedia())},
 		}}}, nil
+	case msgpb.CallOp_CALL_JOIN:
+		return &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_Join{Join: &rtcpb.SignalJoinReq{GroupId: in.GetGroupId()}}}, nil
+	case msgpb.CallOp_CALL_GROUP:
+		return &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_GroupCall{GroupCall: &rtcpb.SignalGroupCallReq{GroupId: in.GetGroupId()}}}, nil
 	case msgpb.CallOp_CALL_CANCEL:
 		return &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_Cancel{Cancel: &rtcpb.SignalCancelReq{RoomId: in.GetCallId()}}}, nil
 	case msgpb.CallOp_CALL_ACCEPT:
@@ -83,11 +92,36 @@ func signalReply(userID string, in *msgpb.CallSignal, resp *rtcpb.SignalResp) (*
 			Op: msgpb.CallOp_CALL_INVITE, CallId: payload.Invite.GetRoomId(), PeerId: in.GetPeerId(),
 			Media: in.GetMedia(), CallerId: userID, CalleeId: in.GetPeerId(),
 		}, nil
+	case *rtcpb.SignalResp_InviteInGroup:
+		if payload.InviteInGroup.GetRoomId() == "" {
+			return nil, errorcode.ErrInternal.WithMsg("empty rtc response")
+		}
+		return &msgpb.CallSignal{
+			Op: msgpb.CallOp_CALL_INVITE, CallId: payload.InviteInGroup.GetRoomId(),
+			Media: msgpb.CallMedia_CALL_AUDIO, CallerId: userID, GroupId: payload.InviteInGroup.GetGroupId(),
+			Url: payload.InviteInGroup.GetLiveUrl(), Token: payload.InviteInGroup.GetToken(),
+			UserIds: payload.InviteInGroup.GetInviteeUserIds(),
+		}, nil
 	case *rtcpb.SignalResp_Accept:
 		return &msgpb.CallSignal{
 			Op: msgpb.CallOp_CALL_ACCEPT, CallId: payload.Accept.GetRoomId(),
 			Url: payload.Accept.GetLiveUrl(), Token: payload.Accept.GetToken(), CalleeId: userID,
-			Media: msgpb.CallMedia_CALL_AUDIO,
+			Media: msgpb.CallMedia_CALL_AUDIO, GroupId: payload.Accept.GetGroupId(), UserIds: payload.Accept.GetUserIds(),
+		}, nil
+	case *rtcpb.SignalResp_Join:
+		if payload.Join.GetRoomId() == "" {
+			return nil, errorcode.ErrInternal.WithMsg("empty rtc response")
+		}
+		return &msgpb.CallSignal{
+			Op: msgpb.CallOp_CALL_JOIN, CallId: payload.Join.GetRoomId(), CallerId: userID,
+			Media: msgpb.CallMedia_CALL_AUDIO, GroupId: payload.Join.GetGroupId(),
+			Url: payload.Join.GetLiveUrl(), Token: payload.Join.GetToken(), UserIds: payload.Join.GetUserIds(),
+		}, nil
+	case *rtcpb.SignalResp_GroupCall:
+		return &msgpb.CallSignal{
+			Op: msgpb.CallOp_CALL_GROUP, CallId: payload.GroupCall.GetRoomId(),
+			GroupId: payload.GroupCall.GetGroupId(), CallerId: payload.GroupCall.GetCallerUserId(),
+			UserIds: payload.GroupCall.GetUserIds(), Media: msgpb.CallMedia_CALL_AUDIO,
 		}, nil
 	case *rtcpb.SignalResp_Cancel:
 		return &msgpb.CallSignal{Op: msgpb.CallOp_CALL_CANCEL, CallId: in.GetCallId()}, nil

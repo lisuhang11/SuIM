@@ -34,10 +34,19 @@ const (
 	OpTimeout  = "timeout"
 	OpBusy     = "busy"
 	OpAnswered = "answered"
+	OpJoined   = "joined"
+	OpLeft     = "left"
 
 	// MediaAudio and MediaVideo are the only call kinds.
 	MediaAudio = "audio"
 	MediaVideo = "video"
+
+	// KindSingle is a two-person call. KindGroup is a group voice room.
+	KindSingle = "single"
+	KindGroup  = "group"
+
+	// MaxGroupVoice is the host plus the people who can be invited or join later.
+	MaxGroupVoice = 9
 
 	stateRinging  = "ringing"
 	stateAccepted = "accepted"
@@ -59,6 +68,9 @@ type Signal struct {
 	Reason   string
 	URL      string
 	Token    string
+	GroupID  string
+	Actor    string
+	Roster   []string
 }
 
 // Event is pushed to every gateway. Except is a connection id that should not
@@ -74,6 +86,9 @@ type Event struct {
 	Reason string   `json:"reason,omitempty"`
 	URL    string   `json:"url,omitempty"`
 	Token  string   `json:"token,omitempty"`
+	Group  string   `json:"group,omitempty"`
+	Actor  string   `json:"actor,omitempty"`
+	Roster []string `json:"roster,omitempty"`
 }
 
 // Board is the shared call record.
@@ -181,6 +196,17 @@ func (b *Board) Accepted(ctx context.Context, userID, callID string) (Signal, er
 	sig.CallerID = vals["caller"]
 	sig.CalleeID = vals["callee"]
 	sig.Media = vals["media"]
+	sig.GroupID = vals["group"]
+	if vals["kind"] == KindGroup {
+		status, err := b.rdb.HGet(ctx, b.memberKey(callID), userID).Result()
+		if errors.Is(err, redis.Nil) || status != memberJoined {
+			return sig, errorcode.ErrCallNotMember
+		}
+		if err != nil {
+			return sig, err
+		}
+		return sig, nil
+	}
 	if userID != sig.CallerID && userID != sig.CalleeID {
 		return sig, errorcode.ErrCallNotMember
 	}

@@ -3,7 +3,9 @@ package register
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"sync"
@@ -14,6 +16,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const keepAliveRetryDelay = time.Second
+
+var errRegisterStopped = errors.New("registration stopped")
+
 var _ Registry = (*etcdRegistry)(nil)
 
 type etcdRegistry struct {
@@ -21,11 +27,12 @@ type etcdRegistry struct {
 	ownClient bool
 	ttl       int64
 
-	mu          sync.Mutex
-	leaseID     clientv3.LeaseID
-	keepAliveCh <-chan *clientv3.LeaseKeepAliveResponse
-	cancel      context.CancelFunc
-	key         string
+	mu      sync.Mutex
+	gen     uint64
+	leaseID clientv3.LeaseID
+	cancel  context.CancelFunc
+	key     string
+	value   string
 }
 
 func NewEtcdRegistry(cfg *Config) (Registry, error) {
@@ -61,51 +68,127 @@ func (r *etcdRegistry) Register(ctx context.Context, inst *ServiceInstance) erro
 		return fmt.Errorf("cleanup previous registration: %w", err)
 	}
 
-	lease, err := r.client.Grant(ctx, r.ttl)
-	if err != nil {
-		return fmt.Errorf("grant lease: %w", err)
-	}
-
 	// etcd naming 监听的前缀不带前导斜杠，和 Dial 里的 etcd:///services/... 对齐。
 	key := fmt.Sprintf("services/%s/%s", url.PathEscape(inst.Name), url.PathEscape(inst.ID))
 	valBytes, _ := json.Marshal(map[string]string{"Addr": inst.Addr})
-	if _, err := r.client.Put(ctx, key, string(valBytes), clientv3.WithLease(lease.ID)); err != nil {
-		_, _ = r.client.Revoke(context.Background(), lease.ID)
-		return fmt.Errorf("put key: %w", err)
+	value := string(valBytes)
+	leaseID, err := r.putLeaseLocked(ctx, key, value)
+	if err != nil {
+		return err
 	}
 
 	keepCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	ch, err := r.client.KeepAlive(keepCtx, lease.ID)
+	ch, err := r.client.KeepAlive(keepCtx, leaseID)
 	if err != nil {
 		cancel()
-		_, _ = r.client.Revoke(context.Background(), lease.ID)
+		_, _ = r.client.Revoke(context.Background(), leaseID)
 		_, _ = r.client.Delete(context.Background(), key)
 		return fmt.Errorf("start keepalive: %w", err)
 	}
 
-	r.leaseID = lease.ID
+	r.leaseID = leaseID
 	r.key = key
-	r.keepAliveCh = ch
+	r.value = value
 	r.cancel = cancel
-
-	go r.consume(keepCtx, ch)
+	go r.keepAlive(keepCtx, r.gen, ch)
 	return nil
 }
 
-func (r *etcdRegistry) consume(ctx context.Context, ch <-chan *clientv3.LeaseKeepAliveResponse) {
+// putLeaseLocked grants a lease and writes key. The caller holds r.mu.
+func (r *etcdRegistry) putLeaseLocked(ctx context.Context, key, value string) (clientv3.LeaseID, error) {
+	lease, err := r.client.Grant(ctx, r.ttl)
+	if err != nil {
+		return 0, fmt.Errorf("grant lease: %w", err)
+	}
+	if _, err := r.client.Put(ctx, key, value, clientv3.WithLease(lease.ID)); err != nil {
+		_, _ = r.client.Revoke(context.Background(), lease.ID)
+		return 0, fmt.Errorf("put key: %w", err)
+	}
+	return lease.ID, nil
+}
+
+// keepAlive renews the lease. etcd closes the keepalive channel when that lease
+// can no longer be renewed, so the same key is written again with a new lease.
+func (r *etcdRegistry) keepAlive(ctx context.Context, gen uint64, ch <-chan *clientv3.LeaseKeepAliveResponse) {
 	for {
-		select {
-		case resp, ok := <-ch:
-			if !ok {
-				// TODO: 租约丢失，通知上层
-				return
-			}
-			if resp != nil && resp.TTL <= 0 {
-				return
-			}
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return
 		}
+		if ch == nil {
+			r.mu.Lock()
+			if r.gen != gen || r.client == nil || r.leaseID == 0 {
+				r.mu.Unlock()
+				return
+			}
+			leaseID := r.leaseID
+			client := r.client
+			r.mu.Unlock()
+			var err error
+			ch, err = client.KeepAlive(ctx, leaseID)
+			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
+				slog.Warn("etcd keepalive stopped", "err", err)
+				if err := r.reRegister(ctx, gen); err != nil {
+					if errors.Is(err, errRegisterStopped) || ctx.Err() != nil || !sleepCtx(ctx, keepAliveRetryDelay) {
+						return
+					}
+				}
+				ch = nil
+				continue
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case resp, ok := <-ch:
+			if ok && resp != nil && resp.TTL > 0 {
+				continue
+			}
+			if ctx.Err() != nil {
+				return
+			}
+			slog.Warn("etcd keepalive stopped", "err", errors.New("lease lost"))
+			if err := r.reRegister(ctx, gen); err != nil {
+				if errors.Is(err, errRegisterStopped) || ctx.Err() != nil || !sleepCtx(ctx, keepAliveRetryDelay) {
+					return
+				}
+			}
+			ch = nil
+		}
+	}
+}
+
+// reRegister writes the current key onto a new lease. errRegisterStopped means
+// the registration was removed or replaced, and the caller must not try again.
+func (r *etcdRegistry) reRegister(ctx context.Context, gen uint64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if ctx.Err() != nil || r.gen != gen || r.client == nil || r.key == "" || r.value == "" {
+		return errRegisterStopped
+	}
+	retryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	leaseID, err := r.putLeaseLocked(retryCtx, r.key, r.value)
+	if err != nil {
+		slog.Warn("etcd re-register failed", "key", r.key, "err", err)
+		return err
+	}
+	// The key now belongs to the new lease. The old lease has no key and expires on its own.
+	r.leaseID = leaseID
+	slog.Info("etcd re-registered", "key", r.key)
+	return nil
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 
@@ -116,16 +199,17 @@ func (r *etcdRegistry) Deregister(ctx context.Context) error {
 }
 
 func (r *etcdRegistry) deregisterLocked() error {
-	if r.leaseID == 0 && r.key == "" {
-		return nil
-	}
-	bgCtx, cancelBg := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancelBg()
-
+	r.gen++
 	if r.cancel != nil {
 		r.cancel()
 		r.cancel = nil
 	}
+	if r.leaseID == 0 && r.key == "" {
+		r.value = ""
+		return nil
+	}
+	bgCtx, cancelBg := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelBg()
 
 	var firstErr error
 	if r.leaseID != 0 {
@@ -140,7 +224,7 @@ func (r *etcdRegistry) deregisterLocked() error {
 	}
 	r.leaseID = 0
 	r.key = ""
-	r.keepAliveCh = nil
+	r.value = ""
 	return firstErr
 }
 

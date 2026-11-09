@@ -7,7 +7,20 @@ option go_package = "github.com/lisuhang11/SuIM/proto/msggateway;msggatewaypb";
 // MsgGateway reports online platforms from the shared Redis record.
 service MsgGateway {
   rpc GetUsersOnlineStatus(GetUsersOnlineStatusReq) returns (GetUsersOnlineStatusResp);
+  // KickPlatform closes this process's sockets for one user on one platform.
+  // The same token is closed without frame 2002. A different token receives 2002.
+  // The shared online record is left unchanged; the gateway that accepted the
+  // new connection owns that record.
+  rpc KickPlatform(KickPlatformReq) returns (KickPlatformResp);
 }
+
+message KickPlatformReq {
+  string user_id = 1;
+  int32 platform_id = 2;
+  string token = 3;
+}
+
+message KickPlatformResp {}
 
 message GetUsersOnlineStatusReq {
   repeated string user_ids = 1;

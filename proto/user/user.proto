@@ -20,6 +20,9 @@ service UserService {
   rpc ChangePassword(ChangePasswordReq) returns (ChangePasswordResp);
   rpc ValidateToken(ValidateTokenReq) returns (ValidateTokenResp);
   rpc Logout(LogoutReq) returns (LogoutResp);
+  // ReplacePlatformSession revokes every other live token of this token's user
+  // on the same platform. The token in the request stays valid.
+  rpc ReplacePlatformSession(ReplacePlatformSessionReq) returns (ReplacePlatformSessionResp);
   // SendSmsCode delivers a one-time code. The code is never returned to the caller.
   // register, login, bind, and resetpwd codes are stored apart and cannot be exchanged.
   rpc SendSmsCode(SendSmsCodeReq) returns (SendSmsCodeResp);
@@ -184,6 +187,12 @@ message LogoutReq {
 }
 
 message LogoutResp {}
+
+message ReplacePlatformSessionReq {
+  string token = 1;
+}
+
+message ReplacePlatformSessionResp {}
 
 // SendSmsCodeReq.scene is register, login, bind, or resetpwd.
 // client_ip is set by the gateway. captcha_ticket is checked when captcha is required.

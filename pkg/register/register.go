@@ -17,6 +17,9 @@ type Registry interface {
 	Register(ctx context.Context, instance *ServiceInstance) error
 	Deregister(ctx context.Context) error
 	Dial(ctx context.Context, service string, opts ...grpc.DialOption) (*grpc.ClientConn, error)
+	// List returns every registered instance of a service. The caller uses it
+	// to reach each process, which Dial's round robin does not do.
+	List(ctx context.Context, service string) ([]ServiceInstance, error)
 	Close() error
 }
 

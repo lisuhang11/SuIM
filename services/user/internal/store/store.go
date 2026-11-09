@@ -230,6 +230,46 @@ func (s *Store) StartSession(ctx context.Context, tok *model.Token) ([]string, e
 	return hashes, nil
 }
 
+// RevokeOtherSessions revokes live tokens of one user on one platform except keepHash.
+// keepHash itself stays valid. The returned hashes are the revoked ones.
+func (s *Store) RevokeOtherSessions(ctx context.Context, userID string, platformID int32, keepHash string) ([]string, error) {
+	if keepHash == "" {
+		return nil, fmt.Errorf("token hash is required")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	live, err := listLive(ctx, tx, userID, platformID)
+	if err != nil {
+		return nil, err
+	}
+	var drop []model.Token
+	for _, tok := range live {
+		if tok.Hash != keepHash {
+			drop = append(drop, tok)
+		}
+	}
+	if len(drop) == 0 {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE auth_tokens SET is_revoked = 1
+		WHERE user_id = ? AND platform_id = ? AND is_revoked = 0 AND token_hash <> ?`,
+		userID, platformID, keepHash); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return tokenHashes(drop), s.dropSnapshots(ctx, drop)
+}
+
 // RevokeSession marks every live token of the user on one platform revoked and drops their Redis snapshots.
 func (s *Store) RevokeSession(ctx context.Context, userID string, platformID int32) ([]string, error) {
 	tx, err := s.db.BeginTx(ctx, nil)

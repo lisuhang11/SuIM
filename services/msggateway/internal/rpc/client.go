@@ -31,6 +31,12 @@ func (c *UserClient) Validate(ctx context.Context, token string) (string, int32,
 	return resp.GetUser().GetUserId(), resp.GetPlatformId(), nil
 }
 
+// ReplacePlatform keeps this token and revokes the user's other tokens on its platform.
+func (c *UserClient) ReplacePlatform(ctx context.Context, token string) error {
+	_, err := c.client.ReplacePlatformSession(ctx, &userpb.ReplacePlatformSessionReq{Token: token})
+	return err
+}
+
 // GroupClient reads membership from the group service.
 type GroupClient struct {
 	client grouppb.GroupServiceClient

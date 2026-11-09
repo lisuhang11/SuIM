@@ -74,9 +74,12 @@ type Server struct {
 	// calls only subscribes to signals published by the rtc service.
 	calls    *call.Board
 	signals  CallSignals
+	online   *online.Status
+	peers    GatewayPeers
+	kick     GatewayKick
+	selfAddr string
 	maxConn  int64
 	hooks    Hooks
-	online   *online.Status
 	upgrader websocket.Upgrader
 }
 
@@ -98,6 +101,9 @@ type Options struct {
 	Calls            *call.Board
 	Signals          CallSignals
 	Online           *online.Status
+	Gateways         GatewayPeers
+	Kick             GatewayKick
+	SelfAddr         string
 	MaxConn          int64
 	HandshakeTimeout time.Duration
 	Hooks            Hooks
@@ -120,6 +126,9 @@ func New(opts Options) *Server {
 		calls:    opts.Calls,
 		signals:  opts.Signals,
 		online:   opts.Online,
+		peers:    opts.Gateways,
+		kick:     opts.Kick,
+		selfAddr: opts.SelfAddr,
 		maxConn:  opts.MaxConn,
 		hooks:    opts.Hooks,
 		upgrader: websocket.Upgrader{
@@ -182,6 +191,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.report(client.userID, []int32{int32(client.platformID)}, nil)
 	s.notifyOnline(client.userID)
 	s.afterUserOnline(client)
+	go s.claimPlatform(client)
 }
 
 // Deliver pushes one sequenced message to the online members of its conversation.

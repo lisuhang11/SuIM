@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v3.21.12
-// source: msggateway.proto
+// source: msggateway/msggateway.proto
 
 package msggatewaypb
 
@@ -20,15 +20,21 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	MsgGateway_GetUsersOnlineStatus_FullMethodName = "/msggateway.MsgGateway/GetUsersOnlineStatus"
+	MsgGateway_KickPlatform_FullMethodName         = "/msggateway.MsgGateway/KickPlatform"
 )
 
 // MsgGatewayClient is the client API for MsgGateway service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// MsgGateway reports which users are connected to this process.
+// MsgGateway reports online platforms from the shared Redis record.
 type MsgGatewayClient interface {
 	GetUsersOnlineStatus(ctx context.Context, in *GetUsersOnlineStatusReq, opts ...grpc.CallOption) (*GetUsersOnlineStatusResp, error)
+	// KickPlatform closes this process's sockets for one user on one platform.
+	// The same token is closed without frame 2002. A different token receives 2002.
+	// The shared online record is left unchanged; the gateway that accepted the
+	// new connection owns that record.
+	KickPlatform(ctx context.Context, in *KickPlatformReq, opts ...grpc.CallOption) (*KickPlatformResp, error)
 }
 
 type msgGatewayClient struct {
@@ -49,13 +55,28 @@ func (c *msgGatewayClient) GetUsersOnlineStatus(ctx context.Context, in *GetUser
 	return out, nil
 }
 
+func (c *msgGatewayClient) KickPlatform(ctx context.Context, in *KickPlatformReq, opts ...grpc.CallOption) (*KickPlatformResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(KickPlatformResp)
+	err := c.cc.Invoke(ctx, MsgGateway_KickPlatform_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgGatewayServer is the server API for MsgGateway service.
 // All implementations must embed UnimplementedMsgGatewayServer
 // for forward compatibility.
 //
-// MsgGateway reports which users are connected to this process.
+// MsgGateway reports online platforms from the shared Redis record.
 type MsgGatewayServer interface {
 	GetUsersOnlineStatus(context.Context, *GetUsersOnlineStatusReq) (*GetUsersOnlineStatusResp, error)
+	// KickPlatform closes this process's sockets for one user on one platform.
+	// The same token is closed without frame 2002. A different token receives 2002.
+	// The shared online record is left unchanged; the gateway that accepted the
+	// new connection owns that record.
+	KickPlatform(context.Context, *KickPlatformReq) (*KickPlatformResp, error)
 	mustEmbedUnimplementedMsgGatewayServer()
 }
 
@@ -68,6 +89,9 @@ type UnimplementedMsgGatewayServer struct{}
 
 func (UnimplementedMsgGatewayServer) GetUsersOnlineStatus(context.Context, *GetUsersOnlineStatusReq) (*GetUsersOnlineStatusResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUsersOnlineStatus not implemented")
+}
+func (UnimplementedMsgGatewayServer) KickPlatform(context.Context, *KickPlatformReq) (*KickPlatformResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method KickPlatform not implemented")
 }
 func (UnimplementedMsgGatewayServer) mustEmbedUnimplementedMsgGatewayServer() {}
 func (UnimplementedMsgGatewayServer) testEmbeddedByValue()                    {}
@@ -108,6 +132,24 @@ func _MsgGateway_GetUsersOnlineStatus_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MsgGateway_KickPlatform_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KickPlatformReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgGatewayServer).KickPlatform(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MsgGateway_KickPlatform_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgGatewayServer).KickPlatform(ctx, req.(*KickPlatformReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MsgGateway_ServiceDesc is the grpc.ServiceDesc for MsgGateway service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -119,7 +161,11 @@ var MsgGateway_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetUsersOnlineStatus",
 			Handler:    _MsgGateway_GetUsersOnlineStatus_Handler,
 		},
+		{
+			MethodName: "KickPlatform",
+			Handler:    _MsgGateway_KickPlatform_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "msggateway.proto",
+	Metadata: "msggateway/msggateway.proto",
 }

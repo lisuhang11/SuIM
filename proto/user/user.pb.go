@@ -1419,6 +1419,86 @@ func (*LogoutResp) Descriptor() ([]byte, []int) {
 	return file_user_user_proto_rawDescGZIP(), []int{21}
 }
 
+type ReplacePlatformSessionReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplacePlatformSessionReq) Reset() {
+	*x = ReplacePlatformSessionReq{}
+	mi := &file_user_user_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplacePlatformSessionReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplacePlatformSessionReq) ProtoMessage() {}
+
+func (x *ReplacePlatformSessionReq) ProtoReflect() protoreflect.Message {
+	mi := &file_user_user_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplacePlatformSessionReq.ProtoReflect.Descriptor instead.
+func (*ReplacePlatformSessionReq) Descriptor() ([]byte, []int) {
+	return file_user_user_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ReplacePlatformSessionReq) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type ReplacePlatformSessionResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplacePlatformSessionResp) Reset() {
+	*x = ReplacePlatformSessionResp{}
+	mi := &file_user_user_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplacePlatformSessionResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplacePlatformSessionResp) ProtoMessage() {}
+
+func (x *ReplacePlatformSessionResp) ProtoReflect() protoreflect.Message {
+	mi := &file_user_user_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplacePlatformSessionResp.ProtoReflect.Descriptor instead.
+func (*ReplacePlatformSessionResp) Descriptor() ([]byte, []int) {
+	return file_user_user_proto_rawDescGZIP(), []int{23}
+}
+
 // SendSmsCodeReq.scene is register, login, bind, or resetpwd.
 // client_ip is set by the gateway. captcha_ticket is checked when captcha is required.
 type SendSmsCodeReq struct {
@@ -1434,7 +1514,7 @@ type SendSmsCodeReq struct {
 
 func (x *SendSmsCodeReq) Reset() {
 	*x = SendSmsCodeReq{}
-	mi := &file_user_user_proto_msgTypes[22]
+	mi := &file_user_user_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1446,7 +1526,7 @@ func (x *SendSmsCodeReq) String() string {
 func (*SendSmsCodeReq) ProtoMessage() {}
 
 func (x *SendSmsCodeReq) ProtoReflect() protoreflect.Message {
-	mi := &file_user_user_proto_msgTypes[22]
+	mi := &file_user_user_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1459,7 +1539,7 @@ func (x *SendSmsCodeReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendSmsCodeReq.ProtoReflect.Descriptor instead.
 func (*SendSmsCodeReq) Descriptor() ([]byte, []int) {
-	return file_user_user_proto_rawDescGZIP(), []int{22}
+	return file_user_user_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *SendSmsCodeReq) GetPhone() string {
@@ -1506,7 +1586,7 @@ type SendSmsCodeResp struct {
 
 func (x *SendSmsCodeResp) Reset() {
 	*x = SendSmsCodeResp{}
-	mi := &file_user_user_proto_msgTypes[23]
+	mi := &file_user_user_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1518,7 +1598,7 @@ func (x *SendSmsCodeResp) String() string {
 func (*SendSmsCodeResp) ProtoMessage() {}
 
 func (x *SendSmsCodeResp) ProtoReflect() protoreflect.Message {
-	mi := &file_user_user_proto_msgTypes[23]
+	mi := &file_user_user_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1531,7 +1611,7 @@ func (x *SendSmsCodeResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendSmsCodeResp.ProtoReflect.Descriptor instead.
 func (*SendSmsCodeResp) Descriptor() ([]byte, []int) {
-	return file_user_user_proto_rawDescGZIP(), []int{23}
+	return file_user_user_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SendSmsCodeResp) GetExpireSeconds() int64 {
@@ -1561,7 +1641,7 @@ type RegisterPhoneReq struct {
 
 func (x *RegisterPhoneReq) Reset() {
 	*x = RegisterPhoneReq{}
-	mi := &file_user_user_proto_msgTypes[24]
+	mi := &file_user_user_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1573,7 +1653,7 @@ func (x *RegisterPhoneReq) String() string {
 func (*RegisterPhoneReq) ProtoMessage() {}
 
 func (x *RegisterPhoneReq) ProtoReflect() protoreflect.Message {
-	mi := &file_user_user_proto_msgTypes[24]
+	mi := &file_user_user_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1586,7 +1666,7 @@ func (x *RegisterPhoneReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterPhoneReq.ProtoReflect.Descriptor instead.
 func (*RegisterPhoneReq) Descriptor() ([]byte, []int) {
-	return file_user_user_proto_rawDescGZIP(), []int{24}
+	return file_user_user_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RegisterPhoneReq) GetPhone() string {
@@ -1670,7 +1750,7 @@ type RegisterPhoneResp struct {
 
 func (x *RegisterPhoneResp) Reset() {
 	*x = RegisterPhoneResp{}
-	mi := &file_user_user_proto_msgTypes[25]
+	mi := &file_user_user_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1682,7 +1762,7 @@ func (x *RegisterPhoneResp) String() string {
 func (*RegisterPhoneResp) ProtoMessage() {}
 
 func (x *RegisterPhoneResp) ProtoReflect() protoreflect.Message {
-	mi := &file_user_user_proto_msgTypes[25]
+	mi := &file_user_user_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1695,7 +1775,7 @@ func (x *RegisterPhoneResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterPhoneResp.ProtoReflect.Descriptor instead.
 func (*RegisterPhoneResp) Descriptor() ([]byte, []int) {
-	return file_user_user_proto_rawDescGZIP(), []int{25}
+	return file_user_user_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *RegisterPhoneResp) GetUser() *UserInfo {
@@ -1855,7 +1935,10 @@ const file_user_user_proto_rawDesc = "" +
 	"\tLogoutReq\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"\f\n" +
 	"\n" +
-	"LogoutResp\"\x9d\x01\n" +
+	"LogoutResp\"1\n" +
+	"\x19ReplacePlatformSessionReq\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\x1c\n" +
+	"\x1aReplacePlatformSessionResp\"\x9d\x01\n" +
 	"\x0eSendSmsCodeReq\x12\x14\n" +
 	"\x05phone\x18\x01 \x01(\tR\x05phone\x12\x14\n" +
 	"\x05scene\x18\x02 \x01(\tR\x05scene\x12\x1b\n" +
@@ -1880,7 +1963,7 @@ const file_user_user_proto_rawDesc = "" +
 	"\x11RegisterPhoneResp\x12\"\n" +
 	"\x04user\x18\x01 \x01(\v2\x0e.user.UserInfoR\x04user\x12\x14\n" +
 	"\x05token\x18\x02 \x01(\tR\x05token\x12.\n" +
-	"\x13expire_time_seconds\x18\x03 \x01(\x03R\x11expireTimeSeconds2\xfc\x05\n" +
+	"\x13expire_time_seconds\x18\x03 \x01(\x03R\x11expireTimeSeconds2\xd9\x06\n" +
 	"\vUserService\x121\n" +
 	"\bRegister\x12\x11.user.RegisterReq\x1a\x12.user.RegisterResp\x12(\n" +
 	"\x05Login\x12\x0e.user.LoginReq\x1a\x0f.user.LoginResp\x122\n" +
@@ -1895,7 +1978,8 @@ const file_user_user_proto_rawDesc = "" +
 	"DeleteUser\x12\x13.user.DeleteUserReq\x1a\x14.user.DeleteUserResp\x12C\n" +
 	"\x0eChangePassword\x12\x17.user.ChangePasswordReq\x1a\x18.user.ChangePasswordResp\x12@\n" +
 	"\rValidateToken\x12\x16.user.ValidateTokenReq\x1a\x17.user.ValidateTokenResp\x12+\n" +
-	"\x06Logout\x12\x0f.user.LogoutReq\x1a\x10.user.LogoutResp\x12:\n" +
+	"\x06Logout\x12\x0f.user.LogoutReq\x1a\x10.user.LogoutResp\x12[\n" +
+	"\x16ReplacePlatformSession\x12\x1f.user.ReplacePlatformSessionReq\x1a .user.ReplacePlatformSessionResp\x12:\n" +
 	"\vSendSmsCode\x12\x14.user.SendSmsCodeReq\x1a\x15.user.SendSmsCodeResp\x12@\n" +
 	"\rRegisterPhone\x12\x16.user.RegisterPhoneReq\x1a\x17.user.RegisterPhoneRespB.Z,github.com/lisuhang11/SuIM/proto/user;userpbb\x06proto3"
 
@@ -1911,41 +1995,43 @@ func file_user_user_proto_rawDescGZIP() []byte {
 	return file_user_user_proto_rawDescData
 }
 
-var file_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_user_user_proto_goTypes = []any{
-	(*UserInfo)(nil),           // 0: user.UserInfo
-	(*RegisterReq)(nil),        // 1: user.RegisterReq
-	(*RegisterResp)(nil),       // 2: user.RegisterResp
-	(*LoginReq)(nil),           // 3: user.LoginReq
-	(*LoginResp)(nil),          // 4: user.LoginResp
-	(*LoginPhoneReq)(nil),      // 5: user.LoginPhoneReq
-	(*GetUserByIDReq)(nil),     // 6: user.GetUserByIDReq
-	(*GetUserByIDResp)(nil),    // 7: user.GetUserByIDResp
-	(*GetUsersByIDsReq)(nil),   // 8: user.GetUsersByIDsReq
-	(*GetUsersByIDsResp)(nil),  // 9: user.GetUsersByIDsResp
-	(*SearchUsersReq)(nil),     // 10: user.SearchUsersReq
-	(*SearchUsersResp)(nil),    // 11: user.SearchUsersResp
-	(*UpdateUserReq)(nil),      // 12: user.UpdateUserReq
-	(*UpdateUserResp)(nil),     // 13: user.UpdateUserResp
-	(*DeleteUserReq)(nil),      // 14: user.DeleteUserReq
-	(*DeleteUserResp)(nil),     // 15: user.DeleteUserResp
-	(*ChangePasswordReq)(nil),  // 16: user.ChangePasswordReq
-	(*ChangePasswordResp)(nil), // 17: user.ChangePasswordResp
-	(*ValidateTokenReq)(nil),   // 18: user.ValidateTokenReq
-	(*ValidateTokenResp)(nil),  // 19: user.ValidateTokenResp
-	(*LogoutReq)(nil),          // 20: user.LogoutReq
-	(*LogoutResp)(nil),         // 21: user.LogoutResp
-	(*SendSmsCodeReq)(nil),     // 22: user.SendSmsCodeReq
-	(*SendSmsCodeResp)(nil),    // 23: user.SendSmsCodeResp
-	(*RegisterPhoneReq)(nil),   // 24: user.RegisterPhoneReq
-	(*RegisterPhoneResp)(nil),  // 25: user.RegisterPhoneResp
-	nil,                        // 26: user.GetUsersByIDsResp.UsersEntry
+	(*UserInfo)(nil),                   // 0: user.UserInfo
+	(*RegisterReq)(nil),                // 1: user.RegisterReq
+	(*RegisterResp)(nil),               // 2: user.RegisterResp
+	(*LoginReq)(nil),                   // 3: user.LoginReq
+	(*LoginResp)(nil),                  // 4: user.LoginResp
+	(*LoginPhoneReq)(nil),              // 5: user.LoginPhoneReq
+	(*GetUserByIDReq)(nil),             // 6: user.GetUserByIDReq
+	(*GetUserByIDResp)(nil),            // 7: user.GetUserByIDResp
+	(*GetUsersByIDsReq)(nil),           // 8: user.GetUsersByIDsReq
+	(*GetUsersByIDsResp)(nil),          // 9: user.GetUsersByIDsResp
+	(*SearchUsersReq)(nil),             // 10: user.SearchUsersReq
+	(*SearchUsersResp)(nil),            // 11: user.SearchUsersResp
+	(*UpdateUserReq)(nil),              // 12: user.UpdateUserReq
+	(*UpdateUserResp)(nil),             // 13: user.UpdateUserResp
+	(*DeleteUserReq)(nil),              // 14: user.DeleteUserReq
+	(*DeleteUserResp)(nil),             // 15: user.DeleteUserResp
+	(*ChangePasswordReq)(nil),          // 16: user.ChangePasswordReq
+	(*ChangePasswordResp)(nil),         // 17: user.ChangePasswordResp
+	(*ValidateTokenReq)(nil),           // 18: user.ValidateTokenReq
+	(*ValidateTokenResp)(nil),          // 19: user.ValidateTokenResp
+	(*LogoutReq)(nil),                  // 20: user.LogoutReq
+	(*LogoutResp)(nil),                 // 21: user.LogoutResp
+	(*ReplacePlatformSessionReq)(nil),  // 22: user.ReplacePlatformSessionReq
+	(*ReplacePlatformSessionResp)(nil), // 23: user.ReplacePlatformSessionResp
+	(*SendSmsCodeReq)(nil),             // 24: user.SendSmsCodeReq
+	(*SendSmsCodeResp)(nil),            // 25: user.SendSmsCodeResp
+	(*RegisterPhoneReq)(nil),           // 26: user.RegisterPhoneReq
+	(*RegisterPhoneResp)(nil),          // 27: user.RegisterPhoneResp
+	nil,                                // 28: user.GetUsersByIDsResp.UsersEntry
 }
 var file_user_user_proto_depIdxs = []int32{
 	0,  // 0: user.RegisterResp.user:type_name -> user.UserInfo
 	0,  // 1: user.LoginResp.user:type_name -> user.UserInfo
 	0,  // 2: user.GetUserByIDResp.user:type_name -> user.UserInfo
-	26, // 3: user.GetUsersByIDsResp.users:type_name -> user.GetUsersByIDsResp.UsersEntry
+	28, // 3: user.GetUsersByIDsResp.users:type_name -> user.GetUsersByIDsResp.UsersEntry
 	0,  // 4: user.SearchUsersResp.users:type_name -> user.UserInfo
 	0,  // 5: user.ValidateTokenResp.user:type_name -> user.UserInfo
 	0,  // 6: user.RegisterPhoneResp.user:type_name -> user.UserInfo
@@ -1961,23 +2047,25 @@ var file_user_user_proto_depIdxs = []int32{
 	16, // 16: user.UserService.ChangePassword:input_type -> user.ChangePasswordReq
 	18, // 17: user.UserService.ValidateToken:input_type -> user.ValidateTokenReq
 	20, // 18: user.UserService.Logout:input_type -> user.LogoutReq
-	22, // 19: user.UserService.SendSmsCode:input_type -> user.SendSmsCodeReq
-	24, // 20: user.UserService.RegisterPhone:input_type -> user.RegisterPhoneReq
-	2,  // 21: user.UserService.Register:output_type -> user.RegisterResp
-	4,  // 22: user.UserService.Login:output_type -> user.LoginResp
-	4,  // 23: user.UserService.LoginPhone:output_type -> user.LoginResp
-	7,  // 24: user.UserService.GetUserByID:output_type -> user.GetUserByIDResp
-	9,  // 25: user.UserService.GetUsersByIDs:output_type -> user.GetUsersByIDsResp
-	11, // 26: user.UserService.SearchUsers:output_type -> user.SearchUsersResp
-	13, // 27: user.UserService.UpdateUser:output_type -> user.UpdateUserResp
-	15, // 28: user.UserService.DeleteUser:output_type -> user.DeleteUserResp
-	17, // 29: user.UserService.ChangePassword:output_type -> user.ChangePasswordResp
-	19, // 30: user.UserService.ValidateToken:output_type -> user.ValidateTokenResp
-	21, // 31: user.UserService.Logout:output_type -> user.LogoutResp
-	23, // 32: user.UserService.SendSmsCode:output_type -> user.SendSmsCodeResp
-	25, // 33: user.UserService.RegisterPhone:output_type -> user.RegisterPhoneResp
-	21, // [21:34] is the sub-list for method output_type
-	8,  // [8:21] is the sub-list for method input_type
+	22, // 19: user.UserService.ReplacePlatformSession:input_type -> user.ReplacePlatformSessionReq
+	24, // 20: user.UserService.SendSmsCode:input_type -> user.SendSmsCodeReq
+	26, // 21: user.UserService.RegisterPhone:input_type -> user.RegisterPhoneReq
+	2,  // 22: user.UserService.Register:output_type -> user.RegisterResp
+	4,  // 23: user.UserService.Login:output_type -> user.LoginResp
+	4,  // 24: user.UserService.LoginPhone:output_type -> user.LoginResp
+	7,  // 25: user.UserService.GetUserByID:output_type -> user.GetUserByIDResp
+	9,  // 26: user.UserService.GetUsersByIDs:output_type -> user.GetUsersByIDsResp
+	11, // 27: user.UserService.SearchUsers:output_type -> user.SearchUsersResp
+	13, // 28: user.UserService.UpdateUser:output_type -> user.UpdateUserResp
+	15, // 29: user.UserService.DeleteUser:output_type -> user.DeleteUserResp
+	17, // 30: user.UserService.ChangePassword:output_type -> user.ChangePasswordResp
+	19, // 31: user.UserService.ValidateToken:output_type -> user.ValidateTokenResp
+	21, // 32: user.UserService.Logout:output_type -> user.LogoutResp
+	23, // 33: user.UserService.ReplacePlatformSession:output_type -> user.ReplacePlatformSessionResp
+	25, // 34: user.UserService.SendSmsCode:output_type -> user.SendSmsCodeResp
+	27, // 35: user.UserService.RegisterPhone:output_type -> user.RegisterPhoneResp
+	22, // [22:36] is the sub-list for method output_type
+	8,  // [8:22] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -1995,7 +2083,7 @@ func file_user_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_user_user_proto_rawDesc), len(file_user_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   27,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

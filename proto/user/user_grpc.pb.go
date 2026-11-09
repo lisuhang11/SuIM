@@ -19,19 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_Register_FullMethodName       = "/user.UserService/Register"
-	UserService_Login_FullMethodName          = "/user.UserService/Login"
-	UserService_LoginPhone_FullMethodName     = "/user.UserService/LoginPhone"
-	UserService_GetUserByID_FullMethodName    = "/user.UserService/GetUserByID"
-	UserService_GetUsersByIDs_FullMethodName  = "/user.UserService/GetUsersByIDs"
-	UserService_SearchUsers_FullMethodName    = "/user.UserService/SearchUsers"
-	UserService_UpdateUser_FullMethodName     = "/user.UserService/UpdateUser"
-	UserService_DeleteUser_FullMethodName     = "/user.UserService/DeleteUser"
-	UserService_ChangePassword_FullMethodName = "/user.UserService/ChangePassword"
-	UserService_ValidateToken_FullMethodName  = "/user.UserService/ValidateToken"
-	UserService_Logout_FullMethodName         = "/user.UserService/Logout"
-	UserService_SendSmsCode_FullMethodName    = "/user.UserService/SendSmsCode"
-	UserService_RegisterPhone_FullMethodName  = "/user.UserService/RegisterPhone"
+	UserService_Register_FullMethodName               = "/user.UserService/Register"
+	UserService_Login_FullMethodName                  = "/user.UserService/Login"
+	UserService_LoginPhone_FullMethodName             = "/user.UserService/LoginPhone"
+	UserService_GetUserByID_FullMethodName            = "/user.UserService/GetUserByID"
+	UserService_GetUsersByIDs_FullMethodName          = "/user.UserService/GetUsersByIDs"
+	UserService_SearchUsers_FullMethodName            = "/user.UserService/SearchUsers"
+	UserService_UpdateUser_FullMethodName             = "/user.UserService/UpdateUser"
+	UserService_DeleteUser_FullMethodName             = "/user.UserService/DeleteUser"
+	UserService_ChangePassword_FullMethodName         = "/user.UserService/ChangePassword"
+	UserService_ValidateToken_FullMethodName          = "/user.UserService/ValidateToken"
+	UserService_Logout_FullMethodName                 = "/user.UserService/Logout"
+	UserService_ReplacePlatformSession_FullMethodName = "/user.UserService/ReplacePlatformSession"
+	UserService_SendSmsCode_FullMethodName            = "/user.UserService/SendSmsCode"
+	UserService_RegisterPhone_FullMethodName          = "/user.UserService/RegisterPhone"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -54,6 +55,9 @@ type UserServiceClient interface {
 	ChangePassword(ctx context.Context, in *ChangePasswordReq, opts ...grpc.CallOption) (*ChangePasswordResp, error)
 	ValidateToken(ctx context.Context, in *ValidateTokenReq, opts ...grpc.CallOption) (*ValidateTokenResp, error)
 	Logout(ctx context.Context, in *LogoutReq, opts ...grpc.CallOption) (*LogoutResp, error)
+	// ReplacePlatformSession revokes every other live token of this token's user
+	// on the same platform. The token in the request stays valid.
+	ReplacePlatformSession(ctx context.Context, in *ReplacePlatformSessionReq, opts ...grpc.CallOption) (*ReplacePlatformSessionResp, error)
 	// SendSmsCode delivers a one-time code. The code is never returned to the caller.
 	// register, login, bind, and resetpwd codes are stored apart and cannot be exchanged.
 	SendSmsCode(ctx context.Context, in *SendSmsCodeReq, opts ...grpc.CallOption) (*SendSmsCodeResp, error)
@@ -180,6 +184,16 @@ func (c *userServiceClient) Logout(ctx context.Context, in *LogoutReq, opts ...g
 	return out, nil
 }
 
+func (c *userServiceClient) ReplacePlatformSession(ctx context.Context, in *ReplacePlatformSessionReq, opts ...grpc.CallOption) (*ReplacePlatformSessionResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReplacePlatformSessionResp)
+	err := c.cc.Invoke(ctx, UserService_ReplacePlatformSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) SendSmsCode(ctx context.Context, in *SendSmsCodeReq, opts ...grpc.CallOption) (*SendSmsCodeResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SendSmsCodeResp)
@@ -220,6 +234,9 @@ type UserServiceServer interface {
 	ChangePassword(context.Context, *ChangePasswordReq) (*ChangePasswordResp, error)
 	ValidateToken(context.Context, *ValidateTokenReq) (*ValidateTokenResp, error)
 	Logout(context.Context, *LogoutReq) (*LogoutResp, error)
+	// ReplacePlatformSession revokes every other live token of this token's user
+	// on the same platform. The token in the request stays valid.
+	ReplacePlatformSession(context.Context, *ReplacePlatformSessionReq) (*ReplacePlatformSessionResp, error)
 	// SendSmsCode delivers a one-time code. The code is never returned to the caller.
 	// register, login, bind, and resetpwd codes are stored apart and cannot be exchanged.
 	SendSmsCode(context.Context, *SendSmsCodeReq) (*SendSmsCodeResp, error)
@@ -268,6 +285,9 @@ func (UnimplementedUserServiceServer) ValidateToken(context.Context, *ValidateTo
 }
 func (UnimplementedUserServiceServer) Logout(context.Context, *LogoutReq) (*LogoutResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method Logout not implemented")
+}
+func (UnimplementedUserServiceServer) ReplacePlatformSession(context.Context, *ReplacePlatformSessionReq) (*ReplacePlatformSessionResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReplacePlatformSession not implemented")
 }
 func (UnimplementedUserServiceServer) SendSmsCode(context.Context, *SendSmsCodeReq) (*SendSmsCodeResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendSmsCode not implemented")
@@ -494,6 +514,24 @@ func _UserService_Logout_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_ReplacePlatformSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplacePlatformSessionReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).ReplacePlatformSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_ReplacePlatformSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).ReplacePlatformSession(ctx, req.(*ReplacePlatformSessionReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_SendSmsCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SendSmsCodeReq)
 	if err := dec(in); err != nil {
@@ -580,6 +618,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Logout",
 			Handler:    _UserService_Logout_Handler,
+		},
+		{
+			MethodName: "ReplacePlatformSession",
+			Handler:    _UserService_ReplacePlatformSession_Handler,
 		},
 		{
 			MethodName: "SendSmsCode",

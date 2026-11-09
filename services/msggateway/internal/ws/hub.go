@@ -40,6 +40,19 @@ func (h *Hub) Add(c *Client) (quiet, kicked []*Client) {
 	return quiet, kicked
 }
 
+// Platform copies the connections this process holds for one user on one platform.
+func (h *Hub) Platform(userID string, platformID int) []*Client {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	list := h.users[userID][platformID]
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]*Client, len(list))
+	copy(out, list)
+	return out
+}
+
 func (h *Hub) Remove(c *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

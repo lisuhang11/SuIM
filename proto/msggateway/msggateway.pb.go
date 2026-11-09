@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        v3.21.12
-// source: msggateway.proto
+// source: msggateway/msggateway.proto
 
 package msggatewaypb
 
@@ -21,6 +21,102 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type KickPlatformReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PlatformId    int32                  `protobuf:"varint,2,opt,name=platform_id,json=platformId,proto3" json:"platform_id,omitempty"`
+	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KickPlatformReq) Reset() {
+	*x = KickPlatformReq{}
+	mi := &file_msggateway_msggateway_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KickPlatformReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KickPlatformReq) ProtoMessage() {}
+
+func (x *KickPlatformReq) ProtoReflect() protoreflect.Message {
+	mi := &file_msggateway_msggateway_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KickPlatformReq.ProtoReflect.Descriptor instead.
+func (*KickPlatformReq) Descriptor() ([]byte, []int) {
+	return file_msggateway_msggateway_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *KickPlatformReq) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *KickPlatformReq) GetPlatformId() int32 {
+	if x != nil {
+		return x.PlatformId
+	}
+	return 0
+}
+
+func (x *KickPlatformReq) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type KickPlatformResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KickPlatformResp) Reset() {
+	*x = KickPlatformResp{}
+	mi := &file_msggateway_msggateway_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KickPlatformResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KickPlatformResp) ProtoMessage() {}
+
+func (x *KickPlatformResp) ProtoReflect() protoreflect.Message {
+	mi := &file_msggateway_msggateway_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KickPlatformResp.ProtoReflect.Descriptor instead.
+func (*KickPlatformResp) Descriptor() ([]byte, []int) {
+	return file_msggateway_msggateway_proto_rawDescGZIP(), []int{1}
+}
+
 type GetUsersOnlineStatusReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserIds       []string               `protobuf:"bytes,1,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
@@ -30,7 +126,7 @@ type GetUsersOnlineStatusReq struct {
 
 func (x *GetUsersOnlineStatusReq) Reset() {
 	*x = GetUsersOnlineStatusReq{}
-	mi := &file_msggateway_proto_msgTypes[0]
+	mi := &file_msggateway_msggateway_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +138,7 @@ func (x *GetUsersOnlineStatusReq) String() string {
 func (*GetUsersOnlineStatusReq) ProtoMessage() {}
 
 func (x *GetUsersOnlineStatusReq) ProtoReflect() protoreflect.Message {
-	mi := &file_msggateway_proto_msgTypes[0]
+	mi := &file_msggateway_msggateway_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +151,7 @@ func (x *GetUsersOnlineStatusReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUsersOnlineStatusReq.ProtoReflect.Descriptor instead.
 func (*GetUsersOnlineStatusReq) Descriptor() ([]byte, []int) {
-	return file_msggateway_proto_rawDescGZIP(), []int{0}
+	return file_msggateway_msggateway_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetUsersOnlineStatusReq) GetUserIds() []string {
@@ -74,7 +170,7 @@ type GetUsersOnlineStatusResp struct {
 
 func (x *GetUsersOnlineStatusResp) Reset() {
 	*x = GetUsersOnlineStatusResp{}
-	mi := &file_msggateway_proto_msgTypes[1]
+	mi := &file_msggateway_msggateway_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -86,7 +182,7 @@ func (x *GetUsersOnlineStatusResp) String() string {
 func (*GetUsersOnlineStatusResp) ProtoMessage() {}
 
 func (x *GetUsersOnlineStatusResp) ProtoReflect() protoreflect.Message {
-	mi := &file_msggateway_proto_msgTypes[1]
+	mi := &file_msggateway_msggateway_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -99,7 +195,7 @@ func (x *GetUsersOnlineStatusResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUsersOnlineStatusResp.ProtoReflect.Descriptor instead.
 func (*GetUsersOnlineStatusResp) Descriptor() ([]byte, []int) {
-	return file_msggateway_proto_rawDescGZIP(), []int{1}
+	return file_msggateway_msggateway_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetUsersOnlineStatusResp) GetUsers() []*OnlineUser {
@@ -120,7 +216,7 @@ type OnlineUser struct {
 
 func (x *OnlineUser) Reset() {
 	*x = OnlineUser{}
-	mi := &file_msggateway_proto_msgTypes[2]
+	mi := &file_msggateway_msggateway_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -132,7 +228,7 @@ func (x *OnlineUser) String() string {
 func (*OnlineUser) ProtoMessage() {}
 
 func (x *OnlineUser) ProtoReflect() protoreflect.Message {
-	mi := &file_msggateway_proto_msgTypes[2]
+	mi := &file_msggateway_msggateway_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -145,7 +241,7 @@ func (x *OnlineUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OnlineUser.ProtoReflect.Descriptor instead.
 func (*OnlineUser) Descriptor() ([]byte, []int) {
-	return file_msggateway_proto_rawDescGZIP(), []int{2}
+	return file_msggateway_msggateway_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *OnlineUser) GetUserId() string {
@@ -180,7 +276,7 @@ type Platform struct {
 
 func (x *Platform) Reset() {
 	*x = Platform{}
-	mi := &file_msggateway_proto_msgTypes[3]
+	mi := &file_msggateway_msggateway_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -192,7 +288,7 @@ func (x *Platform) String() string {
 func (*Platform) ProtoMessage() {}
 
 func (x *Platform) ProtoReflect() protoreflect.Message {
-	mi := &file_msggateway_proto_msgTypes[3]
+	mi := &file_msggateway_msggateway_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -205,7 +301,7 @@ func (x *Platform) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Platform.ProtoReflect.Descriptor instead.
 func (*Platform) Descriptor() ([]byte, []int) {
-	return file_msggateway_proto_rawDescGZIP(), []int{3}
+	return file_msggateway_msggateway_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Platform) GetPlatformId() int32 {
@@ -229,12 +325,18 @@ func (x *Platform) GetIsBackground() bool {
 	return false
 }
 
-var File_msggateway_proto protoreflect.FileDescriptor
+var File_msggateway_msggateway_proto protoreflect.FileDescriptor
 
-const file_msggateway_proto_rawDesc = "" +
+const file_msggateway_msggateway_proto_rawDesc = "" +
 	"\n" +
-	"\x10msggateway.proto\x12\n" +
-	"msggateway\"4\n" +
+	"\x1bmsggateway/msggateway.proto\x12\n" +
+	"msggateway\"a\n" +
+	"\x0fKickPlatformReq\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1f\n" +
+	"\vplatform_id\x18\x02 \x01(\x05R\n" +
+	"platformId\x12\x14\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\"\x12\n" +
+	"\x10KickPlatformResp\"4\n" +
 	"\x17GetUsersOnlineStatusReq\x12\x19\n" +
 	"\buser_ids\x18\x01 \x03(\tR\auserIds\"H\n" +
 	"\x18GetUsersOnlineStatusResp\x12,\n" +
@@ -248,62 +350,67 @@ const file_msggateway_proto_rawDesc = "" +
 	"\vplatform_id\x18\x01 \x01(\x05R\n" +
 	"platformId\x12\x17\n" +
 	"\aconn_id\x18\x02 \x01(\tR\x06connId\x12#\n" +
-	"\ris_background\x18\x03 \x01(\bR\fisBackground2o\n" +
+	"\ris_background\x18\x03 \x01(\bR\fisBackground2\xba\x01\n" +
 	"\n" +
 	"MsgGateway\x12a\n" +
-	"\x14GetUsersOnlineStatus\x12#.msggateway.GetUsersOnlineStatusReq\x1a$.msggateway.GetUsersOnlineStatusRespB:Z8github.com/lisuhang11/SuIM/proto/msggateway;msggatewaypbb\x06proto3"
+	"\x14GetUsersOnlineStatus\x12#.msggateway.GetUsersOnlineStatusReq\x1a$.msggateway.GetUsersOnlineStatusResp\x12I\n" +
+	"\fKickPlatform\x12\x1b.msggateway.KickPlatformReq\x1a\x1c.msggateway.KickPlatformRespB:Z8github.com/lisuhang11/SuIM/proto/msggateway;msggatewaypbb\x06proto3"
 
 var (
-	file_msggateway_proto_rawDescOnce sync.Once
-	file_msggateway_proto_rawDescData []byte
+	file_msggateway_msggateway_proto_rawDescOnce sync.Once
+	file_msggateway_msggateway_proto_rawDescData []byte
 )
 
-func file_msggateway_proto_rawDescGZIP() []byte {
-	file_msggateway_proto_rawDescOnce.Do(func() {
-		file_msggateway_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_msggateway_proto_rawDesc), len(file_msggateway_proto_rawDesc)))
+func file_msggateway_msggateway_proto_rawDescGZIP() []byte {
+	file_msggateway_msggateway_proto_rawDescOnce.Do(func() {
+		file_msggateway_msggateway_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_msggateway_msggateway_proto_rawDesc), len(file_msggateway_msggateway_proto_rawDesc)))
 	})
-	return file_msggateway_proto_rawDescData
+	return file_msggateway_msggateway_proto_rawDescData
 }
 
-var file_msggateway_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_msggateway_proto_goTypes = []any{
-	(*GetUsersOnlineStatusReq)(nil),  // 0: msggateway.GetUsersOnlineStatusReq
-	(*GetUsersOnlineStatusResp)(nil), // 1: msggateway.GetUsersOnlineStatusResp
-	(*OnlineUser)(nil),               // 2: msggateway.OnlineUser
-	(*Platform)(nil),                 // 3: msggateway.Platform
+var file_msggateway_msggateway_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_msggateway_msggateway_proto_goTypes = []any{
+	(*KickPlatformReq)(nil),          // 0: msggateway.KickPlatformReq
+	(*KickPlatformResp)(nil),         // 1: msggateway.KickPlatformResp
+	(*GetUsersOnlineStatusReq)(nil),  // 2: msggateway.GetUsersOnlineStatusReq
+	(*GetUsersOnlineStatusResp)(nil), // 3: msggateway.GetUsersOnlineStatusResp
+	(*OnlineUser)(nil),               // 4: msggateway.OnlineUser
+	(*Platform)(nil),                 // 5: msggateway.Platform
 }
-var file_msggateway_proto_depIdxs = []int32{
-	2, // 0: msggateway.GetUsersOnlineStatusResp.users:type_name -> msggateway.OnlineUser
-	3, // 1: msggateway.OnlineUser.platforms:type_name -> msggateway.Platform
-	0, // 2: msggateway.MsgGateway.GetUsersOnlineStatus:input_type -> msggateway.GetUsersOnlineStatusReq
-	1, // 3: msggateway.MsgGateway.GetUsersOnlineStatus:output_type -> msggateway.GetUsersOnlineStatusResp
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
+var file_msggateway_msggateway_proto_depIdxs = []int32{
+	4, // 0: msggateway.GetUsersOnlineStatusResp.users:type_name -> msggateway.OnlineUser
+	5, // 1: msggateway.OnlineUser.platforms:type_name -> msggateway.Platform
+	2, // 2: msggateway.MsgGateway.GetUsersOnlineStatus:input_type -> msggateway.GetUsersOnlineStatusReq
+	0, // 3: msggateway.MsgGateway.KickPlatform:input_type -> msggateway.KickPlatformReq
+	3, // 4: msggateway.MsgGateway.GetUsersOnlineStatus:output_type -> msggateway.GetUsersOnlineStatusResp
+	1, // 5: msggateway.MsgGateway.KickPlatform:output_type -> msggateway.KickPlatformResp
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
 	2, // [2:2] is the sub-list for extension extendee
 	0, // [0:2] is the sub-list for field type_name
 }
 
-func init() { file_msggateway_proto_init() }
-func file_msggateway_proto_init() {
-	if File_msggateway_proto != nil {
+func init() { file_msggateway_msggateway_proto_init() }
+func file_msggateway_msggateway_proto_init() {
+	if File_msggateway_msggateway_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_msggateway_proto_rawDesc), len(file_msggateway_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_msggateway_msggateway_proto_rawDesc), len(file_msggateway_msggateway_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_msggateway_proto_goTypes,
-		DependencyIndexes: file_msggateway_proto_depIdxs,
-		MessageInfos:      file_msggateway_proto_msgTypes,
+		GoTypes:           file_msggateway_msggateway_proto_goTypes,
+		DependencyIndexes: file_msggateway_msggateway_proto_depIdxs,
+		MessageInfos:      file_msggateway_msggateway_proto_msgTypes,
 	}.Build()
-	File_msggateway_proto = out.File
-	file_msggateway_proto_goTypes = nil
-	file_msggateway_proto_depIdxs = nil
+	File_msggateway_msggateway_proto = out.File
+	file_msggateway_msggateway_proto_goTypes = nil
+	file_msggateway_msggateway_proto_depIdxs = nil
 }

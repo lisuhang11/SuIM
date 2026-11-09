@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -141,6 +142,31 @@ func (r *etcdRegistry) deregisterLocked() error {
 	r.key = ""
 	r.keepAliveCh = nil
 	return firstErr
+}
+
+func (r *etcdRegistry) List(ctx context.Context, service string) ([]ServiceInstance, error) {
+	if service == "" {
+		return nil, fmt.Errorf("service name is required")
+	}
+	prefix := fmt.Sprintf("services/%s/", url.PathEscape(service))
+	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("list %s: %w", service, err)
+	}
+	out := make([]ServiceInstance, 0, len(resp.Kvs))
+	for _, kv := range resp.Kvs {
+		var meta map[string]string
+		if err := json.Unmarshal(kv.Value, &meta); err != nil {
+			return nil, fmt.Errorf("decode %s: %w", kv.Key, err)
+		}
+		addr := strings.TrimSpace(meta["Addr"])
+		if addr == "" {
+			continue
+		}
+		id := strings.TrimPrefix(string(kv.Key), prefix)
+		out = append(out, ServiceInstance{ID: id, Name: service, Addr: addr})
+	}
+	return out, nil
 }
 
 func (r *etcdRegistry) Dial(ctx context.Context, service string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {

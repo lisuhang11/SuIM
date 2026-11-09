@@ -29,6 +29,7 @@ type Client struct {
 	server     *Server
 	closed     atomic.Bool
 	kicked     atomic.Bool
+	keepOnline atomic.Bool
 	subs       map[string]struct{}
 }
 
@@ -127,15 +128,32 @@ func (c *Client) Kick() {
 	c.close()
 }
 
+// replaced closes this socket because another gateway accepted the platform.
+// The shared online record stays with that gateway. A different token receives 2002.
+func (c *Client) replaced(token string) {
+	c.keepOnline.Store(true)
+	if c.token != token {
+		c.Kick()
+		return
+	}
+	c.close()
+}
+
 func (c *Client) close() {
 	if !c.closed.CompareAndSwap(false, true) {
 		return
 	}
 	c.server.hub.Remove(c)
-	if !c.server.stillLocal(c.userID, c.platformID) {
+	if !c.keepOnline.Load() && !c.server.stillLocal(c.userID, c.platformID) {
 		c.server.report(c.userID, nil, []int32{int32(c.platformID)})
 	}
 	_ = c.conn.Close()
+	if c.keepOnline.Load() {
+		if c.kicked.Load() {
+			c.server.afterUserKickOff(c)
+		}
+		return
+	}
 	c.server.notifyOnline(c.userID)
 	if c.kicked.Load() {
 		c.server.afterUserKickOff(c)

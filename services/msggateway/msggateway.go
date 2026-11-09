@@ -109,6 +109,7 @@ func run(cfgPath string) error {
 		defer hooks.Close()
 	}
 	w := cfg.Webhooks
+	addr := fmt.Sprintf("%s:%d", cfg.RegisterIP, cfg.RPCPort)
 	server := ws.New(ws.Options{
 		Tokens:           rpc.NewUserClient(userpb.NewUserServiceClient(userConn)),
 		Groups:           groupClient,
@@ -118,6 +119,9 @@ func run(cfgPath string) error {
 		Calls:            call.New(rdb),
 		Signals:          rpc.NewRtcClient(rtcpb.NewRtcServiceClient(rtcConn)),
 		Online:           online.New(rdb),
+		Gateways:         gatewayList{reg: reg},
+		Kick:             rpc.GatewayKick{},
+		SelfAddr:         addr,
 		MaxConn:          cfg.MaxConn,
 		HandshakeTimeout: time.Duration(cfg.HandshakeTimeoutSec) * time.Second,
 		Hooks: ws.Hooks{
@@ -156,7 +160,6 @@ func run(cfgPath string) error {
 		_ = rpcLis.Close()
 		return err
 	}
-	addr := fmt.Sprintf("%s:%d", cfg.RegisterIP, cfg.RPCPort)
 	regCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	err = reg.Register(regCtx, &register.ServiceInstance{ID: id, Name: "msggateway", Addr: addr})
 	cancel()
@@ -219,6 +222,27 @@ func (g groups) Joined(ctx context.Context, userID string) ([]ws.JoinedGroup, er
 	out := make([]ws.JoinedGroup, len(joined))
 	for i, item := range joined {
 		out[i] = ws.JoinedGroup{ID: item.ID, Super: item.Super}
+	}
+	return out, nil
+}
+
+type gatewayList struct {
+	reg register.Registry
+}
+
+func (g gatewayList) Addrs(ctx context.Context) ([]string, error) {
+	if g.reg == nil {
+		return nil, nil
+	}
+	items, err := g.reg.List(ctx, "msggateway")
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.Addr != "" {
+			out = append(out, item.Addr)
+		}
 	}
 	return out, nil
 }

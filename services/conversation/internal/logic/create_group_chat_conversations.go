@@ -10,8 +10,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/conversation/internal/model"
 )
 
-// CreateGroupChatConversations writes one row per member.
-// A repeated call leaves existing rows in place. Each member's visible ceiling is cleared to zero.
+// 为每名成员写一行群会话。重复调用不覆盖已有行，并把每人的可见上限清成 0。
 func (s *Server) CreateGroupChatConversations(ctx context.Context, req *conversationpb.CreateGroupChatConversationsReq) (*conversationpb.CreateGroupChatConversationsResp, error) {
 	groupID := strings.TrimSpace(req.GetGroupId())
 	if groupID == "" || len(groupID) > 64 || strings.Contains(groupID, ":") {

@@ -9,9 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/conversation/internal/model"
 )
 
-// CreateSingleChatConversations writes the rows for a new single chat or notification chat.
-// A repeated call leaves the existing rows in place. No conversation-change notice is sent.
-// Notification chats (type 4) have one row, owned by the receiver.
+// 为新的单聊或通知会话写行。重复调用不覆盖已有行，也不发会话变更通知。通知会话只有接收方一行。
 func (s *Server) CreateSingleChatConversations(ctx context.Context, req *conversationpb.CreateSingleChatConversationsReq) (*conversationpb.CreateSingleChatConversationsResp, error) {
 	sendID, err := normalizeUserID(req.GetSendId())
 	if err != nil {

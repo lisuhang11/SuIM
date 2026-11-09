@@ -8,7 +8,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// GetFullGroupMemberUserIDs 返回成员 ID 和版本。调用者必须已经在群里。
+// 返回成员 ID 和版本。调用者必须已经在群里。
 func (s *Server) GetFullGroupMemberUserIDs(ctx context.Context, req *grouppb.GetFullGroupMemberUserIDsReq) (*grouppb.GetFullGroupMemberUserIDsResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

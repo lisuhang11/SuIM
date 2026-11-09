@@ -9,7 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 )
 
-// UpdateGroupInfo 群主或管理员修改群名、公告、简介、头像和入群设置。
+// 群主或管理员修改群名、公告、简介、头像和入群设置。
 func (s *Server) UpdateGroupInfo(ctx context.Context, req *grouppb.UpdateGroupInfoReq) (*grouppb.UpdateGroupInfoResp, error) {
 	// 操作者取上下文里的用户。
 	groupID, err := normalizeGroupID(req.GetGroupId())

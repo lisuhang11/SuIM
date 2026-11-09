@@ -8,6 +8,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
+// 一次查询多个群的成员变更。一批最多 100 个群，重复的群只算一次。
 func (s *Server) BatchGetIncrementalGroupMembers(ctx context.Context, req *grouppb.BatchGetIncrementalGroupMembersReq) (*grouppb.BatchGetIncrementalGroupMembersResp, error) {
 	// 1. 一批最多 100 个群，重复的群 ID 只算一次。
 	userID, err := bindActor(ctx, req.GetUserId())

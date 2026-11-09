@@ -14,7 +14,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/token"
 )
 
-// Hooks carries the user webhook client and callback switches.
+// 用户 webhook 客户端和各回调开关。
 type Hooks struct {
 	Client                 *webhook.Client
 	BeforeUserRegister     webhook.BeforeConfig
@@ -25,6 +25,7 @@ type Hooks struct {
 	AfterUpdateUserInfoEx  webhook.AfterConfig
 }
 
+// 用户 gRPC 服务。资料修改和删除都由令牌里的用户发起。
 type Server struct {
 	userpb.UnimplementedUserServiceServer
 	store     *store.Store
@@ -40,6 +41,7 @@ type Server struct {
 	pepper    string
 }
 
+// 用存储、令牌签发和令牌缓存构造用户服务。
 func New(st *store.Store, issuer *token.Issuer, tokens localcache.Cache[*model.Token]) *Server {
 	return &Server{
 		store:  st,
@@ -50,7 +52,7 @@ func New(st *store.Store, issuer *token.Issuer, tokens localcache.Cache[*model.T
 	}
 }
 
-// UseProfiles turns on the user-row cache. A nil cache keeps every read on MySQL.
+// 打开用户行缓存。传入 nil 时每次都读 MySQL。
 func (s *Server) UseProfiles(profiles *Profiles) {
 	if s != nil {
 		s.profiles = profiles
@@ -70,7 +72,18 @@ func (s *Server) dropProfile(ctx context.Context, userID string) {
 	}
 }
 
-// UseHooks attaches webhook switches. A nil client leaves every callback disabled.
+// 接入短信发送、人机校验、频率策略和验证码哈希盐。
+func (s *Server) UseSMS(sender SMSSender, captcha CaptchaChecker, policy SMSPolicy, pepper string) {
+	if s == nil {
+		return
+	}
+	s.smsSender = sender
+	s.captcha = captcha
+	s.policy = policy
+	s.pepper = pepper
+}
+
+// 接入 webhook 开关。客户端为 nil 时所有回调都不执行。
 func (s *Server) UseHooks(hooks Hooks) {
 	if s != nil {
 		s.hooks = hooks
@@ -84,7 +97,7 @@ func (s *Server) invalidate(ctx context.Context, hashes []string) {
 	s.tokens.Del(ctx, hashes...)
 }
 
-// toPublic is the card returned to anyone other than the profile owner.
+// 返回给资料主人以外的人的名片，不含账号和手机号。
 func toPublic(u *model.User) *userpb.UserInfo {
 	return &userpb.UserInfo{
 		UserId:         u.UserID,
@@ -102,8 +115,7 @@ func projectUser(u *model.User, viewerID string) *userpb.UserInfo {
 	return toPublic(u)
 }
 
-// actorID is the session user for a mutating RPC. An empty requested ID means
-// the token user. A different ID is rejected before any read or write.
+// 修改类接口使用的会话用户。请求里的用户 ID 为空时就是令牌用户，填了别人则在读写之前拒绝。
 func (s *Server) actorID(ctx context.Context, raw, requested string) (string, error) {
 	claims, _, err := s.loadUsable(ctx, strings.TrimSpace(raw), model.TokenType)
 	if err != nil {

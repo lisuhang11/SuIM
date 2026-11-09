@@ -6,7 +6,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// GetJoinedGroups 分页返回用户已加入的群。
+// 分页返回用户已加入的群。
 func (s *Server) GetJoinedGroups(ctx context.Context, req *grouppb.GetJoinedGroupsReq) (*grouppb.GetJoinedGroupsResp, error) {
 	userID, err := bindActor(ctx, req.GetUserId())
 	if err != nil {

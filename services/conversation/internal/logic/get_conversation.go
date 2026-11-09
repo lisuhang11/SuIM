@@ -8,8 +8,7 @@ import (
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 )
 
-// GetConversation returns one conversation owned by the caller.
-// A missing row is not found. Another user's row is not readable.
+// 返回调用者自己的一行会话。没有这一行是未找到，别人的行不能读。
 func (s *Server) GetConversation(ctx context.Context, req *conversationpb.GetConversationReq) (*conversationpb.GetConversationResp, error) {
 	owner, err := actorID(ctx, req.GetOwnerUserId())
 	if err != nil {

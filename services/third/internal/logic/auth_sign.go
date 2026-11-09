@@ -9,6 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/third/internal/model"
 )
 
+// 为调用者自己的未过期上传签发分片地址。别人的 upload_id 不能签。
 func (s *Server) AuthSign(ctx context.Context, req *thirdpb.AuthSignReq) (*thirdpb.AuthSignResp, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

@@ -20,16 +20,9 @@ const (
 	joinPerHour   = 20
 )
 
-// Quota counts how often one user creates groups, invites people, or joins.
+// 统计一个用户创建群、邀请和入群的次数。
 type Quota interface {
 	Reserve(ctx context.Context, limits []store.Limit) error
-}
-
-// UseQuota attaches the Redis counters. A nil quota leaves the three actions unlimited.
-func (s *Server) UseQuota(q Quota) {
-	if s != nil {
-		s.quota = q
-	}
 }
 
 func (s *Server) reserveCreate(ctx context.Context, userID string) error {

@@ -6,7 +6,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// CancelMuteGroup 解除全员禁言。已解散的群保持解散，不会被改回正常。
+// 解除全员禁言。已解散的群保持解散，不会被改回正常。
 func (s *Server) CancelMuteGroup(ctx context.Context, req *grouppb.CancelMuteGroupReq) (*grouppb.CancelMuteGroupResp, error) {
 	op, err := bindActor(ctx, req.GetOpUserId())
 	if err != nil {

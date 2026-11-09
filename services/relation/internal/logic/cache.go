@@ -7,14 +7,6 @@ import (
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 )
 
-// UseCache attaches the Redis and process-local friend cache.
-// A nil cache keeps every read on MySQL, which is how the in-process tests run.
-func (s *Server) UseCache(lists *relationcache.Lists) {
-	if s != nil {
-		s.lists = lists
-	}
-}
-
 func (s *Server) friendIDs(ctx context.Context, owner string) ([]string, error) {
 	if s.lists == nil {
 		return s.store.FriendUserIDs(ctx, owner)

@@ -13,6 +13,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 用手机号和短信验证码注册。手机号已被占用或验证码不对时拒绝。
 func (s *Server) RegisterPhone(ctx context.Context, req *userpb.RegisterPhoneReq) (*userpb.RegisterPhoneResp, error) {
 	version := strings.TrimSpace(req.GetProtocolVersion())
 	if !req.GetAgreeProtocol() || version == "" || len(version) > 32 {

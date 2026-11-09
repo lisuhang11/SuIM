@@ -6,7 +6,7 @@ import (
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 )
 
-// GetPinnedConversationIDs lists the caller's pinned conversations.
+// 返回调用者置顶的会话。
 func (s *Server) GetPinnedConversationIDs(ctx context.Context, req *conversationpb.GetPinnedConversationIDsReq) (*conversationpb.GetPinnedConversationIDsResp, error) {
 	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {

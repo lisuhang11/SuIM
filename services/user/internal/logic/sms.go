@@ -7,18 +7,17 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
-// SMSSender delivers a one-time code. The code must not be logged unless the
-// process was started with sms.debugLogCode.
+// 投递一次性验证码。除非进程以短信调试日志启动，否则不能把验证码写进日志。
 type SMSSender interface {
 	Send(ctx context.Context, phone, code, scene string) (string, error)
 }
 
-// CaptchaChecker verifies a provider ticket. A client-supplied string is not proof.
+// 校验服务商票据。客户端自己填的字符串不算通过。
 type CaptchaChecker interface {
 	Verify(ctx context.Context, ticket, phone, scene, ip string) error
 }
 
-// SMSPolicy is the send-side limit and code lifetime configuration.
+// 发送侧的频率限制和验证码有效期。
 type SMSPolicy struct {
 	CodeTTL          time.Duration
 	RetryTTL         time.Duration
@@ -34,16 +33,7 @@ type SMSPolicy struct {
 	BlacklistDevices map[string]struct{}
 }
 
-func (s *Server) UseSMS(sender SMSSender, captcha CaptchaChecker, policy SMSPolicy, pepper string) {
-	if s == nil {
-		return
-	}
-	s.smsSender = sender
-	s.captcha = captcha
-	s.policy = policy
-	s.pepper = pepper
-}
-
+// 接入短信发送、人机校验、频率策略和验证码哈希盐。
 func (s *Server) smsBlocked(ctx context.Context, key, ip, device string) (bool, error) {
 	if inSet(s.policy.BlacklistPhones, key) || inSet(s.policy.BlacklistIPs, ip) || inSet(s.policy.BlacklistDevices, device) {
 		return true, nil

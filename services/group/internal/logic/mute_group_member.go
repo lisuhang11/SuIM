@@ -8,7 +8,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// MuteGroupMember 禁言一名成员。群主不能被禁言，管理员只有群主能禁言。
+// 禁言一名成员。群主不能被禁言，管理员只有群主能禁言。
 func (s *Server) MuteGroupMember(ctx context.Context, req *grouppb.MuteGroupMemberReq) (*grouppb.MuteGroupMemberResp, error) {
 	op, err := bindActor(ctx, req.GetOpUserId())
 	if err != nil {

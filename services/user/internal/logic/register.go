@@ -14,6 +14,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 用邮箱、昵称和密码注册。邮箱已被占用时拒绝。
 func (s *Server) Register(ctx context.Context, req *userpb.RegisterReq) (*userpb.RegisterResp, error) {
 	// 1. 校验邮箱、昵称和密码。
 	email, nickname, err := normalizeAccount(req.GetEmail(), req.GetUsername())

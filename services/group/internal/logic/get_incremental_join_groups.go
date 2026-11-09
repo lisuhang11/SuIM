@@ -7,6 +7,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
+// 按版本返回调用者的入群变更。版本对不上或差额达到限额时只返回 full，不带群资料。
 func (s *Server) GetIncrementalJoinGroups(ctx context.Context, req *grouppb.GetIncrementalJoinGroupsReq) (*grouppb.GetIncrementalJoinGroupsResp, error) {
 	// 1. 校验用户。调用方必须是上下文里的本人。
 	userID, err := bindActor(ctx, req.GetUserId())

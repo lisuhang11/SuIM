@@ -7,6 +7,7 @@ import (
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 )
 
+// 按版本返回调用者的会话变更。版本对不上或差额达到限额时只返回 full。
 func (s *Server) GetIncrementalConversation(ctx context.Context, req *conversationpb.GetIncrementalConversationReq) (*conversationpb.GetIncrementalConversationResp, error) {
 	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {

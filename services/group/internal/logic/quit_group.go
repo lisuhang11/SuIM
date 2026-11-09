@@ -8,7 +8,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 )
 
-// QuitGroup 成员退出群。群主不能退群。
+// 成员退出群。群主不能退群。
 func (s *Server) QuitGroup(ctx context.Context, req *grouppb.QuitGroupReq) (*grouppb.QuitGroupResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

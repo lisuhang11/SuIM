@@ -11,6 +11,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/token"
 )
 
+// 确认令牌签名正确且会话仍有效。账号已停用或不存在时视为无效。
 func (s *Server) ValidateToken(ctx context.Context, req *userpb.ValidateTokenReq) (*userpb.ValidateTokenResp, error) {
 	// 1. 解析 token，并核对该会话仍有效。
 	claims, _, err := s.loadUsable(ctx, req.GetToken(), model.TokenType)

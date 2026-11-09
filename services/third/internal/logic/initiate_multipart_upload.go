@@ -8,6 +8,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/third/internal/model"
 )
 
+// 按文件大小开始分片上传。相同哈希已有对象时直接复用，不再上传。
 func (s *Server) InitiateMultipartUpload(ctx context.Context, req *thirdpb.InitiateMultipartUploadReq) (*thirdpb.InitiateMultipartUploadResp, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

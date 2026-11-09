@@ -7,7 +7,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 )
 
-// groupIDFromConversation reports the group id carried by a group or group-notification conversation.
+// 从群会话或群通知会话的 ID 里取出群 ID。单聊和带下划线的通知 ID 不算群。
 func groupIDFromConversation(conversationID string) (string, bool) {
 	switch {
 	case strings.HasPrefix(conversationID, "sg_"):
@@ -24,10 +24,7 @@ func groupIDFromConversation(conversationID string) (string, bool) {
 	}
 }
 
-// visibleSeqs is the sequence window this user may read.
-// A current member follows the conversation, tightened by a personal minimum or ceiling.
-// Someone who has left can read only up to the ceiling stored when they left.
-// Zero is not a ceiling, so a stranger with no row cannot read the group.
+// 这个用户能读的序号窗口。在群成员跟随会话，并受个人上下限收紧。已退群的人只能读到离群时记下的上限。0 不是上限，没有记录的外人读不到。
 func (s *Server) visibleSeqs(ctx context.Context, userID, conversationID string) (int64, int64, error) {
 	groupID, group := groupIDFromConversation(conversationID)
 	if !group {

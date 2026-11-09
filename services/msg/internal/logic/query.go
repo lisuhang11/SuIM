@@ -9,7 +9,7 @@ import (
 
 const orderDesc = 1
 
-// seqWindow keeps sequences inside [minSeq, maxSeq]. Order only decides which side is the end.
+// 把序号收进闭区间。参数顺序只决定哪一端是终点。
 func seqWindow(order int32, minSeq, maxSeq int64, seqs []int64) (wanted []int64, isEnd bool, endSeq int64) {
 	for _, seq := range seqs {
 		if seq <= 0 {

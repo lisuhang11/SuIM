@@ -8,8 +8,9 @@ import (
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 )
 
+// 分页返回调用者自己的好友。
 func (s *Server) GetFriendList(ctx context.Context, req *relationpb.GetFriendListReq) (*relationpb.GetFriendListResp, error) {
-	// 1. 校验用户和分页。调用方必须是本人，操作者身份尚未从上下文接入。
+	// 1. 校验用户和分页。调用方必须是本人。
 	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err

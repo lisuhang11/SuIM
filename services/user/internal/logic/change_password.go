@@ -11,6 +11,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 修改调用者自己的密码。user_id 为空就是自己，填了别人则拒绝。
 func (s *Server) ChangePassword(ctx context.Context, req *userpb.ChangePasswordReq) (*userpb.ChangePasswordResp, error) {
 	// 1. 用会话确定操作者，再校验新密码。
 	id, err := s.actorID(ctx, req.GetToken(), req.GetUserId())

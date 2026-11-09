@@ -9,6 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 删除调用者自己的账号和全部令牌。user_id 为空就是自己，填了别人则拒绝。
 func (s *Server) DeleteUser(ctx context.Context, req *userpb.DeleteUserReq) (*userpb.DeleteUserResp, error) {
 	// 1. 用会话确定操作者。user_id 为空则删自己，填了别人则拒绝。
 	id, err := s.actorID(ctx, req.GetToken(), req.GetUserId())

@@ -8,7 +8,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 )
 
-// KickGroupMember 把成员移出群。群主可踢管理员和普通成员，管理员只能踢普通成员。
+// 把成员移出群。群主可踢管理员和普通成员，管理员只能踢普通成员。
 func (s *Server) KickGroupMember(ctx context.Context, req *grouppb.KickGroupMemberReq) (*grouppb.KickGroupMemberResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

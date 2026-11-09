@@ -6,7 +6,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// CancelMuteGroupMember 解除一名成员的禁言。权限和禁言相同。
+// 解除一名成员的禁言。权限和禁言相同。
 func (s *Server) CancelMuteGroupMember(ctx context.Context, req *grouppb.CancelMuteGroupMemberReq) (*grouppb.CancelMuteGroupMemberResp, error) {
 	op, err := bindActor(ctx, req.GetOpUserId())
 	if err != nil {

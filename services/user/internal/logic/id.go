@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// 生成一个随机用户 ID。
 func NewID() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {

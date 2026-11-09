@@ -10,8 +10,9 @@ import (
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
 
+// 由被申请人同意或拒绝一条未处理的好友申请。
 func (s *Server) RespondFriendApply(ctx context.Context, req *relationpb.RespondFriendApplyReq) (*relationpb.RespondFriendApplyResp, error) {
-	// 1. 校验双方 userID。调用方必须是被申请人，操作者身份尚未从上下文接入。
+	// 1. 校验双方 userID。调用方必须是被申请人。
 	from, err := normalizeUserID(req.GetFromUserId())
 	if err != nil {
 		return nil, err

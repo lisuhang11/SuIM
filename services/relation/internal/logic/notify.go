@@ -27,8 +27,7 @@ const (
 	optOfflinePush     = "offlinePush"
 )
 
-// friendNoticeOptions 按 OpenIM 的默认通知配置。
-// 只有同意会进单聊并计未读。通知副本不落历史。申请、同意、拒绝打开离线推送。
+// 按 OpenIM 的默认通知配置。 只有同意会进单聊并计未读。通知副本不落历史。申请、同意、拒绝打开离线推送。
 func friendNoticeOptions(sendMessage, offline bool) map[string]bool {
 	return map[string]bool{
 		optNotNotification: false,

@@ -6,7 +6,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// MuteGroup 全员禁言。群主和管理员可以发言，已解散的群不能改状态。
+// 全员禁言。群主和管理员可以发言，已解散的群不能改状态。
 func (s *Server) MuteGroup(ctx context.Context, req *grouppb.MuteGroupReq) (*grouppb.MuteGroupResp, error) {
 	op, err := bindActor(ctx, req.GetOpUserId())
 	if err != nil {

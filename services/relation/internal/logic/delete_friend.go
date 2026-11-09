@@ -9,6 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
 
+// 只删除调用者这一侧的好友关系。对方的好友行还在。
 func (s *Server) DeleteFriend(ctx context.Context, req *relationpb.DeleteFriendReq) (*relationpb.DeleteFriendResp, error) {
 	// 1. 校验双方 userID。关系拥有者取上下文里的用户。
 	owner, err := actorID(ctx, req.GetUserId())

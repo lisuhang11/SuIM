@@ -8,6 +8,7 @@ import (
 	relationpb "github.com/lisuhang11/SuIM/proto/relation"
 )
 
+// 分别返回两人是否把对方拉黑。调用者必须是其中一人。
 func (s *Server) IsBlack(ctx context.Context, req *relationpb.IsBlackReq) (*relationpb.IsBlackResp, error) {
 	// 1. 校验双方 userID。上下文里的用户必须是其中一人。
 	user1, err := normalizeUserID(req.GetUser1())

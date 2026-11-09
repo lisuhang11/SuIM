@@ -33,12 +33,14 @@ func newBatcher(size, workers int, interval time.Duration, do func(context.Conte
 	return &batcher{size: size, interval: interval, in: in, do: do}
 }
 
+// 按分片启动批处理。同一个会话键始终进同一个 worker。
 func (b *batcher) Start(ctx context.Context) {
 	for i := range b.in {
 		go b.run(ctx, b.in[i])
 	}
 }
 
+// 把一条消息放进它的分片。上下文取消时不再入队。
 func (b *batcher) Put(ctx context.Context, msg *mq.Message) error {
 	n := int(hashKey(msg.Key) % uint32(len(b.in)))
 	select {

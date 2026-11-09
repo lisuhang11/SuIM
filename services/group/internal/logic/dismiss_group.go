@@ -8,9 +8,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 )
 
-// DismissGroup 群主解散群。
-// delete_member 为空时只改状态并发送 1511，成员行留着，方便把解散提示推给现有成员。
-// delete_member 为 true 时删掉全部成员并记入入群版本，不再发提示，也不冻历史。
+// 群主解散群。 delete_member 为空时只改状态并发送 1511，成员行留着，方便把解散提示推给现有成员。 delete_member 为 true 时删掉全部成员并记入入群版本，不再发提示，也不冻历史。
 func (s *Server) DismissGroup(ctx context.Context, req *grouppb.DismissGroupReq) (*grouppb.DismissGroupResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

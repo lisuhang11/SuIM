@@ -10,7 +10,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/store"
 )
 
-// JoinGroup 用户主动入群。群设置为直接加入时写入成员，否则只写入申请。
+// 用户主动入群。群设置为直接加入时写入成员，否则只写入申请。
 func (s *Server) JoinGroup(ctx context.Context, req *grouppb.JoinGroupReq) (*grouppb.JoinGroupResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

@@ -6,9 +6,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 )
 
-// Plan chooses the part size for size bytes.
-// Files that fit in MinPartSize * MaxNumSize use MinPartSize.
-// Larger files use the smallest size that stays within MaxNumSize parts.
+// 按字节数选择分片大小。放得进最小分片乘最大片数时用最小分片，否则用仍不超过最大片数的最小尺寸。
 func Plan(limits Limits, size int64) (partSize int64, count int, err error) {
 	if size <= 0 {
 		return 0, 0, errorcode.ErrThirdInvalidArgs.WithMsg("size must be greater than 0")

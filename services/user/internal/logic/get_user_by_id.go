@@ -9,6 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 按用户 ID 取资料。没有令牌或令牌不是本人时只返回公开名片，不存在则报未找到。
 func (s *Server) GetUserByID(ctx context.Context, req *userpb.GetUserByIDReq) (*userpb.GetUserByIDResp, error) {
 	// 1. 校验用户 ID。
 	id, err := normalizeUserID(req.GetUserId())

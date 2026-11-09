@@ -16,8 +16,7 @@ type memberEdit struct {
 	profile bool
 }
 
-// SetGroupMemberInfo 修改群成员的昵称、头像、角色和扩展字段。
-// 不能把任何人设成群主。任命或调整他人角色只留给群主，管理员只能把自己降为普通成员。
+// 修改群成员的昵称、头像、角色和扩展字段。 不能把任何人设成群主。任命或调整他人角色只留给群主，管理员只能把自己降为普通成员。
 func (s *Server) SetGroupMemberInfo(ctx context.Context, req *grouppb.SetGroupMemberInfoReq) (*grouppb.SetGroupMemberInfoResp, error) {
 	op, err := bindActor(ctx, req.GetOpUserId())
 	if err != nil {
@@ -169,8 +168,7 @@ func allowMemberEdit(op, target *model.Member, patch model.MemberPatch) error {
 	}
 }
 
-// allowRoleChange 只让群主改变别人的角色。角色没变时不拦截。
-// 管理员不能任命管理员，只能把自己降为普通成员。群主不能改自己的角色，转让走单独的接口。
+// 只让群主改变别人的角色。角色没变时不拦截。 管理员不能任命管理员，只能把自己降为普通成员。群主不能改自己的角色，转让走单独的接口。
 func allowRoleChange(op, target *model.Member, role *int32) error {
 	if role == nil || *role == target.RoleLevel {
 		return nil

@@ -9,6 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/third/internal/model"
 )
 
+// 表单上传完成后登记对象名。会话过期或不属于调用者时拒绝。
 func (s *Server) CompleteFormData(ctx context.Context, req *thirdpb.CompleteFormDataReq) (*thirdpb.CompleteFormDataResp, error) {
 	if err := checkMeta("", "", req.GetUrlPrefix()); err != nil {
 		return nil, err

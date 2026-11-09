@@ -8,7 +8,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
-// MarkConversationAsRead advances the read cursor. Single chat also marks each sequence.
+// 把已读游标推到指定序号。单聊还会把游标之间的每条标成已读。
 func (s *Server) MarkConversationAsRead(ctx context.Context, req *msgpb.MarkConversationAsReadReq) (*msgpb.MarkConversationAsReadResp, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

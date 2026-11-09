@@ -68,7 +68,7 @@ func (s *Server) memberOf(ctx context.Context, groupID, userID string) (*model.M
 	return member, nil
 }
 
-// requireMember rejects callers who are not in the group. A dismissed group still allows its members.
+// 调用者不在群里时拒绝。群已解散时，仍在成员表里的人可以通过。
 func (s *Server) requireMember(ctx context.Context, groupID, userID string) error {
 	userID, err := normalizeUserID(userID)
 	if err != nil {

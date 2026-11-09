@@ -10,6 +10,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 只按用户 ID 精确查找。邮箱、账号和手机号不参与，查不到时返回空列表。别人只能看到公开名片。
 func (s *Server) SearchUsers(ctx context.Context, req *userpb.SearchUsersReq) (*userpb.SearchUsersResp, error) {
 	// 1. 只按用户 ID 精确查找。邮箱、账号、手机号不参与匹配。
 	keyword := strings.TrimSpace(req.GetKeyword())

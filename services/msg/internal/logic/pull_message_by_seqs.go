@@ -7,6 +7,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
+// 按序号区间拉取消息。通知会话和普通会话分开返回，区间外的序号不出现。
 func (s *Server) PullMessageBySeqs(ctx context.Context, req *msgpb.PullMessageBySeqsReq) (*msgpb.PushMessages, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

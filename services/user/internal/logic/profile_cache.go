@@ -21,8 +21,7 @@ const (
 	profileTTL    = 12 * time.Hour
 )
 
-// Profiles caches a user row by user id. Login still reads MySQL so the password
-// hash never has to be served from this cache.
+// 按用户 ID 缓存用户行。登录仍读 MySQL，密码哈希不从这里返回。
 type Profiles struct {
 	rdb   redis.UniversalClient
 	store *store.Store
@@ -30,7 +29,7 @@ type Profiles struct {
 	local localcache.Cache[*model.User]
 }
 
-// NewProfileCache starts the local profile cache and subscribes to deletes from other instances.
+// 启动本进程的资料缓存，并订阅其他实例发来的删除。
 func NewProfileCache(ctx context.Context, rdb redis.UniversalClient, st *store.Store, cfg svcconfig.LocalCache) (*Profiles, func()) {
 	if cfg.Topic == "" {
 		cfg.Topic = "suim:user:profile:delete"
@@ -68,6 +67,7 @@ func NewProfileCache(ctx context.Context, rdb redis.UniversalClient, st *store.S
 	}
 }
 
+// 按用户 ID 取资料。本进程和 Redis 都没有时读 MySQL。
 func (p *Profiles) Get(ctx context.Context, userID string) (*model.User, error) {
 	user, err := p.local.Get(ctx, userID, func(ctx context.Context) (*model.User, error) {
 		if p.rdb != nil {
@@ -96,7 +96,7 @@ func (p *Profiles) Get(ctx context.Context, userID string) (*model.User, error) 
 	return publicCopy(user), nil
 }
 
-// Drop removes the profile from Redis and from this process, and tells other instances to drop it.
+// 从 Redis 和本进程删掉这份资料，并通知其他实例删除。
 func (p *Profiles) Drop(ctx context.Context, userIDs ...string) {
 	if p == nil {
 		return

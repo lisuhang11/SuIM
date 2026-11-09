@@ -10,6 +10,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 用手机号和短信验证码登录并签发令牌。验证码错误或过期时拒绝。
 func (s *Server) LoginPhone(ctx context.Context, req *userpb.LoginPhoneReq) (*userpb.LoginResp, error) {
 	if req.GetPlatformId() <= 0 {
 		return nil, errorcode.ErrUserInvalidLogin.WithMsg("platform_id is required")

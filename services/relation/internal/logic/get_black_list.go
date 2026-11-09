@@ -8,6 +8,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 )
 
+// 分页返回调用者自己的黑名单。
 func (s *Server) GetBlackList(ctx context.Context, req *relationpb.GetBlackListReq) (*relationpb.GetBlackListResp, error) {
 	// 1. 校验用户和分页。
 	userID, err := actorID(ctx, req.GetUserId())

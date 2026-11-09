@@ -8,6 +8,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
+// 返回一个会话当前的最大序号。不校验调用者是否在这个会话里，没有消息时是 0。
 func (s *Server) GetConversationMaxSeq(ctx context.Context, req *msgpb.GetConversationMaxSeqReq) (*msgpb.GetConversationMaxSeqResp, error) {
 	conversationID := strings.TrimSpace(req.GetConversationId())
 	if conversationID == "" {

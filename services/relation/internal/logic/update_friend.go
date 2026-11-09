@@ -9,6 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
 
+// 修改调用者对这名好友的备注。不改对方那一侧。
 func (s *Server) UpdateFriend(ctx context.Context, req *relationpb.UpdateFriendReq) (*relationpb.UpdateFriendResp, error) {
 	// 1. 校验双方 userID。关系拥有者取上下文里的用户。
 	owner, err := actorID(ctx, req.GetOwnerUserId())

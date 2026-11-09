@@ -28,7 +28,7 @@ const (
 	optOfflinePush          = "offlinePush"
 )
 
-// SendMsg checks one message and publishes it to toRedis. msgtransfer assigns the seq.
+// 校验一条消息后写入 toRedis。序号由 msgtransfer 分配，这里不落库。
 func (s *Server) SendMsg(ctx context.Context, req *msgpb.SendMsgReq) (*msgpb.SendMsgResp, error) {
 	msg := req.GetMsgData()
 	if msg == nil {
@@ -150,9 +150,7 @@ func (s *Server) authorizeSingleSend(ctx context.Context, msg *msgpb.MsgData) er
 	return s.applySingleRecv(ctx, msg)
 }
 
-// applySingleRecv honors the receiver's own single-chat setting.
-// 0 and a missing row still deliver. 1 drops the message. 2 delivers it and turns offline push off.
-// Read receipts stay deliverable when the receiver has chosen not to receive.
+// 按接收方自己的单聊接收设置决定投递。0 或缺行照常送达，1 拒绝，2 送达但关掉离线推送。已读回执在不接收时仍然送达。
 func (s *Server) applySingleRecv(ctx context.Context, msg *msgpb.MsgData) error {
 	if s.recv == nil || msg == nil {
 		return nil

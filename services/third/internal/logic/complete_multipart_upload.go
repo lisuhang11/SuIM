@@ -9,6 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/third/internal/model"
 )
 
+// 全部分片到齐后完成上传并登记对象名。缺片或会话过期时拒绝。
 func (s *Server) CompleteMultipartUpload(ctx context.Context, req *thirdpb.CompleteMultipartUploadReq) (*thirdpb.CompleteMultipartUploadResp, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

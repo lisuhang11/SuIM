@@ -6,8 +6,9 @@ import (
 	relationpb "github.com/lisuhang11/SuIM/proto/relation"
 )
 
+// 分页返回别人发给调用者的好友申请。
 func (s *Server) GetRecvFriendRequests(ctx context.Context, req *relationpb.GetRecvFriendRequestsReq) (*relationpb.GetRecvFriendRequestsResp, error) {
-	// 1. 校验用户、分页和处理状态。调用方必须是本人，操作者身份尚未从上下文接入。
+	// 1. 校验用户、分页和处理状态。调用方必须是本人。
 	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err

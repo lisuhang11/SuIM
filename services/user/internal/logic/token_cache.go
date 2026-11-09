@@ -13,8 +13,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/model"
 )
 
-// NewTokenCache builds the process-local token cache. Login and logout publish the
-// revoked hashes on Redis so other instances drop the same keys.
+// 构造本进程的令牌缓存。登录和退出会把作废的哈希发到 Redis，其他实例据此删掉同一批键。
 func NewTokenCache(ctx context.Context, rdb redis.UniversalClient, cfg svcconfig.LocalCache) (localcache.Cache[*model.Token], func()) {
 	if !cfg.Enable() {
 		return nil, func() {}

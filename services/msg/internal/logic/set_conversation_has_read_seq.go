@@ -8,7 +8,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
-// SetConversationHasReadSeq stores the cursor and tells the caller's other devices.
+// 记下已读游标，并通知调用者的其他在线设备。
 func (s *Server) SetConversationHasReadSeq(ctx context.Context, req *msgpb.SetConversationHasReadSeqReq) (*msgpb.SetConversationHasReadSeqResp, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

@@ -14,8 +14,9 @@ type afterRemoveBlackReq struct {
 	BlackUserID string `json:"blackUserID"`
 }
 
+// 解除调用者对对方的拉黑。对方不在黑名单里时拒绝。
 func (s *Server) UnblockUser(ctx context.Context, req *relationpb.UnblockUserReq) (*relationpb.UnblockUserResp, error) {
-	// 1. 校验双方 userID。调用方必须是拉黑者，操作者身份尚未从上下文接入。
+	// 1. 校验双方 userID。调用方必须是拉黑者。
 	owner, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err

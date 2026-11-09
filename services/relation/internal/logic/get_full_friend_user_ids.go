@@ -8,6 +8,7 @@ import (
 	relationpb "github.com/lisuhang11/SuIM/proto/relation"
 )
 
+// 返回调用者的全部好友 ID 和当前版本。版本没变时不必再拉资料。
 func (s *Server) GetFullFriendUserIDs(ctx context.Context, req *relationpb.GetFullFriendUserIDsReq) (*relationpb.GetFullFriendUserIDsResp, error) {
 	// 1. 校验用户。
 	userID, err := actorID(ctx, req.GetUserId())

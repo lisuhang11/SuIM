@@ -13,6 +13,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 修改调用者自己的资料。user_id 为空就是自己，填了别人则拒绝。
 func (s *Server) UpdateUser(ctx context.Context, req *userpb.UpdateUserReq) (*userpb.UpdateUserResp, error) {
 	// 1. 用会话确定操作者。user_id 为空则改自己，填了别人则拒绝。
 	id, err := s.actorID(ctx, req.GetToken(), req.GetUserId())

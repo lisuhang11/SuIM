@@ -33,8 +33,7 @@ func sceneNeedsAccount(scene string) bool {
 	return scene == SceneLogin || scene == SceneResetPwd
 }
 
-// NormalizePhone accepts a mainland number with optional +86, 86, or 0086,
-// and ignores spaces and dashes. The national number must match ^1\d{10}$.
+// 接受可选的 +86、86 或 0086，忽略空格和横线。国内号码必须是 1 开头的 11 位。
 func NormalizePhone(raw string) (area, national string, err error) {
 	compact := compactPhone(raw)
 	switch {

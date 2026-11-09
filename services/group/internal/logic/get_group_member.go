@@ -8,7 +8,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/store"
 )
 
-// GetGroupMember 返回群和一名成员。成员不在群里时 member 为空。
+// 返回群和一名成员。成员不在群里时 member 为空。
 func (s *Server) GetGroupMember(ctx context.Context, req *grouppb.GetGroupMemberReq) (*grouppb.GetGroupMemberResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

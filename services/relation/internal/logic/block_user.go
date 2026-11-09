@@ -16,8 +16,9 @@ type beforeAddBlackReq struct {
 	BlackUserID string `json:"blackUserID"`
 }
 
+// 把对方拉黑。不能拉黑自己，已经拉黑过会拒绝。
 func (s *Server) BlockUser(ctx context.Context, req *relationpb.BlockUserReq) (*relationpb.BlockUserResp, error) {
-	// 1. 校验双方 userID。调用方必须是拉黑者，操作者身份尚未从上下文接入。
+	// 1. 校验双方 userID。调用方必须是拉黑者。
 	owner, err := actorID(ctx, req.GetUserId())
 	if err != nil {
 		return nil, err
@@ -50,7 +51,7 @@ func (s *Server) BlockUser(ctx context.Context, req *relationpb.BlockUserReq) (*
 	return &relationpb.BlockUserResp{}, nil
 }
 
-// rejectIfBlocked stops a friend request or an agreement when either user has blocked the other.
+// 任一方拉黑了对方时，拒绝好友申请和同意。
 func (s *Server) rejectIfBlocked(ctx context.Context, user1, user2 string) error {
 	in1, in2, err := s.blocked(ctx, user1, user2)
 	if err != nil {

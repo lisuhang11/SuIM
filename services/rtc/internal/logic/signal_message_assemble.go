@@ -7,42 +7,11 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/call"
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	"github.com/lisuhang11/SuIM/pkg/livekit"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	rtcpb "github.com/lisuhang11/SuIM/proto/rtc"
 )
 
-// Relations is the friend and blacklist check used before a private call rings.
-type Relations interface {
-	IsFriend(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
-	IsBlack(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
-}
-
-// Groups reports whether a user is still a member of a group.
-type Groups interface {
-	InGroup(ctx context.Context, groupID, userID string) (bool, error)
-}
-
-// Service owns call state. msggateway only forwards the websocket frame.
-type Service struct {
-	rtcpb.UnimplementedRtcServiceServer
-	calls     *call.Board
-	relations Relations
-	groups    Groups
-	media     livekit.Config
-}
-
-// UseGroups enables group voice. Without it, a group invite is rejected.
-func (s *Service) UseGroups(groups Groups) {
-	if s != nil {
-		s.groups = groups
-	}
-}
-
-func New(calls *call.Board, relations Relations, media livekit.Config) *Service {
-	return &Service{calls: calls, relations: relations, media: media}
-}
-
+// 按信令种类转接邀请、接听、拒绝、取消、挂断和群通话。未识别的载荷拒绝。
 func (s *Service) SignalMessageAssemble(ctx context.Context, req *rtcpb.SignalMessageAssembleReq) (*rtcpb.SignalMessageAssembleResp, error) {
 	if req == nil || req.SignalReq == nil {
 		return nil, errorcode.ErrCallInvalid
@@ -72,64 +41,6 @@ func (s *Service) SignalMessageAssemble(ctx context.Context, req *rtcpb.SignalMe
 		return nil, errorcode.ErrCallInvalid
 	}
 }
-
-func (s *Service) SignalGetTokenByRoomID(ctx context.Context, req *rtcpb.SignalGetTokenByRoomIDReq) (*rtcpb.SignalGetTokenByRoomIDResp, error) {
-	if req == nil {
-		return nil, errorcode.ErrCallInvalid
-	}
-	userID, err := rpcctx.Actor(ctx, req.GetUserId())
-	if err != nil || userID == "" {
-		return nil, errorcode.ErrNoPermission
-	}
-	if s == nil || s.calls == nil {
-		return nil, errorcode.ErrInternal.WithMsg("call signaling is not configured")
-	}
-	if !s.media.Enabled() {
-		return nil, errorcode.ErrInternal.WithMsg("livekit is not configured")
-	}
-	sig, err := s.calls.Accepted(ctx, userID, req.GetRoomId())
-	if err != nil {
-		return nil, err
-	}
-	url, token, err := s.sign(userID, req.GetRoomId(), sig.Media)
-	if err != nil || token == "" {
-		return nil, errorcode.ErrInternal.WithMsg("sign call token")
-	}
-	return &rtcpb.SignalGetTokenByRoomIDResp{Token: token, LiveUrl: url}, nil
-}
-
-// Sweep ends ringing calls that nobody answered and tells both people.
-func (s *Service) Sweep(ctx context.Context) {
-	if s == nil || s.calls == nil {
-		return
-	}
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			ended, err := s.calls.Expire(ctx, time.Now())
-			if err != nil {
-				slog.Warn("expire calls", "err", err)
-				continue
-			}
-			for _, sig := range ended {
-				s.publish(ctx, sig, call.OpTimeout, []string{sig.CallerID, sig.CalleeID}, "")
-			}
-			groupEnded, err := s.calls.ExpireGroup(ctx, time.Now())
-			if err != nil {
-				slog.Warn("expire group calls", "err", err)
-				continue
-			}
-			for _, step := range groupEnded {
-				s.afterGroup(ctx, step, call.OpTimeout, "")
-			}
-		}
-	}
-}
-
 func (s *Service) invite(ctx context.Context, caller string, req *rtcpb.SignalInviteReq) (*rtcpb.SignalMessageAssembleResp, error) {
 	if req == nil || req.Invitation == nil || req.Invitation.InviteeUserId == "" {
 		return nil, errorcode.ErrCallInvalid
@@ -154,7 +65,6 @@ func (s *Service) invite(ctx context.Context, caller string, req *rtcpb.SignalIn
 		Invite: &rtcpb.SignalInviteResp{RoomId: sig.CallID},
 	}}}, nil
 }
-
 func (s *Service) accept(ctx context.Context, userID, connID, roomID string) (*rtcpb.SignalMessageAssembleResp, error) {
 	if s == nil || s.calls == nil {
 		return nil, errorcode.ErrInternal.WithMsg("call signaling is not configured")
@@ -189,7 +99,6 @@ func (s *Service) accept(ctx context.Context, userID, connID, roomID string) (*r
 		Accept: &rtcpb.SignalAcceptResp{Token: calleeToken, RoomId: sig.CallID, LiveUrl: calleeURL},
 	}}}, nil
 }
-
 func (s *Service) end(ctx context.Context, userID, roomID, op string) (*rtcpb.SignalMessageAssembleResp, error) {
 	if s == nil || s.calls == nil {
 		return nil, errorcode.ErrInternal.WithMsg("call signaling is not configured")
@@ -221,13 +130,11 @@ func (s *Service) end(ctx context.Context, userID, roomID, op string) (*rtcpb.Si
 	s.publish(ctx, sig, op, []string{peerOf(userID, sig)}, "")
 	return ended(op), nil
 }
-
 func (s *Service) authorize(ctx context.Context, caller, callee string) error {
 	if s == nil || s.relations == nil {
 		return errorcode.ErrInternal.WithMsg("relation service is not configured")
 	}
-	// Relation rejects a call that does not name the operator. The gateway
-	// already authenticated this user and stored that id on the context.
+	// 关系服务会拒绝没有操作者的调用。网关已经鉴定过这个用户，并把 ID 放进上下文。
 	ctx = rpcctx.WithUser(ctx, caller)
 	blockedByCaller, blockedByCallee, err := s.relations.IsBlack(ctx, caller, callee)
 	if err != nil {
@@ -245,7 +152,6 @@ func (s *Service) authorize(ctx context.Context, caller, callee string) error {
 	}
 	return nil
 }
-
 func (s *Service) sign(identity, room, media string) (string, string, error) {
 	if s == nil || !s.media.Enabled() {
 		return "", "", nil
@@ -257,14 +163,12 @@ func (s *Service) sign(identity, room, media string) (string, string, error) {
 	}
 	return url, token, nil
 }
-
 func (s *Service) abort(ctx context.Context, userID string, sig call.Signal) {
 	if _, err := s.calls.Hangup(ctx, userID, sig.CallID); err != nil {
 		slog.Warn("hang up after token failure", "err", err, "callID", sig.CallID)
 	}
 	s.publish(ctx, sig, call.OpHangup, []string{sig.CallerID, sig.CalleeID}, "")
 }
-
 func (s *Service) publish(ctx context.Context, sig call.Signal, op string, users []string, except string) {
 	if s == nil || s.calls == nil {
 		return
@@ -293,14 +197,12 @@ func (s *Service) publish(ctx context.Context, sig call.Signal, op string, users
 		slog.Warn("publish call signal", "err", err, "op", op, "callID", sig.CallID)
 	}
 }
-
 func peerOf(userID string, sig call.Signal) string {
 	if userID == sig.CallerID {
 		return sig.CalleeID
 	}
 	return sig.CallerID
 }
-
 func ended(op string) *rtcpb.SignalMessageAssembleResp {
 	resp := &rtcpb.SignalResp{}
 	switch op {

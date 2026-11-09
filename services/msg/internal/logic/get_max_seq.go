@@ -7,6 +7,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
+// 返回调用者各会话的最大序号。有消息的会话最小序号固定为 1。
 func (s *Server) GetMaxSeq(ctx context.Context, req *msgpb.GetMaxSeqReq) (*msgpb.GetMaxSeqResp, error) {
 	// 1. 汇总这个用户已经有消息的会话，再加上仍在其中的群会话。
 	userID, err := actorUser(ctx, req.GetUserId())

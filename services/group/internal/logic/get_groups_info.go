@@ -7,7 +7,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// GetGroupsInfo 按群 ID 取群资料。一个或多个 ID 走同一条逻辑，找不到的 ID 略过。
+// 按群 ID 取群资料。一个或多个 ID 走同一条逻辑，找不到的 ID 略过。
 func (s *Server) GetGroupsInfo(ctx context.Context, req *grouppb.GetGroupsInfoReq) (*grouppb.GetGroupsInfoResp, error) {
 	if len(req.GetGroupIds()) == 0 {
 		return nil, errorcode.ErrGroupInvalidArgs.WithMsg("group ids are empty")

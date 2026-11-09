@@ -7,6 +7,7 @@ import (
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 )
 
+// 为小文件签发一次表单上传。调用者只能给自己的对象申请。
 func (s *Server) InitiateFormData(ctx context.Context, req *thirdpb.InitiateFormDataReq) (*thirdpb.InitiateFormDataResp, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

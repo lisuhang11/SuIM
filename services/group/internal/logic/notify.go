@@ -50,13 +50,12 @@ const (
 	optOfflinePush     = "offlinePush"
 )
 
-// 成员变更写成通知消息。msggateway 只负责把这条消息推给在线成员。
-// 客户端在版本号正好是本地加一时直接套用，否则再拉 incremental_members。
+// 成员变更写成通知消息。msggateway 只负责把这条消息推给在线成员。 客户端在版本号正好是本地加一时直接套用，否则再拉 incremental_members。
 func (s *Server) sendNotice(ctx context.Context, op string, group *model.Group, contentType int32, detail any) {
 	s.sendNoticeOptions(ctx, op, group, contentType, detail, nil)
 }
 
-// sendNoticeOptions 发送群通知。opts 为空时沿用原有选项：缺省项由 msgtransfer 视为开启。
+// 发送群通知。opts 为空时沿用原有选项：缺省项由 msgtransfer 视为开启。
 func (s *Server) sendNoticeOptions(ctx context.Context, op string, group *model.Group, contentType int32, detail any, opts map[string]bool) {
 	if s.sender == nil || group == nil {
 		return
@@ -74,8 +73,7 @@ func (s *Server) sendNoticeOptions(ctx context.Context, op string, group *model.
 	}
 }
 
-// groupInfoOptions 按 OpenIM 的 isSendMsg 区分聊天记录和仅推送。
-// 进聊天记录的副本计未读；通知副本本身不落历史，也不走离线推送。
+// 按 OpenIM 的 isSendMsg 区分聊天记录和仅推送。 进聊天记录的副本计未读；通知副本本身不落历史，也不走离线推送。
 func groupInfoOptions(sendMessage bool) map[string]bool {
 	return map[string]bool{
 		optNotNotification: false,
@@ -124,8 +122,7 @@ func (s *Server) notifyCreated(ctx context.Context, owner string, group *model.G
 	}
 }
 
-// notifyGroupInfo 按改动的字段发提示。公告、群名、其他资料可以同时发出。
-// 非空公告和群名进入群聊天记录；清空公告、头像和其他资料只推给在线成员。
+// 按改动的字段发提示。公告、群名、其他资料可以同时发出。 非空公告和群名进入群聊天记录；清空公告、头像和其他资料只推给在线成员。
 func (s *Server) notifyGroupInfo(ctx context.Context, op string, group *model.Group, opMember *model.Member, patch model.GroupPatch) {
 	if group == nil {
 		return

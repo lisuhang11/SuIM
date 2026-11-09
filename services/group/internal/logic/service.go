@@ -11,17 +11,17 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/store"
 )
 
-// Users loads public profiles. A missing ID is absent from the map.
+// 读取公开资料。结果里没有的 ID 表示这个用户不存在。
 type Users interface {
 	GetUsers(ctx context.Context, ids []string) (map[string]model.UserProfile, error)
 }
 
-// MsgSender publishes one notification. msgtransfer assigns the seq and msggateway pushes it.
+// 投递一条通知。序号由 msgtransfer 分配，长连接由 msggateway 推送。
 type MsgSender interface {
 	SendNotification(ctx context.Context, msg *msgpb.MsgData) error
 }
 
-// Hooks carries the group webhook client and callback switches.
+// 群 webhook 客户端和各回调开关。
 type Hooks struct {
 	Client                   *webhook.Client
 	BeforeCreateGroup        webhook.BeforeConfig
@@ -42,6 +42,7 @@ type Hooks struct {
 	AfterSetGroupMemberInfo  webhook.AfterConfig
 }
 
+// 群 gRPC 服务。
 type Server struct {
 	grouppb.UnimplementedGroupServiceServer
 	store        *store.Store
@@ -56,11 +57,12 @@ type Server struct {
 	now          func() time.Time
 }
 
+// 用存储、用户查询和通知发送构造群服务。
 func New(st *store.Store, users Users, sender MsgSender) *Server {
 	return &Server{store: st, users: users, sender: sender, memberNormal: 200, memberSuper: 1000, now: time.Now}
 }
 
-// UseMemberLimit sets how many members a normal group and a super group may hold, including the owner.
+// 设置普通群和超大群的人数上限，含群主。超大群上限不能小于普通群。
 func (s *Server) UseMemberLimit(normal, super int) {
 	if s != nil && normal > 0 && super >= normal {
 		s.memberNormal = normal
@@ -75,7 +77,28 @@ func (s *Server) memberCap(groupType int32) int {
 	return s.memberNormal
 }
 
-// UseHooks attaches webhook switches. A nil client leaves every callback disabled.
+// 接入消息服务的序号读写。
+func (s *Server) UseSeq(seq SeqClient) {
+	if s != nil {
+		s.seq = seq
+	}
+}
+
+// 接入会话服务。
+func (s *Server) UseConversations(convs GroupConversations) {
+	if s != nil {
+		s.convs = convs
+	}
+}
+
+// 接入 Redis 计数。传入 nil 时这三项不限次数。
+func (s *Server) UseQuota(q Quota) {
+	if s != nil {
+		s.quota = q
+	}
+}
+
+// 接入 webhook 开关。客户端为 nil 时所有回调都不执行。
 func (s *Server) UseHooks(hooks Hooks) {
 	if s != nil {
 		s.hooks = hooks

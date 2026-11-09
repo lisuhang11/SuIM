@@ -1,0 +1,41 @@
+package logic
+
+import (
+	"context"
+
+	"github.com/lisuhang11/SuIM/pkg/call"
+	"github.com/lisuhang11/SuIM/pkg/livekit"
+	rtcpb "github.com/lisuhang11/SuIM/proto/rtc"
+)
+
+// 私聊呼叫前检查好友和拉黑。
+type Relations interface {
+	IsFriend(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
+	IsBlack(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
+}
+
+// 查询用户是否还在这个群里。
+type Groups interface {
+	InGroup(ctx context.Context, groupID, userID string) (bool, error)
+}
+
+// 保存通话状态。msggateway 只转发长连接帧。
+type Service struct {
+	rtcpb.UnimplementedRtcServiceServer
+	calls     *call.Board
+	relations Relations
+	groups    Groups
+	media     livekit.Config
+}
+
+// 打开群语音。未注入时群邀请会被拒绝。
+func (s *Service) UseGroups(groups Groups) {
+	if s != nil {
+		s.groups = groups
+	}
+}
+
+// 用通话状态、好友检查和 LiveKit 配置构造通话服务。
+func New(calls *call.Board, relations Relations, media livekit.Config) *Service {
+	return &Service{calls: calls, relations: relations, media: media}
+}

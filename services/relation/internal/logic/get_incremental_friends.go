@@ -8,10 +8,10 @@ import (
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 )
 
-// IncrementalLimit is how many version logs fit in one incremental response.
-// Reaching it means the client should take a full snapshot instead.
+// 一次增量响应最多带这么多版本日志。达到这个数时客户端应改拉全量。
 const IncrementalLimit = 200
 
+// 按版本返回好友变更。版本对不上或差额达到限额时只返回 full，不带好友资料。
 func (s *Server) GetIncrementalFriends(ctx context.Context, req *relationpb.GetIncrementalFriendsReq) (*relationpb.GetIncrementalFriendsResp, error) {
 	// 1. 校验用户。调用方必须是上下文里的本人。
 	userID, err := actorID(ctx, req.GetUserId())

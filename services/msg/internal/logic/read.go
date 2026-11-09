@@ -38,7 +38,7 @@ func (s *Server) readSeq(ctx context.Context, userID, conversationID string) (in
 	return state[conversationID].HasReadSeq, nil
 }
 
-// fillReadSeqs covers every sequence after the stored cursor, then adds any extra the client named.
+// 先补上已读游标之后到目标序号的每一条，再并入客户端额外点名的序号。
 func fillReadSeqs(current, target int64, extra []int64) []int64 {
 	var seqs []int64
 	seen := map[int64]struct{}{}
@@ -125,7 +125,7 @@ func pairIDs(prefix, conversationID string) (string, string, bool) {
 	return parts[0], parts[1], true
 }
 
-// sendReadReceipt publishes content type 2200. reliable keeps it in the notification history.
+// 发出内容类型 2200 的已读回执。reliable 为真时这份通知留在通知历史里。
 func (s *Server) sendReadReceipt(ctx context.Context, sendID, recvID, groupID, conversationID string, session int32, seqs []int64, hasReadSeq int64, reliable bool) error {
 	tips, err := json.Marshal(struct {
 		MarkAsReadUserID string  `json:"markAsReadUserID"`

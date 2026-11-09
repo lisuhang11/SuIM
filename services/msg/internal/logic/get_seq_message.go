@@ -7,6 +7,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
+// 按调用者点名的序号拉取消息，只返回他能看见的序号。
 func (s *Server) GetSeqMessage(ctx context.Context, req *msgpb.GetSeqMessageReq) (*msgpb.PushMessages, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

@@ -8,8 +8,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
-// SetUserConversationMinSeq writes each user's history floor.
-// The conversation service calls this, then writes conversation.min_seq itself.
+// 写下这些人的历史下限。会话服务调用后再自己写 conversation.min_seq。
 func (s *Server) SetUserConversationMinSeq(ctx context.Context, req *msgpb.SetUserConversationMinSeqReq) (*msgpb.SetUserConversationMinSeqResp, error) {
 	conversationID := strings.TrimSpace(req.GetConversationId())
 	if conversationID == "" || req.GetMinSeq() < 0 {

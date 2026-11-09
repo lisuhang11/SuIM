@@ -10,6 +10,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 按用户 ID 批量取资料。不存在的 ID 不出现，只有调用者自己的那一行是完整资料。
 func (s *Server) GetUsersByIDs(ctx context.Context, req *userpb.GetUsersByIDsReq) (*userpb.GetUsersByIDsResp, error) {
 	// 1. 校验用户 ID，并去掉重复项。
 	seen := make(map[string]struct{}, len(req.GetUserIds()))

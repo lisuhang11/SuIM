@@ -8,7 +8,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 )
 
-// TransferGroupOwner 群主把群转给一名成员，自己降为该成员原来的角色。
+// 群主把群转给一名成员，自己降为该成员原来的角色。
 func (s *Server) TransferGroupOwner(ctx context.Context, req *grouppb.TransferGroupOwnerReq) (*grouppb.TransferGroupOwnerResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

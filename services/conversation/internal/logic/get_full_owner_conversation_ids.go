@@ -8,6 +8,7 @@ import (
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 )
 
+// 返回调用者的全部会话 ID 和当前版本。
 func (s *Server) GetFullOwnerConversationIDs(ctx context.Context, req *conversationpb.GetFullOwnerConversationIDsReq) (*conversationpb.GetFullOwnerConversationIDsResp, error) {
 	userID, err := actorID(ctx, req.GetUserId())
 	if err != nil {

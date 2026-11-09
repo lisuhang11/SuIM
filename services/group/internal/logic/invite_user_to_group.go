@@ -9,7 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/model"
 )
 
-// InviteUserToGroup 邀请用户入群。全员需要验证时，普通成员只写入申请。
+// 邀请用户入群。全员需要验证时，普通成员只写入申请。
 func (s *Server) InviteUserToGroup(ctx context.Context, req *grouppb.InviteUserToGroupReq) (*grouppb.InviteUserToGroupResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
+// 按版本返回一个群的成员变更。版本对不上或差额达到限额时只返回 full。调用者必须在群里。
 func (s *Server) GetIncrementalGroupMembers(ctx context.Context, req *grouppb.GetIncrementalGroupMembersReq) (*grouppb.GetIncrementalGroupMembersResp, error) {
 	// 1. 调用方必须是群成员，已解散的群不能增量同步。
 	groupID, err := normalizeGroupID(req.GetGroupId())

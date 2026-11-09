@@ -6,7 +6,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// GetGroupMembers 分页返回群成员资料。调用者必须已经在群里。
+// 分页返回群成员资料。调用者必须已经在群里。
 func (s *Server) GetGroupMembers(ctx context.Context, req *grouppb.GetGroupMembersReq) (*grouppb.GetGroupMembersResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

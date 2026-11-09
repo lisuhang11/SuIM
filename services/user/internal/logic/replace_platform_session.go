@@ -8,8 +8,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/model"
 )
 
-// ReplacePlatformSession keeps the caller's token and revokes the other live
-// tokens of that user on the same platform.
+// 保留这次带来的令牌，作废该用户在同一平台上的其他有效令牌。
 func (s *Server) ReplacePlatformSession(ctx context.Context, req *userpb.ReplacePlatformSessionReq) (*userpb.ReplacePlatformSessionResp, error) {
 	claims, tok, err := s.loadUsable(ctx, req.GetToken(), model.TokenType)
 	if err != nil {

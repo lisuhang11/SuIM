@@ -12,18 +12,19 @@ import (
 	"github.com/lisuhang11/SuIM/services/msgtransfer/internal/config"
 )
 
-// MySQLHandler consumes toMysql and writes messages into MySQL.
+// 消费 toMysql，把消息写入 MySQL。
 type MySQLHandler struct {
 	db      MsgDB
 	webhook *webhook.Client
 	after   config.AfterMsgSaveDB
 }
 
+// 用消息库构造 toMysql 消费者。
 func NewMySQLHandler(db MsgDB, client *webhook.Client, after config.AfterMsgSaveDB) *MySQLHandler {
 	return &MySQLHandler{db: db, webhook: client, after: after}
 }
 
-// Handle inserts one toMysql batch and acks it after MySQL accepts the rows.
+// 写入一批 toMysql。MySQL 接受后才确认这批队列消息。
 func (h *MySQLHandler) Handle(ctx context.Context, msg *mq.Message) error {
 	body := &msgpb.MsgDataToMySQL{}
 	if err := proto.Unmarshal(msg.Value, body); err != nil {

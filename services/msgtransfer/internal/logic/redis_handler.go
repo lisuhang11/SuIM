@@ -26,13 +26,13 @@ type readSeq struct {
 	userSeq        map[string]int64
 }
 
-// Conversations asks the conversation service to create rows. It does not write the conversation table.
+// 通知会话服务补会话行。不直接写会话表。
 type Conversations interface {
 	Ensure(ctx context.Context, conversationID, sendID, recvID string, sessionType int32) error
 	EnsureGroup(ctx context.Context, groupID, callerID string, sessionType int32) error
 }
 
-// RedisHandler consumes toRedis, assigns sequences, and publishes toMysql plus toPush.
+// 消费 toRedis，分配序号，再投递 toMysql 和 toPush。
 type RedisHandler struct {
 	transfer *Transfer
 	chats    Conversations
@@ -44,13 +44,14 @@ type RedisHandler struct {
 	wg       sync.WaitGroup
 }
 
-// UseSingleChats creates conversation rows after a chat message is sequenced.
+// 序号分配后再为单聊补会话行。
 func (h *RedisHandler) UseSingleChats(chats Conversations) {
 	if h != nil {
 		h.chats = chats
 	}
 }
 
+// 用序号缓存和两条下游队列构造 toRedis 消费者。
 func NewRedisHandler(transfer *Transfer, batchSize, workers int, interval time.Duration) *RedisHandler {
 	readCtx, stopRead := context.WithCancel(context.Background())
 	h := &RedisHandler{
@@ -63,14 +64,14 @@ func NewRedisHandler(transfer *Transfer, batchSize, workers int, interval time.D
 	return h
 }
 
-// Start runs the batch workers and the read-seq writer until ctx is canceled.
+// 启动批处理 worker 和已读序号写回，直到上下文取消。
 func (h *RedisHandler) Start(ctx context.Context) {
 	h.batch.Start(ctx)
 	h.wg.Add(1)
 	go h.runReadSeq()
 }
 
-// Close stops the read-seq writer. Call it after consumers have stopped.
+// 停掉已读序号写回。要等消费者先停。
 func (h *RedisHandler) Close() {
 	for {
 		select {
@@ -86,7 +87,7 @@ func (h *RedisHandler) Close() {
 	}
 }
 
-// Handle queues one toRedis message. The batch worker acks it after toMysql and toPush succeed.
+// 把一条 toRedis 消息放入批处理。worker 在 toMysql 和 toPush 都成功后才确认。
 func (h *RedisHandler) Handle(ctx context.Context, msg *mq.Message) error {
 	return h.batch.Put(ctx, msg)
 }

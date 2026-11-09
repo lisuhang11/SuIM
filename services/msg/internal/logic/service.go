@@ -12,13 +12,13 @@ import (
 	"github.com/lisuhang11/SuIM/services/msg/internal/store"
 )
 
-// JoinedGroup is a group the user still belongs to.
+// 用户仍在其中的一个群。
 type JoinedGroup struct {
 	ID    string
 	Super bool
 }
 
-// GroupSpeaker is one member's place in a group, used when a group message is sent.
+// 发群消息时这名成员在群里的位置。Found 为假表示没有这条成员记录。
 type GroupSpeaker struct {
 	Found     bool
 	InGroup   bool
@@ -27,36 +27,35 @@ type GroupSpeaker struct {
 	MuteEndMs int64
 }
 
-// Groups lists joined groups and reads one member for the mute check.
+// 列出已加入的群，并读取一名成员供禁言判断。
 type Groups interface {
 	Joined(ctx context.Context, userID string) ([]JoinedGroup, error)
 	Speaker(ctx context.Context, groupID, userID string) (GroupSpeaker, error)
 }
 
-// Pinned lists conversation ids the user has pinned. The conversation service owns that table.
+// 读取用户置顶的会话。会话表属于 conversation 服务。
 type Pinned interface {
 	PinnedConversationIDs(ctx context.Context, userID string) ([]string, error)
 }
 
-// RecvSetting is one user's receive option for a single conversation.
-// Found is false when that user has no row, which means they still receive messages.
+// 一个用户对一个单聊的接收设置。Found 为假表示没有这一行，此时仍然接收。
 type RecvSetting struct {
 	Found bool
 	Opt   int32
 }
 
-// SingleRecv reads the receiver's own single-chat receive option.
+// 读取接收方自己的单聊接收设置。
 type SingleRecv interface {
 	RecvOpt(ctx context.Context, ownerUserID, conversationID string) (RecvSetting, error)
 }
 
-// Relations checks friendship and blocks before a single chat is accepted.
+// 单聊受理前检查好友和拉黑。
 type Relations interface {
 	IsFriend(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
 	IsBlack(ctx context.Context, user1, user2 string) (inUser1, inUser2 bool, err error)
 }
 
-// History reads sequenced messages. msgtransfer writes them.
+// 读取已经编过号的消息。写入由 msgtransfer 完成。
 type History interface {
 	ConversationIDs(ctx context.Context, userID string) ([]string, error)
 	MaxSeqs(ctx context.Context, conversationIDs []string) (map[string]int64, error)
@@ -72,20 +71,20 @@ type History interface {
 	MarkRead(ctx context.Context, conversationID, readerID string, seqs []int64) error
 }
 
-// MsgBefore is a synchronous message callback plus content types that skip it.
+// 发送前的同步回调，以及跳过这次回调的内容类型。
 type MsgBefore struct {
 	webhook.BeforeConfig `yaml:",inline"`
 	DeniedTypes          []int32 `yaml:"deniedTypes"`
 }
 
-// MsgAfter is an asynchronous message callback. AttentionIds limits who it fires for.
+// 发送后的异步回调。AttentionIds 限定哪些用户会触发它。
 type MsgAfter struct {
 	webhook.AfterConfig `yaml:",inline"`
 	AttentionIds        []string `yaml:"attentionIds"`
 	DeniedTypes         []int32  `yaml:"deniedTypes"`
 }
 
-// Hooks carries the message webhook client and callback switches.
+// 消息 webhook 客户端和各回调开关。
 type Hooks struct {
 	Client           *webhook.Client
 	BeforeSendSingle MsgBefore
@@ -97,7 +96,7 @@ type Hooks struct {
 	AfterGroupRead   MsgAfter
 }
 
-// Server is the msg gRPC service. It publishes sends and reads history.
+// 消息 gRPC 服务。负责受理发送和读取历史。
 type Server struct {
 	msgpb.UnimplementedMsgServiceServer
 	store     History
@@ -109,25 +108,26 @@ type Server struct {
 	hooks     Hooks
 }
 
+// 用历史存储、队列和关系、群依赖构造消息服务。置顶和接收设置稍后注入。
 func New(st History, publish mq.Producer, relations Relations, groups Groups) *Server {
 	return &Server{store: st, publish: publish, relations: relations, groups: groups}
 }
 
-// UsePinned reads pinned conversation ids from the conversation service.
+// 接入会话服务里的置顶列表。
 func (s *Server) UsePinned(pinned Pinned) {
 	if s != nil {
 		s.pinned = pinned
 	}
 }
 
-// UseRecv reads the receiver's single-chat receive option. A nil reader leaves the check off.
+// 接入接收方的单聊接收设置。传入 nil 时不检查免打扰。
 func (s *Server) UseRecv(recv SingleRecv) {
 	if s != nil {
 		s.recv = recv
 	}
 }
 
-// UseHooks attaches webhook switches. A nil client leaves every callback disabled.
+// 接入 webhook 开关。客户端为 nil 时所有回调都不执行。
 func (s *Server) UseHooks(hooks Hooks) {
 	if s != nil {
 		s.hooks = hooks

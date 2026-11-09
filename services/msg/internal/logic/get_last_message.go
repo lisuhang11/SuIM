@@ -7,6 +7,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
+// 返回调用者在可见范围内能读到的最后一条。没点名会话时用他已有的会话，读不到的会话不出现。
 func (s *Server) GetLastMessage(ctx context.Context, req *msgpb.GetLastMessageReq) (*msgpb.GetLastMessageResp, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

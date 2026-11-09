@@ -8,7 +8,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
-// MarkMsgsAsRead marks the listed sequences. The last sequence is the new read cursor.
+// 把列出的序号标成已读。其中最大的序号成为新的已读游标。
 func (s *Server) MarkMsgsAsRead(ctx context.Context, req *msgpb.MarkMsgsAsReadReq) (*msgpb.MarkMsgsAsReadResp, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

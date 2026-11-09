@@ -10,7 +10,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/group/internal/store"
 )
 
-// GroupApplicationResponse 由群主或管理员同意、拒绝一条未处理的入群申请。
+// 由群主或管理员同意、拒绝一条未处理的入群申请。
 func (s *Server) GroupApplicationResponse(ctx context.Context, req *grouppb.GroupApplicationResponseReq) (*grouppb.GroupApplicationResponseResp, error) {
 	groupID, err := normalizeGroupID(req.GetGroupId())
 	if err != nil {

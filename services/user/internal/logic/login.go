@@ -12,6 +12,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 用账号和密码登录并签发令牌。手机号不走这里。
 func (s *Server) Login(ctx context.Context, req *userpb.LoginReq) (*userpb.LoginResp, error) {
 	// 1. 只接受账户和密码。手机号不能走这条登录。
 	account := strings.TrimSpace(req.GetAccount())

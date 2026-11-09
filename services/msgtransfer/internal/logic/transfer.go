@@ -12,7 +12,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/msgtransfer/internal/model"
 )
 
-// SeqCache assigns sequences and keeps recent messages in Redis.
+// 分配序号，并在 Redis 里保留最近的消息。
 type SeqCache interface {
 	Malloc(ctx context.Context, conversationID string, n int64) (int64, error)
 	ClientSeq(ctx context.Context, conversationID, clientMsgID string) (int64, bool, error)
@@ -21,14 +21,14 @@ type SeqCache interface {
 	SetUserReadSeq(ctx context.Context, conversationID string, userSeq map[string]int64) error
 }
 
-// MsgDB stores messages and read sequences in MySQL.
+// 在 MySQL 里保存消息和已读序号。
 type MsgDB interface {
 	InsertMessages(ctx context.Context, conversationID string, msgs []*msgpb.MsgData) error
 	SetUserReadSeq(ctx context.Context, conversationID string, userSeq map[string]int64) error
 	SaveMaxSeq(ctx context.Context, conversationID string, maxSeq int64) error
 }
 
-// Transfer assigns sequences, fills Redis, and publishes toMysql and toPush.
+// 分配序号、写入 Redis，并投递 toMysql 和 toPush。
 type Transfer struct {
 	cache   SeqCache
 	db      MsgDB
@@ -36,12 +36,12 @@ type Transfer struct {
 	toPush  mq.Producer
 }
 
+// 用序号缓存和两条下游队列构造传输器。
 func NewTransfer(cache SeqCache, db MsgDB, toMySQL, toPush mq.Producer) *Transfer {
 	return &Transfer{cache: cache, db: db, toMySQL: toMySQL, toPush: toPush}
 }
 
-// BatchInsertChat2Cache assigns seq, writes the messages into Redis, and records the sender read seq.
-// lastSeq is the conversation max before the newly allocated numbers. isNew is true for the first batch.
+// 分配序号、把消息写入 Redis，并记下发送方已读序号。lastSeq 是这批新序号之前的会话最大值。isNew 只在第一批为真。
 func (t *Transfer) BatchInsertChat2Cache(ctx context.Context, conversationID string, msgs []*msgpb.MsgData) (lastSeq int64, isNew bool, userSeq map[string]int64, err error) {
 	if len(msgs) == 0 {
 		return 0, false, nil, fmt.Errorf("no messages")
@@ -120,12 +120,12 @@ func (t *Transfer) BatchInsertChat2Cache(ctx context.Context, conversationID str
 	return lastSeq, isNew, userSeq, nil
 }
 
-// SetHasReadSeqToDB stores read receipts.
+// 把已读回执写入 MySQL。
 func (t *Transfer) SetHasReadSeqToDB(ctx context.Context, conversationID string, userSeq map[string]int64) error {
 	return t.db.SetUserReadSeq(ctx, conversationID, userSeq)
 }
 
-// MsgToMySQL publishes sequenced messages for the MySQL consumer.
+// 把已编号的消息交给 MySQL 消费者。
 func (t *Transfer) MsgToMySQL(ctx context.Context, key, conversationID string, msgs []*msgpb.MsgData, lastSeq int64) error {
 	if len(msgs) == 0 {
 		return nil
@@ -141,7 +141,7 @@ func (t *Transfer) MsgToMySQL(ctx context.Context, key, conversationID string, m
 	return t.toMySQL.Send(ctx, key, body)
 }
 
-// MsgToPush publishes one message for the push service.
+// 把一条消息交给推送。
 func (t *Transfer) MsgToPush(ctx context.Context, key, conversationID string, msg *msgpb.MsgData) error {
 	body, err := proto.Marshal(&msgpb.PushMsgData{
 		MsgData:        msg,

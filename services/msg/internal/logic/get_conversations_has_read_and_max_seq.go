@@ -7,6 +7,7 @@ import (
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
+// 返回调用者在这些会话上的已读序号和最大序号。没点名会话时用他已有的会话。
 func (s *Server) GetConversationsHasReadAndMaxSeq(ctx context.Context, req *msgpb.GetConversationsHasReadAndMaxSeqReq) (*msgpb.GetConversationsHasReadAndMaxSeqResp, error) {
 	userID, err := actorUser(ctx, req.GetUserId())
 	if err != nil {

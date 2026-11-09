@@ -6,7 +6,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
-// GetGroupApplicationList 返回操作者作为群主或管理员能看到的入群申请。
+// 返回操作者作为群主或管理员能看到的入群申请。
 func (s *Server) GetGroupApplicationList(ctx context.Context, req *grouppb.GetGroupApplicationListReq) (*grouppb.GetGroupApplicationListResp, error) {
 	userID, err := bindActor(ctx, req.GetFromUserId())
 	if err != nil {

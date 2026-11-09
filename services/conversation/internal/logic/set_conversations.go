@@ -6,9 +6,7 @@ import (
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
 )
 
-// SetConversations applies one partial update to each owner.
-// A missing conversation row is created. min_seq and max_seq are ignored.
-// Single-chat is_private_chat is also written on the peer's row.
+// 给每个 owner 应用同一份部分更新。没有会话行会先创建。min_seq 和 max_seq 被忽略。单聊的 is_private_chat 同时写到对方那一行。
 func (s *Server) SetConversations(ctx context.Context, req *conversationpb.SetConversationsReq) (*conversationpb.SetConversationsResp, error) {
 	owners, err := normalizeUserIDs(req.GetUserIds())
 	if err != nil {

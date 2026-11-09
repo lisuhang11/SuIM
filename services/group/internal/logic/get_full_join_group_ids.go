@@ -8,6 +8,7 @@ import (
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 
+// 返回调用者已加入的全部群 ID 和当前版本。
 func (s *Server) GetFullJoinGroupIDs(ctx context.Context, req *grouppb.GetFullJoinGroupIDsReq) (*grouppb.GetFullJoinGroupIDsResp, error) {
 	userID, err := bindActor(ctx, req.GetUserId())
 	if err != nil {

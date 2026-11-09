@@ -9,6 +9,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
 
+// 由调用者向对方发出好友申请。已经是好友或被拉黑时拒绝。
 func (s *Server) SendFriendRequest(ctx context.Context, req *relationpb.SendFriendRequestReq) (*relationpb.SendFriendRequestResp, error) {
 	// 1. 校验双方 userID。申请人取上下文里的用户。
 	from, err := actorID(ctx, req.GetFromUserId())

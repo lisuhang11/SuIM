@@ -8,6 +8,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/model"
 )
 
+// 作废这个用户在该平台上的会话。签名正确但已过期的令牌也可以退出。
 func (s *Server) Logout(ctx context.Context, req *userpb.LogoutReq) (*userpb.LogoutResp, error) {
 	// 1. 解析 token。过期但签名有效也接受。
 	claims, err := s.issuer.ParseIgnoreExpiry(req.GetToken())

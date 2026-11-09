@@ -10,6 +10,7 @@ import (
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
 
+// 向手机号发送一次性验证码。超过频率或命中黑名单时拒绝，验证码本身不返回。
 func (s *Server) SendSmsCode(ctx context.Context, req *userpb.SendSmsCodeReq) (*userpb.SendSmsCodeResp, error) {
 	scene := strings.TrimSpace(req.GetScene())
 	if !validScene(scene) {

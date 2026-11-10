@@ -854,9 +854,9 @@ func (x *SignalAcceptResp) GetUserIds() []string {
 	return nil
 }
 
-// SignalInviteInGroupReq starts a group voice room.
+// SignalInviteInGroupReq starts a group room.
 // The host joins immediately. Each invitee rings until they answer, decline, or time out.
-// media_type must be "audio".
+// media_type is "audio" or "video". Empty means audio.
 type SignalInviteInGroupReq struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	GroupId        string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
@@ -924,8 +924,10 @@ type SignalInviteInGroupResp struct {
 	LiveUrl        string                 `protobuf:"bytes,3,opt,name=live_url,json=liveUrl,proto3" json:"live_url,omitempty"`
 	GroupId        string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
 	InviteeUserIds []string               `protobuf:"bytes,5,rep,name=invitee_user_ids,json=inviteeUserIds,proto3" json:"invitee_user_ids,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// media_type is the room media fixed at invite time.
+	MediaType     string `protobuf:"bytes,6,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SignalInviteInGroupResp) Reset() {
@@ -993,7 +995,14 @@ func (x *SignalInviteInGroupResp) GetInviteeUserIds() []string {
 	return nil
 }
 
-// SignalJoinReq enters a group voice room that is already open.
+func (x *SignalInviteInGroupResp) GetMediaType() string {
+	if x != nil {
+		return x.MediaType
+	}
+	return ""
+}
+
+// SignalJoinReq enters a group room that is already open.
 type SignalJoinReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	GroupId       string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
@@ -1039,12 +1048,14 @@ func (x *SignalJoinReq) GetGroupId() string {
 }
 
 type SignalJoinResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
-	RoomId        string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	LiveUrl       string                 `protobuf:"bytes,3,opt,name=live_url,json=liveUrl,proto3" json:"live_url,omitempty"`
-	GroupId       string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	UserIds       []string               `protobuf:"bytes,5,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Token   string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	RoomId  string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	LiveUrl string                 `protobuf:"bytes,3,opt,name=live_url,json=liveUrl,proto3" json:"live_url,omitempty"`
+	GroupId string                 `protobuf:"bytes,4,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	UserIds []string               `protobuf:"bytes,5,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	// media_type is the room media fixed at invite time.
+	MediaType     string `protobuf:"bytes,6,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1114,7 +1125,14 @@ func (x *SignalJoinResp) GetUserIds() []string {
 	return nil
 }
 
-// SignalGroupCallReq reads the voice room currently open in a group.
+func (x *SignalJoinResp) GetMediaType() string {
+	if x != nil {
+		return x.MediaType
+	}
+	return ""
+}
+
+// SignalGroupCallReq reads the room currently open in a group.
 // An empty room_id means the group has no call.
 type SignalGroupCallReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1161,11 +1179,13 @@ func (x *SignalGroupCallReq) GetGroupId() string {
 }
 
 type SignalGroupCallResp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	GroupId       string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	CallerUserId  string                 `protobuf:"bytes,3,opt,name=caller_user_id,json=callerUserId,proto3" json:"caller_user_id,omitempty"`
-	UserIds       []string               `protobuf:"bytes,4,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	RoomId       string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	GroupId      string                 `protobuf:"bytes,2,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	CallerUserId string                 `protobuf:"bytes,3,opt,name=caller_user_id,json=callerUserId,proto3" json:"caller_user_id,omitempty"`
+	UserIds      []string               `protobuf:"bytes,4,rep,name=user_ids,json=userIds,proto3" json:"user_ids,omitempty"`
+	// media_type is "audio" or "video" when a room is open.
+	MediaType     string `protobuf:"bytes,5,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1226,6 +1246,13 @@ func (x *SignalGroupCallResp) GetUserIds() []string {
 		return x.UserIds
 	}
 	return nil
+}
+
+func (x *SignalGroupCallResp) GetMediaType() string {
+	if x != nil {
+		return x.MediaType
+	}
+	return ""
 }
 
 // SignalHangUpReq is OpenIM's SignalHungUpReq.
@@ -1557,28 +1584,34 @@ const file_rtc_rtc_proto_rawDesc = "" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12(\n" +
 	"\x10invitee_user_ids\x18\x02 \x03(\tR\x0einviteeUserIds\x12\x1d\n" +
 	"\n" +
-	"media_type\x18\x03 \x01(\tR\tmediaType\"\xa8\x01\n" +
+	"media_type\x18\x03 \x01(\tR\tmediaType\"\xc7\x01\n" +
 	"\x17SignalInviteInGroupResp\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x17\n" +
 	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12\x19\n" +
 	"\blive_url\x18\x03 \x01(\tR\aliveUrl\x12\x19\n" +
 	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12(\n" +
-	"\x10invitee_user_ids\x18\x05 \x03(\tR\x0einviteeUserIds\"*\n" +
+	"\x10invitee_user_ids\x18\x05 \x03(\tR\x0einviteeUserIds\x12\x1d\n" +
+	"\n" +
+	"media_type\x18\x06 \x01(\tR\tmediaType\"*\n" +
 	"\rSignalJoinReq\x12\x19\n" +
-	"\bgroup_id\x18\x01 \x01(\tR\agroupId\"\x90\x01\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\"\xaf\x01\n" +
 	"\x0eSignalJoinResp\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x17\n" +
 	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12\x19\n" +
 	"\blive_url\x18\x03 \x01(\tR\aliveUrl\x12\x19\n" +
 	"\bgroup_id\x18\x04 \x01(\tR\agroupId\x12\x19\n" +
-	"\buser_ids\x18\x05 \x03(\tR\auserIds\"/\n" +
+	"\buser_ids\x18\x05 \x03(\tR\auserIds\x12\x1d\n" +
+	"\n" +
+	"media_type\x18\x06 \x01(\tR\tmediaType\"/\n" +
 	"\x12SignalGroupCallReq\x12\x19\n" +
-	"\bgroup_id\x18\x01 \x01(\tR\agroupId\"\x8a\x01\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\"\xa9\x01\n" +
 	"\x13SignalGroupCallResp\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x19\n" +
 	"\bgroup_id\x18\x02 \x01(\tR\agroupId\x12$\n" +
 	"\x0ecaller_user_id\x18\x03 \x01(\tR\fcallerUserId\x12\x19\n" +
-	"\buser_ids\x18\x04 \x03(\tR\auserIds\"*\n" +
+	"\buser_ids\x18\x04 \x03(\tR\auserIds\x12\x1d\n" +
+	"\n" +
+	"media_type\x18\x05 \x01(\tR\tmediaType\"*\n" +
 	"\x0fSignalHangUpReq\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"\x12\n" +
 	"\x10SignalHangUpResp\"*\n" +

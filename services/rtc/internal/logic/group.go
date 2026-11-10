@@ -10,7 +10,11 @@ import (
 )
 
 func (s *Service) inviteGroup(ctx context.Context, caller string, req *rtcpb.SignalInviteInGroupReq) (*rtcpb.SignalMessageAssembleResp, error) {
-	if req == nil || req.GetGroupId() == "" || (req.GetMediaType() != "" && req.GetMediaType() != call.MediaAudio) {
+	media := req.GetMediaType()
+	if media == "" {
+		media = call.MediaAudio
+	}
+	if req == nil || req.GetGroupId() == "" || (media != call.MediaAudio && media != call.MediaVideo) {
 		return nil, errorcode.ErrCallInvalid
 	}
 	if s == nil || s.calls == nil {
@@ -43,7 +47,7 @@ func (s *Service) inviteGroup(ctx context.Context, caller string, req *rtcpb.Sig
 	if len(invitees) > call.MaxGroupVoice-1 {
 		return nil, errorcode.ErrCallFull
 	}
-	step, err := s.calls.InviteGroup(ctx, caller, req.GetGroupId(), call.MediaAudio, invitees)
+	step, err := s.calls.InviteGroup(ctx, caller, req.GetGroupId(), media, invitees)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +55,7 @@ func (s *Service) inviteGroup(ctx context.Context, caller string, req *rtcpb.Sig
 		_, _ = s.calls.LeaveGroup(ctx, caller, step.CallID)
 		return nil, errorcode.ErrCallPeerBusy
 	}
-	url, token, err := s.sign(caller, step.CallID, call.MediaAudio)
+	url, token, err := s.sign(caller, step.CallID, step.Media)
 	if err != nil {
 		_, _ = s.calls.LeaveGroup(ctx, caller, step.CallID)
 		return nil, err
@@ -61,7 +65,7 @@ func (s *Service) inviteGroup(ctx context.Context, caller string, req *rtcpb.Sig
 	s.publishGroup(ctx, ring, call.OpRing, step.Ringing, "", "")
 	return &rtcpb.SignalMessageAssembleResp{SignalResp: &rtcpb.SignalResp{Payload: &rtcpb.SignalResp_InviteInGroup{
 		InviteInGroup: &rtcpb.SignalInviteInGroupResp{
-			Token: token, RoomId: step.CallID, LiveUrl: url, GroupId: step.GroupID, InviteeUserIds: step.Ringing,
+			Token: token, RoomId: step.CallID, LiveUrl: url, GroupId: step.GroupID, InviteeUserIds: step.Ringing, MediaType: step.Media,
 		},
 	}}}, nil
 }
@@ -118,7 +122,7 @@ func (s *Service) joinGroup(ctx context.Context, userID, connID, groupID string)
 	if err != nil {
 		return nil, err
 	}
-	url, token, err := s.sign(userID, step.CallID, call.MediaAudio)
+	url, token, err := s.sign(userID, step.CallID, step.Media)
 	if err != nil {
 		if status == "ringing" {
 			_ = s.calls.RestoreRing(ctx, userID, step.CallID)
@@ -133,7 +137,7 @@ func (s *Service) joinGroup(ctx context.Context, userID, connID, groupID string)
 	}
 	return &rtcpb.SignalMessageAssembleResp{SignalResp: &rtcpb.SignalResp{Payload: &rtcpb.SignalResp_Join{
 		Join: &rtcpb.SignalJoinResp{
-			Token: token, RoomId: step.CallID, LiveUrl: url, GroupId: step.GroupID, UserIds: step.Joined,
+			Token: token, RoomId: step.CallID, LiveUrl: url, GroupId: step.GroupID, UserIds: step.Joined, MediaType: step.Media,
 		},
 	}}}, nil
 }
@@ -162,7 +166,7 @@ func (s *Service) groupCall(ctx context.Context, userID, groupID string) (*rtcpb
 	}
 	return &rtcpb.SignalMessageAssembleResp{SignalResp: &rtcpb.SignalResp{Payload: &rtcpb.SignalResp_GroupCall{
 		GroupCall: &rtcpb.SignalGroupCallResp{
-			RoomId: view.CallID, GroupId: groupID, CallerUserId: view.CallerID, UserIds: view.Joined,
+			RoomId: view.CallID, GroupId: groupID, CallerUserId: view.CallerID, UserIds: view.Joined, MediaType: view.Media,
 		},
 	}}}, nil
 }

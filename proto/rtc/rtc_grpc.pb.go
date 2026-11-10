@@ -27,16 +27,16 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// RtcService is the call signaling service for private calls and group voice.
+// RtcService is the call signaling service for private calls and group calls.
 // OpenIM's RtcService also carries custom signals, room webhooks, and call records.
-// Those are not part of this service. Audio bytes stay on LiveKit.
+// Those are not part of this service. Media bytes stay on LiveKit.
 // msggateway forwards websocket frame 1004 here and delivers frame 2006 from the
 // events this service publishes. The operator is the gateway's authenticated user.
 type RtcServiceClient interface {
 	// SignalMessageAssemble runs one signaling step.
-	// Field 2 is the group voice invite. A private invite stays on field 1.
+	// Field 2 is the group invite. A private invite stays on field 1.
 	SignalMessageAssemble(ctx context.Context, in *SignalMessageAssembleReq, opts ...grpc.CallOption) (*SignalMessageAssembleResp, error)
-	// SignalGetTokenByRoomID signs a new microphone token for someone already in an accepted call.
+	// SignalGetTokenByRoomID signs a new media token for someone already in an accepted call.
 	SignalGetTokenByRoomID(ctx context.Context, in *SignalGetTokenByRoomIDReq, opts ...grpc.CallOption) (*SignalGetTokenByRoomIDResp, error)
 }
 
@@ -72,16 +72,16 @@ func (c *rtcServiceClient) SignalGetTokenByRoomID(ctx context.Context, in *Signa
 // All implementations must embed UnimplementedRtcServiceServer
 // for forward compatibility.
 //
-// RtcService is the call signaling service for private calls and group voice.
+// RtcService is the call signaling service for private calls and group calls.
 // OpenIM's RtcService also carries custom signals, room webhooks, and call records.
-// Those are not part of this service. Audio bytes stay on LiveKit.
+// Those are not part of this service. Media bytes stay on LiveKit.
 // msggateway forwards websocket frame 1004 here and delivers frame 2006 from the
 // events this service publishes. The operator is the gateway's authenticated user.
 type RtcServiceServer interface {
 	// SignalMessageAssemble runs one signaling step.
-	// Field 2 is the group voice invite. A private invite stays on field 1.
+	// Field 2 is the group invite. A private invite stays on field 1.
 	SignalMessageAssemble(context.Context, *SignalMessageAssembleReq) (*SignalMessageAssembleResp, error)
-	// SignalGetTokenByRoomID signs a new microphone token for someone already in an accepted call.
+	// SignalGetTokenByRoomID signs a new media token for someone already in an accepted call.
 	SignalGetTokenByRoomID(context.Context, *SignalGetTokenByRoomIDReq) (*SignalGetTokenByRoomIDResp, error)
 	mustEmbedUnimplementedRtcServiceServer()
 }

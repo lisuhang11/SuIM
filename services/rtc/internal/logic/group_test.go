@@ -14,6 +14,60 @@ import (
 	rtcpb "github.com/lisuhang11/SuIM/proto/rtc"
 )
 
+func TestGroupVideoInviteSignsCamera(t *testing.T) {
+	rdb := openRedis(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	secret := strings.Repeat("v", 32)
+	host, a := "vh"+strconv.FormatInt(time.Now().UnixNano(), 36), "va"+strconv.FormatInt(time.Now().UnixNano(), 36)
+	groupID := "vg" + host
+	svc := New(call.New(rdb), relations{friends: true}, livekit.Config{URL: "ws://127.0.0.1:7880", Key: "suim", Secret: secret})
+	svc.UseGroups(groupSet{members: map[string]map[string]bool{groupID: {host: true, a: true}}})
+	t.Cleanup(func() {
+		bg := context.Background()
+		_ = rdb.Del(bg, call.Prefix+"busy:"+host, call.Prefix+"busy:"+a, call.Prefix+"group:"+groupID).Err()
+	})
+	invited, err := svc.SignalMessageAssemble(rpcctx.WithUser(ctx, host), &rtcpb.SignalMessageAssembleReq{
+		SignalReq: &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_InviteInGroup{InviteInGroup: &rtcpb.SignalInviteInGroupReq{
+			GroupId: groupID, InviteeUserIds: []string{a}, MediaType: call.MediaVideo,
+		}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	room := invited.GetSignalResp().GetInviteInGroup()
+	if room.GetMediaType() != call.MediaVideo {
+		t.Fatalf("media %s", room.GetMediaType())
+	}
+	sources, err := livekit.Sources(secret, room.GetToken())
+	if err != nil || len(sources) != 2 || sources[0] != "microphone" || sources[1] != "camera" {
+		t.Fatalf("sources %v err=%v", sources, err)
+	}
+	view, err := svc.SignalMessageAssemble(rpcctx.WithUser(ctx, a), &rtcpb.SignalMessageAssembleReq{
+		SignalReq: &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_GroupCall{GroupCall: &rtcpb.SignalGroupCallReq{GroupId: groupID}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := view.GetSignalResp().GetGroupCall(); got.GetMediaType() != call.MediaVideo || got.GetRoomId() != room.GetRoomId() {
+		t.Fatalf("group call %+v", got)
+	}
+	joined, err := svc.SignalMessageAssemble(rpcctx.WithUser(ctx, a), &rtcpb.SignalMessageAssembleReq{
+		SignalReq: &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_Join{Join: &rtcpb.SignalJoinReq{GroupId: groupID}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	join := joined.GetSignalResp().GetJoin()
+	if join.GetMediaType() != call.MediaVideo {
+		t.Fatalf("join media %s", join.GetMediaType())
+	}
+	sources, err = livekit.Sources(secret, join.GetToken())
+	if err != nil || len(sources) != 2 || sources[1] != "camera" {
+		t.Fatalf("join sources %v err=%v", sources, err)
+	}
+}
+
 func TestGroupVoiceInviteAcceptAndLeave(t *testing.T) {
 	rdb := openRedis(t)
 	ctx, cancel := context.WithCancel(context.Background())

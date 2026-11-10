@@ -63,8 +63,9 @@ func (b *Board) Kind(ctx context.Context, callID string) (string, error) {
 	return KindSingle, nil
 }
 
-// InviteGroup opens a group voice room and rings the invitees who are not already in a call.
-// The caller is in the room immediately. A busy invitee is returned in Busy and is not rung.
+// InviteGroup opens a group room and rings the invitees who are not already in a call.
+// media is audio or video and stays fixed for the room. The caller is in the room immediately.
+// A busy invitee is returned in Busy and is not rung.
 func (b *Board) InviteGroup(ctx context.Context, caller, groupID, media string, invitees []string) (GroupStep, error) {
 	step := GroupStep{CallerID: caller, GroupID: groupID, Media: media, Actor: caller}
 	if b == nil || b.rdb == nil {
@@ -74,7 +75,7 @@ func (b *Board) InviteGroup(ctx context.Context, caller, groupID, media string, 
 	if len(invitees) > MaxGroupVoice-1 {
 		return step, errorcode.ErrCallFull
 	}
-	if !validUser(caller) || !validUser(groupID) || media != MediaAudio || len(invitees) == 0 {
+	if !validUser(caller) || !validUser(groupID) || (media != MediaAudio && media != MediaVideo) || len(invitees) == 0 {
 		return step, errorcode.ErrCallInvalid
 	}
 	callID, err := newCallID()

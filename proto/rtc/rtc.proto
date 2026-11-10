@@ -4,16 +4,16 @@ package rtc;
 
 option go_package = "github.com/lisuhang11/SuIM/proto/rtc;rtcpb";
 
-// RtcService is the call signaling service for private calls and group voice.
+// RtcService is the call signaling service for private calls and group calls.
 // OpenIM's RtcService also carries custom signals, room webhooks, and call records.
-// Those are not part of this service. Audio bytes stay on LiveKit.
+// Those are not part of this service. Media bytes stay on LiveKit.
 // msggateway forwards websocket frame 1004 here and delivers frame 2006 from the
 // events this service publishes. The operator is the gateway's authenticated user.
 service RtcService {
   // SignalMessageAssemble runs one signaling step.
-  // Field 2 is the group voice invite. A private invite stays on field 1.
+  // Field 2 is the group invite. A private invite stays on field 1.
   rpc SignalMessageAssemble(SignalMessageAssembleReq) returns (SignalMessageAssembleResp);
-  // SignalGetTokenByRoomID signs a new microphone token for someone already in an accepted call.
+  // SignalGetTokenByRoomID signs a new media token for someone already in an accepted call.
   rpc SignalGetTokenByRoomID(SignalGetTokenByRoomIDReq) returns (SignalGetTokenByRoomIDResp);
 }
 
@@ -96,9 +96,9 @@ message SignalAcceptResp {
   repeated string user_ids = 5;
 }
 
-// SignalInviteInGroupReq starts a group voice room.
+// SignalInviteInGroupReq starts a group room.
 // The host joins immediately. Each invitee rings until they answer, decline, or time out.
-// media_type must be "audio".
+// media_type is "audio" or "video". Empty means audio.
 message SignalInviteInGroupReq {
   string group_id = 1;
   repeated string invitee_user_ids = 2;
@@ -111,9 +111,11 @@ message SignalInviteInGroupResp {
   string live_url = 3;
   string group_id = 4;
   repeated string invitee_user_ids = 5;
+  // media_type is the room media fixed at invite time.
+  string media_type = 6;
 }
 
-// SignalJoinReq enters a group voice room that is already open.
+// SignalJoinReq enters a group room that is already open.
 message SignalJoinReq {
   string group_id = 1;
 }
@@ -124,9 +126,11 @@ message SignalJoinResp {
   string live_url = 3;
   string group_id = 4;
   repeated string user_ids = 5;
+  // media_type is the room media fixed at invite time.
+  string media_type = 6;
 }
 
-// SignalGroupCallReq reads the voice room currently open in a group.
+// SignalGroupCallReq reads the room currently open in a group.
 // An empty room_id means the group has no call.
 message SignalGroupCallReq {
   string group_id = 1;
@@ -137,6 +141,8 @@ message SignalGroupCallResp {
   string group_id = 2;
   string caller_user_id = 3;
   repeated string user_ids = 4;
+  // media_type is "audio" or "video" when a room is open.
+  string media_type = 5;
 }
 
 // SignalHangUpReq is OpenIM's SignalHungUpReq.

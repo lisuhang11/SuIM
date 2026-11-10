@@ -77,6 +77,23 @@ func TestGroupRejectEndsWhenOnlyHostRemains(t *testing.T) {
 	}
 }
 
+func TestGroupVideoInviteBlocksAudioInSameGroup(t *testing.T) {
+	board := openBoard(t)
+	ctx := context.Background()
+	host, a := testUsers()
+	groupID := "gv" + host
+	step, err := board.InviteGroup(ctx, host, groupID, MediaVideo, []string{a})
+	if err != nil || step.Media != MediaVideo || !sameSet(step.Joined, []string{host}) || !sameSet(step.Ringing, []string{a}) {
+		t.Fatalf("video invite %+v err=%v", step, err)
+	}
+	if _, err := board.InviteGroup(ctx, a+"x", groupID, MediaAudio, []string{a}); !errorIs(err, errorcode.ErrCallGroupBusy) {
+		t.Fatalf("audio while video open: %v", err)
+	}
+	if _, err := board.InviteGroup(ctx, host, groupID+"2", "film", []string{a}); !errorIs(err, errorcode.ErrCallInvalid) {
+		t.Fatalf("bad media: %v", err)
+	}
+}
+
 func TestGroupBusyInviteeAndLateJoin(t *testing.T) {
 	board := openBoard(t)
 	ctx := context.Background()

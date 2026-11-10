@@ -41,7 +41,7 @@ const (
 	MediaAudio = "audio"
 	MediaVideo = "video"
 
-	// KindSingle is a two-person call. KindGroup is a group voice room.
+	// KindSingle is a two-person call. KindGroup is a group audio or video room.
 	KindSingle = "single"
 	KindGroup  = "group"
 

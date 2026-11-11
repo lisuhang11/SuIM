@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     `password_hash`       VARCHAR(255)  NOT NULL                COMMENT '密码哈希',
     `nickname`            VARCHAR(255)  NOT NULL DEFAULT ''     COMMENT '昵称',
     `avatar_url`          VARCHAR(1024) NOT NULL DEFAULT ''     COMMENT '头像URL',
-    `app_manger_level`    INT           NOT NULL DEFAULT 0      COMMENT '管理员级别',
+    `app_manager_level`    INT           NOT NULL DEFAULT 0      COMMENT '管理员级别',
     `global_recv_msg_opt` INT           NOT NULL DEFAULT 0      COMMENT '全局消息接收选项',
     `is_active`           TINYINT(1)    NOT NULL DEFAULT 1      COMMENT '是否激活',
     `area_code`           VARCHAR(16)   NOT NULL DEFAULT ''     COMMENT '手机区号',

@@ -86,6 +86,14 @@ func run(cfgPath string) error {
 
 	service := logic.New(call.New(rdb), rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)), cfg.LiveKit)
 	service.UseGroups(rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn)))
+	if cfg.Agents.Enabled {
+		stream := cfg.Agents.Stream
+		if stream == "" {
+			stream = "suim:agent:dispatch"
+		}
+		service.UseAgents(cfg.Agents, logic.NewRedisAgentDispatcher(rdb, stream))
+		slog.Info("livekit agents dispatch enabled", "stream", stream, "bots", len(cfg.Agents.BotUserIDs))
+	}
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)

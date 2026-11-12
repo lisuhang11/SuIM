@@ -6,6 +6,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/call"
 	"github.com/lisuhang11/SuIM/pkg/livekit"
 	rtcpb "github.com/lisuhang11/SuIM/proto/rtc"
+	svcconfig "github.com/lisuhang11/SuIM/services/rtc/internal/config"
 )
 
 // 私聊呼叫前检查好友和拉黑。
@@ -22,10 +23,12 @@ type Groups interface {
 // 保存通话状态。msggateway 只转发长连接帧。
 type Service struct {
 	rtcpb.UnimplementedRtcServiceServer
-	calls     *call.Board
-	relations Relations
-	groups    Groups
-	media     livekit.Config
+	calls          *call.Board
+	relations      Relations
+	groups         Groups
+	media          livekit.Config
+	agents         svcconfig.AgentsConfig
+	agentsDispatch AgentDispatcher
 }
 
 // 打开群语音。未注入时群邀请会被拒绝。

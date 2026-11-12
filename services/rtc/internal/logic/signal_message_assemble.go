@@ -50,6 +50,9 @@ func (s *Service) invite(ctx context.Context, caller string, req *rtcpb.SignalIn
 		return nil, errorcode.ErrCallInvalid
 	}
 	invitee := req.Invitation.InviteeUserId
+	if s.agents.Enabled && isAgentBot(s.agents, invitee) {
+		return s.inviteBot(ctx, caller, invitee, media)
+	}
 	if err := s.authorize(ctx, caller, invitee); err != nil {
 		return nil, err
 	}
@@ -95,6 +98,18 @@ func (s *Service) accept(ctx context.Context, userID, connID, roomID string) (*r
 	caller.Token = callerToken
 	s.publish(ctx, caller, call.OpAccept, []string{sig.CallerID}, "")
 	s.publish(ctx, sig, call.OpAnswered, []string{sig.CalleeID}, connID)
+	if s.agents.JoinOnAccept {
+		s.dispatchAgent(ctx, AgentJob{
+			RoomID:       sig.CallID,
+			Media:        sig.Media,
+			LinkedUserID: sig.CallerID,
+			CallerID:     sig.CallerID,
+			CalleeID:     sig.CalleeID,
+			Kind:         "single",
+			Reason:       "human_accept",
+			Identity:     agentIdentity(s.agents),
+		})
+	}
 	return &rtcpb.SignalMessageAssembleResp{SignalResp: &rtcpb.SignalResp{Payload: &rtcpb.SignalResp_Accept{
 		Accept: &rtcpb.SignalAcceptResp{Token: calleeToken, RoomId: sig.CallID, LiveUrl: calleeURL},
 	}}}, nil

@@ -87,6 +87,7 @@ func run(cfgPath, migratePath string) error {
 	messages := msgClient{msgpb.NewMsgServiceClient(msgConn)}
 	conversation := logic.New(st, messages)
 	conversation.UseSeq(messages)
+	conversation.UseHistory(messages)
 	conversationpb.RegisterConversationServiceServer(srv, conversation)
 
 	id, err := newID()
@@ -156,6 +157,19 @@ func (c msgClient) SetUserMinSeq(ctx context.Context, conversationID string, use
 		MinSeq:         seq,
 	})
 	return err
+}
+
+func (c msgClient) LastSeqByTime(ctx context.Context, conversationID string, timeMs int64) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	resp, err := c.client.GetLastMessageSeqByTime(ctx, &msgpb.GetLastMessageSeqByTimeReq{
+		ConversationId: conversationID,
+		Time:           timeMs,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return resp.GetSeq(), nil
 }
 
 func mysqlDSN(cfg config.MySQL) string {

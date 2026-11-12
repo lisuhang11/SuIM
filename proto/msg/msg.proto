@@ -24,6 +24,10 @@ service MsgService {
   rpc SetUserConversationMaxSeq(SetUserConversationMaxSeqReq) returns (SetUserConversationMaxSeqResp);
   // SetUserConversationMinSeq writes one user's visible floor. Zero clears it.
   rpc SetUserConversationMinSeq(SetUserConversationMinSeqReq) returns (SetUserConversationMinSeqResp);
+  // DestructMsgs hard-deletes messages older than timestamp and raises conversation min_seq.
+  rpc DestructMsgs(DestructMsgsReq) returns (DestructMsgsResp);
+  // GetLastMessageSeqByTime returns the greatest seq at or before time for one conversation.
+  rpc GetLastMessageSeqByTime(GetLastMessageSeqByTimeReq) returns (GetLastMessageSeqByTimeResp);
 }
 
 // OfflinePushInfo is the notification payload on MsgData field 20.
@@ -222,6 +226,24 @@ message SetUserConversationMinSeqReq {
 }
 
 message SetUserConversationMinSeqResp {}
+
+message DestructMsgsReq {
+  int64 timestamp = 1;
+  int32 limit = 2;
+}
+
+message DestructMsgsResp {
+  int32 count = 1;
+}
+
+message GetLastMessageSeqByTimeReq {
+  string conversation_id = 1;
+  int64 time = 2;
+}
+
+message GetLastMessageSeqByTimeResp {
+  int64 seq = 1;
+}
 
 message SetAppBackgroundStatusReq {
   string user_id = 1;

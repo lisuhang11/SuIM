@@ -29,6 +29,8 @@ service ThirdService {
   rpc CompleteMultipartUpload(CompleteMultipartUploadReq) returns (CompleteMultipartUploadResp);
   rpc InitiateFormData(InitiateFormDataReq) returns (InitiateFormDataResp);
   rpc CompleteFormData(CompleteFormDataReq) returns (CompleteFormDataResp);
+  // DeleteOutdatedData removes object rows older than expire_time and drops unused MinIO keys.
+  rpc DeleteOutdatedData(DeleteOutdatedDataReq) returns (DeleteOutdatedDataResp);
 }
 
 // KeyValues is one signed-request header or query key.
@@ -146,4 +148,14 @@ message CompleteFormDataReq {
 
 message CompleteFormDataResp {
   string url = 1 [json_name = "url"];
+}
+
+message DeleteOutdatedDataReq {
+  int64 expire_time = 1 [json_name = "expire_time"];
+  repeated string object_group = 2 [json_name = "object_group"];
+  int32 limit = 3 [json_name = "limit"];
+}
+
+message DeleteOutdatedDataResp {
+  int32 count = 1 [json_name = "count"];
 }

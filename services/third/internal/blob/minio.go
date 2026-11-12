@@ -231,6 +231,16 @@ func isMissing(err error) bool {
 	}
 }
 
+
+// Delete removes a finished object from the bucket. Missing keys are ignored.
+func (m *Minio) Delete(ctx context.Context, key string) error {
+	err := m.core.RemoveObject(ctx, m.bucket, key, minio.RemoveObjectOptions{})
+	if err != nil && !isMissing(err) {
+		return err
+	}
+	return nil
+}
+
 // NormalizeETag strips quotes so a part ETag can be compared with an MD5 hex.
 func NormalizeETag(etag string) string {
 	return strings.ToLower(strings.Trim(etag, `"`))

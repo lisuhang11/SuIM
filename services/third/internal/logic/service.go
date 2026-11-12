@@ -39,6 +39,9 @@ type ObjectStore interface {
 	FindByHash(ctx context.Context, hash string) (*model.Object, error)
 	FindByName(ctx context.Context, name string) (*model.Object, error)
 	InsertObject(ctx context.Context, obj *model.Object) error
+	FindExpired(ctx context.Context, expireAt time.Time, causes []string, limit int) ([]*model.Object, error)
+	DeleteByName(ctx context.Context, name string) error
+	CountByStorageKey(ctx context.Context, key string) (int64, error)
 }
 
 // 访问对象存储。分片字节由客户端自己上传。
@@ -51,6 +54,7 @@ type Parts interface {
 	Stat(ctx context.Context, key string) (int64, error)
 	Head(ctx context.Context, key string) (size int64, etag string, err error)
 	Form(ctx context.Context, key string, size int64, contentType string, expires time.Time) (*model.FormCredential, error)
+	Delete(ctx context.Context, key string) error
 }
 
 // 分片计划和未完成上传的保留时间。

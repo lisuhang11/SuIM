@@ -1,0 +1,35 @@
+redis:
+  address:
+    - 127.0.0.1:6379
+  username: ""
+  password: suIM123
+  redisMode: standalone
+  db: 0
+  maxRetry: 3
+  poolSize: 10
+
+registry:
+  type: etcd
+  etcd:
+    endpoints:
+      - 127.0.0.1:2379
+    rootDir: /services
+    username: ""
+    password: ""
+    dialTimeout: 5
+    ttl: 10
+
+cronTask:
+  # cron expression; default daily at 02:00
+  cronExecuteTime: "0 2 * * *"
+  # keep chat records for N days; <=0 disables hard delete
+  retainChatRecords: 365
+  # keep uploaded objects for N days; <=0 disables object cleanup
+  fileExpireTime: 180
+  deleteObjectType:
+    - msg-picture
+    - msg-file
+    - msg-voice
+    - msg-video
+    - msg-video-snapshot
+    - sdklog

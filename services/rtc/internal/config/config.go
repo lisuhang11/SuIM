@@ -15,6 +15,16 @@ type Config struct {
 	Redis      config.Redis    `yaml:"redis"`
 	Registry   register.Config `yaml:"registry"`
 	LiveKit    livekit.Config  `yaml:"livekit"`
+	Agents     AgentsConfig    `yaml:"agents"`
+}
+
+// AgentsConfig controls LiveKit Agent dispatch from the rtc service.
+type AgentsConfig struct {
+	Enabled      bool     `yaml:"enabled"`
+	Stream       string   `yaml:"stream"`
+	BotUserIDs   []string `yaml:"botUserIds"`
+	Identity     string   `yaml:"identity"`
+	JoinOnAccept bool     `yaml:"joinOnAccept"`
 }
 
 func (c *Config) Validate() error {

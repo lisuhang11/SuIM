@@ -20,13 +20,19 @@ type UserSeq interface {
 	SetUserMinSeq(ctx context.Context, conversationID string, userIDs []string, seq int64) error
 }
 
+// 按发送时间查消息序号，供定时清理使用。
+type HistorySeq interface {
+	LastSeqByTime(ctx context.Context, conversationID string, timeMs int64) (int64, error)
+}
+
 // 会话 gRPC 服务。一行会话只属于它的 owner。
 type Server struct {
 	conversationpb.UnimplementedConversationServiceServer
-	store  *store.Store
-	sender MsgSender
-	seq    UserSeq
-	now    func() time.Time
+	store   *store.Store
+	sender  MsgSender
+	seq     UserSeq
+	history HistorySeq
+	now     func() time.Time
 }
 
 // 用存储构造会话服务。序号写入和通知稍后注入。
@@ -38,5 +44,12 @@ func New(st *store.Store, sender MsgSender) *Server {
 func (s *Server) UseSeq(seq UserSeq) {
 	if s != nil {
 		s.seq = seq
+	}
+}
+
+// 接入消息服务的按时间序号查询。
+func (s *Server) UseHistory(history HistorySeq) {
+	if s != nil {
+		s.history = history
 	}
 }

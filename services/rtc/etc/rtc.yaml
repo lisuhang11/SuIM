@@ -27,3 +27,12 @@ livekit:
   url: ws://127.0.0.1:7880
   key: suim
   secret: 1fcb7fa34d15c24e3ba7061eb29ccbcb252f775b34245ebda640b6861339a197
+
+# LiveKit Agents: rtc writes jobs to Redis; agents/voice-assistant consumes them.
+agents:
+  enabled: true
+  stream: suim:agent:dispatch
+  identity: agent:assistant
+  botUserIds:
+    - suim-agent
+  joinOnAccept: false

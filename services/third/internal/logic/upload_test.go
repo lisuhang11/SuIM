@@ -244,6 +244,30 @@ func (m *memObjects) InsertObject(_ context.Context, obj *model.Object) error {
 	return nil
 }
 
+func (m *memObjects) FindExpired(context.Context, time.Time, []string, int) ([]*model.Object, error) {
+	return nil, nil
+}
+
+func (m *memObjects) DeleteByName(_ context.Context, name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.names, name)
+	return nil
+}
+
+func (m *memObjects) CountByStorageKey(_ context.Context, key string) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var n int64
+	for _, obj := range m.names {
+		if obj != nil && obj.StorageKey == key {
+			n++
+		}
+	}
+	return n, nil
+}
+
+
 type memUpload struct {
 	parts map[int][]byte
 }
@@ -361,6 +385,14 @@ func (m *memParts) Form(_ context.Context, key string, _ int64, contentType stri
 		Expires:      expires,
 		SuccessCodes: []int{200},
 	}, nil
+}
+
+func (m *memParts) Delete(_ context.Context, key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.objects, key)
+	delete(m.heads, key)
+	return nil
 }
 
 type memHead struct {

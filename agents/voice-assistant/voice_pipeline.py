@@ -1,31 +1,27 @@
-"""Local STT → LLM → TTS pipeline over a LiveKit room (Phase 2).
+"""LiveKit Agents AgentSession pipeline (STT → LLM → TTS) for SuIM voice bot.
 
-Uses edge-tts for speech out. STT/LLM use OpenAI-compatible APIs (e.g. SiliconFlow).
+Keeps SuIM's Redis room dispatch: worker connects the room itself, then runs
+AgentSession under fake_job_context (no LiveKit Cloud / AgentServer required).
 """
 
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 import os
-import struct
-import wave
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-import av
-import edge_tts
-import numpy as np
 from livekit import rtc
+from livekit.agents import Agent, AgentSession, room_io
+from livekit.agents.testing import fake_job_context
+from livekit.agents.voice import ConversationItemAddedEvent, UserInputTranscribedEvent
+from livekit.plugins import openai, silero
+
+import edge_tts_plugin
 
 LOG = logging.getLogger("suim-agent.voice")
 
-SAMPLE_RATE = 48000
-NUM_CHANNELS = 1
-FRAME_MS = 20
-SAMPLES_PER_FRAME = SAMPLE_RATE * FRAME_MS // 1000
-
-EDGE_VOICE = os.environ.get("AGENT_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
 GREETING = os.environ.get("AGENT_GREETING", "你好，我是 SuIM 语音助手。有什么可以帮你？")
 INSTRUCTIONS = os.environ.get(
     "AGENT_INSTRUCTIONS",
@@ -35,301 +31,149 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "").strip() or None
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_STT_MODEL = os.environ.get("OPENAI_STT_MODEL", "whisper-1")
-# SiliconFlow SenseVoice rejects unknown fields like language=zh.
-STT_SEND_LANGUAGE = os.environ.get("OPENAI_STT_LANGUAGE", "").strip()
+# SenseVoice / some gateways reject unknown language=; detect_language omits it.
+STT_DETECT_LANGUAGE = os.environ.get("OPENAI_STT_DETECT_LANGUAGE", "1").strip() not in {
+    "0",
+    "false",
+    "False",
+    "",
+}
+STT_LANGUAGE = os.environ.get("OPENAI_STT_LANGUAGE", "").strip()
+EDGE_VOICE = os.environ.get("AGENT_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
+TTS_SAMPLE_RATE = int(os.environ.get("AGENT_TTS_SAMPLE_RATE", "24000"))
 
-SPEECH_RMS = float(os.environ.get("AGENT_VAD_RMS", "0.008"))
-SILENCE_MS = int(os.environ.get("AGENT_SILENCE_MS", "800"))
-MIN_SPEECH_MS = int(os.environ.get("AGENT_MIN_SPEECH_MS", "300"))
-MAX_UTTERANCE_MS = int(os.environ.get("AGENT_MAX_UTTERANCE_MS", "15000"))
+_VAD: Any | None = None
 
 
 def has_llm() -> bool:
     return bool(OPENAI_API_KEY)
 
 
-def _openai_client():
-    from openai import OpenAI
+def _require_key() -> None:
+    if not OPENAI_API_KEY:
+        raise RuntimeError(
+            "OPENAI_API_KEY is required for AgentSession (SiliconFlow or OpenAI-compatible)"
+        )
 
-    kwargs: dict[str, Any] = {"api_key": OPENAI_API_KEY}
+
+def _vad() -> Any:
+    global _VAD
+    if _VAD is None:
+        LOG.info("loading Silero VAD")
+        _VAD = silero.VAD.load()
+    return _VAD
+
+
+def build_session() -> AgentSession:
+    _require_key()
+    stt_kwargs: dict[str, Any] = {
+        "model": OPENAI_STT_MODEL,
+        "api_key": OPENAI_API_KEY,
+        "use_realtime": False,
+    }
     if OPENAI_BASE_URL:
-        kwargs["base_url"] = OPENAI_BASE_URL
-    return OpenAI(**kwargs)
+        stt_kwargs["base_url"] = OPENAI_BASE_URL
+    if STT_DETECT_LANGUAGE or not STT_LANGUAGE:
+        stt_kwargs["detect_language"] = True
+    else:
+        stt_kwargs["language"] = STT_LANGUAGE
+
+    llm_kwargs: dict[str, Any] = {
+        "model": OPENAI_MODEL,
+        "api_key": OPENAI_API_KEY,
+        "temperature": 0.7,
+    }
+    if OPENAI_BASE_URL:
+        llm_kwargs["base_url"] = OPENAI_BASE_URL
+
+    return AgentSession(
+        vad=_vad(),
+        stt=openai.STT(**stt_kwargs),
+        llm=openai.LLM(**llm_kwargs),
+        tts=edge_tts_plugin.TTS(voice=EDGE_VOICE, sample_rate=TTS_SAMPLE_RATE),
+    )
 
 
-async def synthesize_pcm(text: str, sample_rate: int = SAMPLE_RATE) -> bytes:
-    text = (text or "").strip()
-    if not text:
-        return b""
-    communicate = edge_tts.Communicate(text, EDGE_VOICE)
-    mp3 = bytearray()
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            mp3.extend(chunk["data"])
-    if not mp3:
-        return b""
-    container = av.open(io.BytesIO(bytes(mp3)), format="mp3")
-    resampler = av.audio.resampler.AudioResampler(format="s16", layout="mono", rate=sample_rate)
-    pcm = bytearray()
-    for frame in container.decode(audio=0):
-        for out in resampler.resample(frame):
-            pcm.extend(bytes(out.planes[0]))
-    for out in resampler.resample(None):
-        pcm.extend(bytes(out.planes[0]))
-    return bytes(pcm)
+def _item_text(item: Any) -> str:
+    text = getattr(item, "text_content", None)
+    if callable(text):
+        text = text()
+    if isinstance(text, str):
+        return text.strip()
+    content = getattr(item, "content", None)
+    if isinstance(content, list):
+        parts = [c for c in content if isinstance(c, str)]
+        return "".join(parts).strip()
+    return ""
 
 
-def pcm_to_wav(pcm: bytes, sample_rate: int = SAMPLE_RATE) -> bytes:
-    buf = io.BytesIO()
-    with wave.open(buf, "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(sample_rate)
-        wf.writeframes(pcm)
-    return buf.getvalue()
+async def run_agent_session(
+    room: rtc.Room,
+    *,
+    linked_user_id: str = "",
+    on_transcript: Callable[[str, str], Awaitable[None]] | None = None,
+    greeting: str | None = None,
+) -> None:
+    """Run AgentSession until the linked user leaves / room closes / session ends."""
+    session = build_session()
+    done = asyncio.Event()
 
+    def _wire_transcripts() -> None:
+        if on_transcript is None:
+            return
 
-async def transcribe(pcm: bytes) -> str:
-    if not has_llm() or not pcm:
-        return ""
+        @session.on("user_input_transcribed")
+        def _on_user(ev: UserInputTranscribedEvent) -> None:
+            if not ev.is_final:
+                return
+            text = (ev.transcript or "").strip()
+            if not text:
+                return
+            asyncio.create_task(on_transcript("user", text))
 
-    def _run() -> str:
-        client = _openai_client()
-        wav = pcm_to_wav(pcm)
-        bio = io.BytesIO(wav)
-        bio.name = "utterance.wav"
-        kwargs: dict[str, Any] = {"model": OPENAI_STT_MODEL, "file": bio}
-        if STT_SEND_LANGUAGE:
-            kwargs["language"] = STT_SEND_LANGUAGE
-        resp = client.audio.transcriptions.create(**kwargs)
-        return (getattr(resp, "text", None) or "").strip()
+        @session.on("conversation_item_added")
+        def _on_item(ev: ConversationItemAddedEvent) -> None:
+            item = ev.item
+            role = getattr(item, "role", None)
+            if role != "assistant":
+                return
+            text = _item_text(item)
+            if not text:
+                return
+            asyncio.create_task(on_transcript("assistant", text))
 
-    return await asyncio.to_thread(_run)
+        @session.on("close")
+        def _on_close(_ev: Any = None) -> None:
+            done.set()
 
+    _wire_transcripts()
 
-async def chat_reply(history: list[dict[str, str]], user_text: str) -> str:
-    if not user_text.strip():
-        return ""
-    if not has_llm():
-        return "我已经听到你了。要开启完整对话，请给助手配置 OPENAI_API_KEY。"
-
-    def _run() -> str:
-        client = _openai_client()
-        messages = [{"role": "system", "content": INSTRUCTIONS}]
-        messages.extend(history[-12:])
-        messages.append({"role": "user", "content": user_text})
-        resp = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=200,
+    if linked_user_id:
+        room_options = room_io.RoomOptions(
+            participant_identity=linked_user_id,
+            close_on_disconnect=True,
+            delete_room_on_close=False,
         )
-        return (resp.choices[0].message.content or "").strip()
+    else:
+        room_options = room_io.RoomOptions(close_on_disconnect=True, delete_room_on_close=False)
 
-    return await asyncio.to_thread(_run)
+    identity = ""
+    try:
+        identity = room.local_participant.identity or "agent:assistant"
+    except Exception:  # noqa: BLE001
+        identity = "agent:assistant"
 
-
-class RoomVoice:
-    """Publish TTS and run a simple energy-VAD conversation loop."""
-
-    def __init__(
-        self,
-        room: rtc.Room,
-        *,
-        linked_user_id: str,
-        on_transcript: Callable[[str, str], Awaitable[None]] | None = None,
-    ) -> None:
-        self.room = room
-        self.linked = linked_user_id
-        self.on_transcript = on_transcript
-        self.source = rtc.AudioSource(SAMPLE_RATE, NUM_CHANNELS)
-        self.track = rtc.LocalAudioTrack.create_audio_track("agent-mic", self.source)
-        self._history: list[dict[str, str]] = []
-        self._speaking = asyncio.Lock()
-        self._stop = asyncio.Event()
-        self._greeted = False
-
-    async def start(self) -> None:
-        opts = rtc.TrackPublishOptions()
-        opts.source = rtc.TrackSource.SOURCE_MICROPHONE
-        pub = await self.room.local_participant.publish_track(self.track, opts)
-        LOG.info("published agent audio track sid=%s", getattr(pub, "sid", ""))
-        # Wait for the caller so the greeting is not played into an empty room.
-        participant = await self._wait_participant(timeout_s=45)
-        if participant is None:
-            LOG.warning("caller never joined; greeting anyway")
-        else:
-            LOG.info("caller present identity=%s; waiting for mic", participant.identity)
-            await self._wait_audio_track(participant, timeout_s=20)
-            await asyncio.sleep(0.4)
-        await self.say(GREETING, role="assistant")
-        self._greeted = True
-
-    def stop(self) -> None:
-        self._stop.set()
-
-    async def say(self, text: str, *, role: str = "assistant") -> None:
-        text = (text or "").strip()
-        if not text:
-            return
-        async with self._speaking:
-            LOG.info("say role=%s text=%s", role, text[:80])
-            if self.on_transcript:
-                try:
-                    await self.on_transcript(role, text)
-                except Exception:  # noqa: BLE001
-                    LOG.exception("transcript callback failed")
-            pcm = await synthesize_pcm(text)
-            LOG.info("tts pcm_bytes=%d", len(pcm))
-            await self._play_pcm(pcm)
-
-    async def _play_pcm(self, pcm: bytes) -> None:
-        if not pcm:
-            return
-        frame_bytes = SAMPLES_PER_FRAME * 2
-        if len(pcm) % frame_bytes:
-            pcm += b"\x00" * (frame_bytes - len(pcm) % frame_bytes)
-        mv = memoryview(pcm)
-        for i in range(0, len(mv), frame_bytes):
-            if self._stop.is_set():
-                break
-            chunk = bytes(mv[i : i + frame_bytes])
-            frame = rtc.AudioFrame(chunk, SAMPLE_RATE, NUM_CHANNELS, SAMPLES_PER_FRAME)
-            await self.source.capture_frame(frame)
-        # Let the last frames drain.
-        await asyncio.sleep(0.05)
-
-    async def run_loop(self) -> None:
-        participant = await self._wait_participant(timeout_s=60)
-        if participant is None:
-            LOG.warning("listen aborted: no caller")
-            return
-        track = await self._wait_audio_track(participant, timeout_s=60)
-        if track is None:
-            LOG.warning("listen aborted: no mic track")
-            return
-        LOG.info("listening to remote audio from %s", participant.identity)
-        stream = rtc.AudioStream.from_track(
-            track=track,
-            sample_rate=SAMPLE_RATE,
-            num_channels=NUM_CHANNELS,
+    with fake_job_context(room=room, agent_identity=identity):
+        await session.start(
+            agent=Agent(instructions=INSTRUCTIONS),
+            room=room,
+            room_options=room_options,
         )
-        silence_needed = max(1, SILENCE_MS // FRAME_MS)
-        min_speech = max(1, MIN_SPEECH_MS // FRAME_MS)
-        max_utt = max(min_speech, MAX_UTTERANCE_MS // FRAME_MS)
-
-        buf = bytearray()
-        speech_frames = 0
-        silence_frames = 0
-        in_speech = False
-
+        line = (greeting if greeting is not None else GREETING).strip()
+        if line:
+            await session.say(line, allow_interruptions=True)
+        LOG.info("AgentSession running; waiting for close")
         try:
-            async for event in stream:
-                if self._stop.is_set():
-                    break
-                if self._speaking.locked():
-                    in_speech = False
-                    speech_frames = 0
-                    silence_frames = 0
-                    buf.clear()
-                    continue
-                frame = event.frame
-                data = bytes(frame.data)
-                rms = _rms(data)
-                if rms >= SPEECH_RMS:
-                    in_speech = True
-                    silence_frames = 0
-                    speech_frames += 1
-                    buf.extend(data)
-                elif in_speech:
-                    silence_frames += 1
-                    buf.extend(data)
-                    if silence_frames >= silence_needed and speech_frames >= min_speech:
-                        utter = bytes(buf)
-                        buf.clear()
-                        in_speech = False
-                        speech_frames = 0
-                        silence_frames = 0
-                        await self._handle_utterance(utter)
-                if speech_frames >= max_utt:
-                    utter = bytes(buf)
-                    buf.clear()
-                    in_speech = False
-                    speech_frames = 0
-                    silence_frames = 0
-                    await self._handle_utterance(utter)
+            await done.wait()
         finally:
-            await stream.aclose()
-
-    async def _handle_utterance(self, pcm: bytes) -> None:
-        if len(pcm) < SAMPLE_RATE * 2 // 10:
-            return
-        LOG.info("utterance pcm_bytes=%d", len(pcm))
-        try:
-            text = await transcribe(pcm)
-        except Exception:  # noqa: BLE001
-            LOG.exception("stt failed")
-            await self.say("我没听清，请再说一次。")
-            return
-        if not text:
-            LOG.info("stt empty")
-            if not has_llm():
-                await self.say("我在这儿。请配置模型密钥后再试对话。")
-            return
-        LOG.info("user said: %s", text)
-        if self.on_transcript:
-            await self.on_transcript("user", text)
-        try:
-            reply = await chat_reply(self._history, text)
-        except Exception:  # noqa: BLE001
-            LOG.exception("llm failed")
-            await self.say("脑子短路了一下，请稍后再试。")
-            return
-        self._history.append({"role": "user", "content": text})
-        if reply:
-            self._history.append({"role": "assistant", "content": reply})
-            await self.say(reply)
-
-    async def _wait_participant(self, timeout_s: float = 30) -> rtc.RemoteParticipant | None:
-        deadline = asyncio.get_event_loop().time() + timeout_s
-        while asyncio.get_event_loop().time() < deadline:
-            if self._stop.is_set():
-                return None
-            for p in self.room.remote_participants.values():
-                if not self.linked or p.identity == self.linked:
-                    return p
-            await asyncio.sleep(0.1)
-        return None
-
-    async def _wait_audio_track(
-        self, participant: rtc.RemoteParticipant, timeout_s: float = 30
-    ) -> rtc.Track | None:
-        deadline = asyncio.get_event_loop().time() + timeout_s
-        while asyncio.get_event_loop().time() < deadline:
-            if self._stop.is_set():
-                return None
-            for pub in participant.track_publications.values():
-                if pub.kind == rtc.TrackKind.KIND_AUDIO and pub.track is not None:
-                    if hasattr(pub, "subscribed") and not pub.subscribed:
-                        try:
-                            pub.set_subscribed(True)
-                        except Exception:  # noqa: BLE001
-                            pass
-                    if pub.track is not None:
-                        return pub.track
-            await asyncio.sleep(0.1)
-        return None
-
-
-def _rms(pcm_s16le: bytes) -> float:
-    if len(pcm_s16le) < 2:
-        return 0.0
-    n = len(pcm_s16le) // 2
-    samples = struct.unpack("<" + "h" * n, pcm_s16le[: n * 2])
-    if not samples:
-        return 0.0
-    acc = 0.0
-    for s in samples:
-        v = s / 32768.0
-        acc += v * v
-    return float(np.sqrt(acc / len(samples)))
+            await session.aclose()

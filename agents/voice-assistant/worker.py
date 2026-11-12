@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Consume SuIM rtc agent dispatch jobs and run a voice assistant in LiveKit."""
+"""Consume SuIM rtc agent dispatch jobs and run LiveKit Agents AgentSession."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import jwt
 import redis.asyncio as redis
 from livekit import rtc
 
-from voice_pipeline import RoomVoice, has_llm
+from voice_pipeline import has_llm, run_agent_session
 
 LOG = logging.getLogger("suim-agent")
 
@@ -80,22 +80,24 @@ async def run_session(job: dict[str, Any]) -> None:
     )
     if not LIVEKIT_API_SECRET:
         raise RuntimeError("LIVEKIT_API_SECRET is required")
+    if not has_llm():
+        raise RuntimeError("OPENAI_API_KEY is required for AgentSession voice pipeline")
 
     room = rtc.Room()
-    done = asyncio.Event()
+    left = asyncio.Event()
 
     @room.on("disconnected")
     def _on_disconnected(*_args: Any) -> None:
         LOG.info("room disconnected room=%s", room_id)
-        done.set()
+        left.set()
 
     @room.on("participant_disconnected")
     def _on_participant_left(participant: rtc.RemoteParticipant) -> None:
         if linked and participant.identity == linked:
             LOG.info("linked user left room=%s", room_id)
-            done.set()
+            left.set()
         elif len(room.remote_participants) == 0:
-            done.set()
+            left.set()
 
     token = access_token(identity, room_id)
     await room.connect(LIVEKIT_URL, token)
@@ -108,27 +110,31 @@ async def run_session(job: dict[str, Any]) -> None:
             json.dumps({"role": role, "text": text}, ensure_ascii=False),
         )
 
-    voice = RoomVoice(room, linked_user_id=linked, on_transcript=on_transcript)
-
+    session_task = asyncio.create_task(
+        run_agent_session(room, linked_user_id=linked, on_transcript=on_transcript),
+        name="agent-session",
+    )
+    wait_left = asyncio.create_task(left.wait(), name="room-left")
     try:
-        await voice.start()
-        listen_task = asyncio.create_task(voice.run_loop(), name="listen")
-        wait_done = asyncio.create_task(done.wait(), name="done")
         finished, pending = await asyncio.wait(
-            {listen_task, wait_done},
+            {session_task, wait_left},
             timeout=60 * 30,
             return_when=asyncio.FIRST_COMPLETED,
         )
-        voice.stop()
         for task in pending:
             task.cancel()
         for task in finished:
-            if task is listen_task and not task.cancelled():
+            if task is session_task and not task.cancelled():
                 exc = task.exception()
                 if exc:
                     raise exc
     finally:
-        voice.stop()
+        if not session_task.done():
+            session_task.cancel()
+            try:
+                await session_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
         await room.disconnect()
         LOG.info("left room=%s", room_id)
 
@@ -150,6 +156,8 @@ async def handle_message(rdb: redis.Redis, msg_id: str, fields: dict[str, Any]) 
 async def consume() -> None:
     if not LIVEKIT_API_SECRET:
         raise SystemExit("set LIVEKIT_API_SECRET to the LiveKit signing secret")
+    if not has_llm():
+        raise SystemExit("set OPENAI_API_KEY (SiliconFlow / OpenAI-compatible) for AgentSession")
 
     heartbeat = 0
     while True:
@@ -175,7 +183,6 @@ async def consume() -> None:
                         GROUP, CONSUMER, streams={STREAM: ">"}, count=1, block=2000
                     )
                 except (TimeoutError, redis.TimeoutError, asyncio.TimeoutError):
-                    # Blocking XREADGROUP can surface as socket timeout; treat as idle.
                     rows = []
                 except Exception:  # noqa: BLE001
                     LOG.exception("xreadgroup failed; reconnecting")

@@ -1,15 +1,16 @@
 # SuIM LiveKit Agents
 
-Phase 2：rtc 派发任务后，worker 进 LiveKit 房间，用语音打招呼，并在配置了模型后进行对讲。
+Phase 2（官方 `AgentSession`）：rtc 派发任务后，worker 进 LiveKit 房间，用 **Silero VAD + OpenAI 兼容 STT/LLM + edge-tts** 对讲（可打断）。
 
 ## 链路
 
 1. 客户端呼叫用户 ID `suim-agent`（见 `rtc.yaml` → `agents.botUserIds`）
-2. `services/rtc` 跳过好友校验，自动 Accept，并向呼叫方推送 `OpAccept`（含 LiveKit URL/Token）
+2. `services/rtc` 跳过好友校验，自动 Accept，并向呼叫方返回 `OpAccept`（含 LiveKit URL/Token）
 3. rtc `XADD` 到 `suim:agent:dispatch`
 4. `agents/voice-assistant/worker.py` 消费任务，以 `agent:assistant` 进房
-5. **edge-tts** 播报问候（无需付费 key）
-6. 能量 VAD 检测你说完后：若配置了 `OPENAI_API_KEY`，走 Whisper STT → Chat LLM → TTS 回复
+5. 在 `fake_job_context` 下启动 LiveKit Agents `AgentSession`（保留 Redis 派发，不必上 LiveKit Cloud AgentServer）
+6. Silero 端点检测 + 官方打断；STT/LLM 走 SiliconFlow（或其它 OpenAI 兼容网关）；TTS 用 edge-tts（免 TTS 密钥）
+7. 字幕经 data topic `suim.agent.transcript` 推到前端
 
 ## 启动
 
@@ -17,20 +18,18 @@ Phase 2：rtc 派发任务后，worker 进 LiveKit 房间，用语音打招呼�
 
 ```bash
 cd agents/voice-assistant
-# 可选：写入模型密钥（不要提交）
+# 必填：模型密钥（不要提交）
 cat > .env <<'ENV'
 OPENAI_API_KEY=sk-...
-# SiliconFlow 示例：
 OPENAI_BASE_URL=https://api.siliconflow.cn/v1
 OPENAI_MODEL=Qwen/Qwen2.5-7B-Instruct
 OPENAI_STT_MODEL=FunAudioLLM/SenseVoiceSmall
+OPENAI_STT_DETECT_LANGUAGE=1
 ENV
 ./run.sh
 ```
 
-前端：我 → 「呼叫 AI 助手」。接通后应能听到中文问候；配置 key 后可继续对话。
-
-没有 `OPENAI_API_KEY` 时：仍能听到问候；你说话后助手会用语音提示如何配置模型。
+前端：联系人 → AI 助手 → 语音通话。接通后应听到问候，并可连续对话、打断助手播报。
 
 ## 配置
 
@@ -46,8 +45,17 @@ agents:
   joinOnAccept: false
 ```
 
+## 与旧版差异
+
+| | 旧自研能量 VAD | 现 AgentSession |
+|--|----------------|-----------------|
+| 端点检测 | RMS 能量 | Silero VAD |
+| 打断 | 助手说话时丢弃用户音频 | 框架原生 barge-in |
+| 编排 | 手写 STT→LLM→TTS 循环 | `AgentSession` |
+| 派发 | Redis（不变） | Redis + `fake_job_context` |
+
 ## 下一阶段
 
-- 接入 LiveKit Agents 官方插件 / Inference（更稳的端点检测与打断）
-- 群通话助手、转写字幕（前端已可订阅 data topic `suim.agent.transcript`）
-- tool 回写 IM 消息
+- 可选：改为 LiveKit 原生 Agent Dispatch（`AgentServer` / `agent_name`），去掉 Redis
+- 会话记忆落库、tool 回写 IM
+- 流式 TTS 插件（进一步压首包延迟）

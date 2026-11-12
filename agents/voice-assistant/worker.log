@@ -1,0 +1,82 @@
+Checked 10 packages in 214ms
+2026-11-12 22:34:54,196 INFO listening stream=suim:agent:dispatch group=suim-agent-workers consumer=worker-177345 llm_configured=True
+2026-11-12 22:35:54,544 INFO heartbeat consumer=worker-177345
+2026-11-12 22:36:05,388 INFO got job id=1794494165387-0
+2026-11-12 22:36:05,388 INFO joining room=f234e407f52b46abf3a0a48137af3cf0 identity=agent:assistant linked=d30eb256-6cb1-4de6-85fc-1c181e25c347 reason=bot_invite llm=True
+Nvidia Decoder is supported.
+2026-11-12 22:36:07,719 INFO livekit_signaling::signal_stream:63:livekit_signaling::signal_stream - connecting to ws://127.0.0.1:7880/rtc/v1
+2026-11-12 22:36:07,737 WARNING livekit_signaling:583:livekit_signaling - signal connection failed on v1 path: Handshake { status: 404 }
+2026-11-12 22:36:07,737 WARNING livekit_signaling:601:livekit_signaling - v1 path not found (404), falling back to v0 path
+2026-11-12 22:36:07,738 INFO livekit_signaling::signal_stream:63:livekit_signaling::signal_stream - connecting to ws://127.0.0.1:7880/rtc
+2026-11-12 22:36:07,962 INFO livekit::rtc_engine::rtc_session:2409:livekit::rtc_engine::rtc_session - connection setup took 454 ms
+2026-11-12 22:36:07,966 INFO connected room=f234e407f52b46abf3a0a48137af3cf0 participants=1
+2026-11-12 22:36:07,968 INFO loading Silero VAD
+2026-11-12 22:36:08,263 INFO RoomIO linked to participant
+2026-11-12 22:36:08,264 INFO adaptive interruption is disabled by default in production mode
+2026-11-12 22:36:09,051 WARNING no request_id provided for TTS edge_tts_plugin.TTS
+2026-11-12 22:36:09,192 INFO HTTP Request: GET https://api.siliconflow.cn/v1/models "HTTP/1.1 200 OK"
+2026-11-12 22:36:16,096 INFO HTTP Request: POST https://api.siliconflow.cn/v1/audio/transcriptions "HTTP/1.1 200 OK"
+2026-11-12 22:36:16,113 INFO AgentSession running; waiting for close
+2026-11-12 22:36:17,853 INFO HTTP Request: POST https://api.siliconflow.cn/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-12 22:36:17,868 WARNING no request_id provided for TTS edge_tts_plugin.TTS
+2026-11-12 22:36:21,426 INFO linked user left room=f234e407f52b46abf3a0a48137af3cf0
+2026-11-12 22:36:21,427 INFO closing agent session due to participant disconnect (disable via `RoomInputOptions.close_on_disconnect=False`)
+2026-11-12 22:36:23,112 INFO HTTP Request: POST https://api.siliconflow.cn/v1/audio/transcriptions "HTTP/1.1 200 OK"
+2026-11-12 22:36:23,116 WARNING skipping user input, speech scheduling is paused
+2026-11-12 22:36:23,120 WARNING livekit_ffi::room_apis::server:279:livekit_ffi::room_apis::server - Attempted to drop unknown FFI handle: 8
+2026-11-12 22:36:23,123 WARNING failed to send session event
+Traceback (most recent call last):
+  File "/home/lisuhang/SuIM/agents/voice-assistant/.venv/lib/python3.12/site-packages/livekit/agents/voice/remote_session.py", line 162, in send_message
+    await self._room.local_participant.send_bytes(
+  File "/home/lisuhang/SuIM/agents/voice-assistant/.venv/lib/python3.12/site-packages/livekit/rtc/participant.py", line 1023, in send_bytes
+    raise StreamError(cb.send_bytes.error.description)
+livekit.rtc.data_stream.StreamError: unable to send packet
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/lisuhang/SuIM/agents/voice-assistant/.venv/lib/python3.12/site-packages/livekit/agents/voice/remote_session.py", line 509, in _write_loop
+    await self._transport.send_message(msg)
+  File "/home/lisuhang/SuIM/agents/voice-assistant/.venv/lib/python3.12/site-packages/livekit/agents/voice/remote_session.py", line 169, in send_message
+    raise RuntimeError(f"failed to send binary stream message: {e}") from e
+RuntimeError: failed to send binary stream message: unable to send packet
+2026-11-12 22:36:23,128 INFO livekit::room:1835:livekit::room - Disconnected from room "f234e407f52b46abf3a0a48137af3cf0" with reason: ClientInitiated
+2026-11-12 22:36:23,133 INFO room disconnected room=f234e407f52b46abf3a0a48137af3cf0
+2026-11-12 22:36:23,133 INFO left room=f234e407f52b46abf3a0a48137af3cf0
+2026-11-12 22:36:23,134 WARNING failed to send session event
+Traceback (most recent call last):
+  File "/home/lisuhang/SuIM/agents/voice-assistant/.venv/lib/python3.12/site-packages/livekit/agents/voice/remote_session.py", line 162, in send_message
+    await self._room.local_participant.send_bytes(
+  File "/home/lisuhang/SuIM/agents/voice-assistant/.venv/lib/python3.12/site-packages/livekit/rtc/participant.py", line 1023, in send_bytes
+    raise StreamError(cb.send_bytes.error.description)
+livekit.rtc.data_stream.StreamError: internal error
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/lisuhang/SuIM/agents/voice-assistant/.venv/lib/python3.12/site-packages/livekit/agents/voice/remote_session.py", line 509, in _write_loop
+    await self._transport.send_message(msg)
+  File "/home/lisuhang/SuIM/agents/voice-assistant/.venv/lib/python3.12/site-packages/livekit/agents/voice/remote_session.py", line 169, in send_message
+    raise RuntimeError(f"failed to send binary stream message: {e}") from e
+RuntimeError: failed to send binary stream message: internal error
+2026-11-12 22:36:49,613 INFO got job id=1794494209613-0
+2026-11-12 22:36:49,614 INFO joining room=eb9ac9cf03b3908c2c94ff079000d52a identity=agent:assistant linked=d30eb256-6cb1-4de6-85fc-1c181e25c347 reason=bot_invite llm=True
+2026-11-12 22:36:49,637 INFO livekit_signaling::signal_stream:63:livekit_signaling::signal_stream - connecting to ws://127.0.0.1:7880/rtc/v1
+2026-11-12 22:36:49,638 WARNING livekit_signaling:583:livekit_signaling - signal connection failed on v1 path: Handshake { status: 404 }
+2026-11-12 22:36:49,644 WARNING livekit_signaling:601:livekit_signaling - v1 path not found (404), falling back to v0 path
+2026-11-12 22:36:49,644 INFO livekit_signaling::signal_stream:63:livekit_signaling::signal_stream - connecting to ws://127.0.0.1:7880/rtc
+2026-11-12 22:36:49,707 INFO connected room=eb9ac9cf03b3908c2c94ff079000d52a participants=0
+2026-11-12 22:36:49,748 INFO livekit::rtc_engine::rtc_session:2409:livekit::rtc_engine::rtc_session - connection setup took 91 ms
+2026-11-12 22:36:49,757 INFO adaptive interruption is disabled by default in production mode
+2026-11-12 22:36:49,766 WARNING no request_id provided for TTS edge_tts_plugin.TTS
+2026-11-12 22:36:50,898 INFO HTTP Request: GET https://api.siliconflow.cn/v1/models "HTTP/1.1 200 OK"
+2026-11-12 22:36:51,128 INFO RoomIO linked to participant
+2026-11-12 22:37:01,999 INFO AgentSession running; waiting for close
+2026-11-12 22:37:04,903 INFO linked user left room=eb9ac9cf03b3908c2c94ff079000d52a
+2026-11-12 22:37:04,903 INFO closing agent session due to participant disconnect (disable via `RoomInputOptions.close_on_disconnect=False`)
+2026-11-12 22:37:05,681 INFO HTTP Request: POST https://api.siliconflow.cn/v1/audio/transcriptions "HTTP/1.1 200 OK"
+2026-11-12 22:37:05,689 WARNING skipping user input, speech scheduling is paused
+2026-11-12 22:37:05,696 WARNING livekit_ffi::room_apis::server:279:livekit_ffi::room_apis::server - Attempted to drop unknown FFI handle: 1732
+2026-11-12 22:37:05,700 INFO left room=eb9ac9cf03b3908c2c94ff079000d52a
+2026-11-12 22:37:05,702 INFO livekit::room:1835:livekit::room - Disconnected from room "eb9ac9cf03b3908c2c94ff079000d52a" with reason: ClientInitiated
+2026-11-12 22:37:25,972 INFO heartbeat consumer=worker-177345

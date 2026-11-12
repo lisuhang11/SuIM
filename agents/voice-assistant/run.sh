@@ -8,6 +8,14 @@ if [[ ! -d .venv ]]; then
 fi
 uv pip install -r requirements.txt --python .venv/bin/python >/dev/null
 
+# Optional local secrets (OPENAI_API_KEY etc). Never commit this file.
+if [[ -f .env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
 # Load LiveKit + Redis settings from rtc.yaml without printing secrets.
 eval "$(.venv/bin/python - <<'PY'
 from pathlib import Path

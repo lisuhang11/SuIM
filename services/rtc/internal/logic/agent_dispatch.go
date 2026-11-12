@@ -153,7 +153,13 @@ func (s *Service) inviteBot(ctx context.Context, caller, bot, media string) (*rt
 		Reason:       "bot_invite",
 		Identity:     agentIdentity(s.agents),
 	})
-	return &rtcpb.SignalMessageAssembleResp{SignalResp: &rtcpb.SignalResp{Payload: &rtcpb.SignalResp_Invite{
-		Invite: &rtcpb.SignalInviteResp{RoomId: accepted.CallID},
+	// Return Accept (with LiveKit credentials) on the 1004 reply so the caller
+	// does not depend on a racing 2006 push that startCall may overwrite.
+	return &rtcpb.SignalMessageAssembleResp{SignalResp: &rtcpb.SignalResp{Payload: &rtcpb.SignalResp_Accept{
+		Accept: &rtcpb.SignalAcceptResp{
+			Token:   token,
+			RoomId:  accepted.CallID,
+			LiveUrl: url,
+		},
 	}}}, nil
 }

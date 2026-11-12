@@ -1,19 +1,5 @@
 #!/usr/bin/env python3
-"""Consume SuIM rtc agent dispatch jobs and join LiveKit rooms.
-
-Env:
-  LIVEKIT_URL          ws://127.0.0.1:7880
-  LIVEKIT_API_KEY      suim
-  LIVEKIT_API_SECRET   (same as rtc.yaml livekit.secret)
-  REDIS_URL            redis://:password@127.0.0.1:6379/0
-  AGENT_STREAM         suim:agent:dispatch
-  AGENT_GROUP          suim-agent-workers
-  AGENT_GREETING       optional spoken/text greeting after join
-
-Phase 1 joins the room as identity from the job and stays until the room
-is empty or the linked user disconnects. Wire STT/LLM/TTS (LiveKit Agents)
-in a later phase when model API keys are available.
-"""
+"""Consume SuIM rtc agent dispatch jobs and run a voice assistant in LiveKit."""
 
 from __future__ import annotations
 
@@ -29,6 +15,8 @@ import jwt
 import redis.asyncio as redis
 from livekit import rtc
 
+from voice_pipeline import RoomVoice, has_llm
+
 LOG = logging.getLogger("suim-agent")
 
 STREAM = os.environ.get("AGENT_STREAM", "suim:agent:dispatch")
@@ -38,7 +26,6 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 LIVEKIT_URL = os.environ.get("LIVEKIT_URL", "ws://127.0.0.1:7880")
 LIVEKIT_API_KEY = os.environ.get("LIVEKIT_API_KEY", "suim")
 LIVEKIT_API_SECRET = os.environ.get("LIVEKIT_API_SECRET", "")
-GREETING = os.environ.get("AGENT_GREETING", "你好，我是 SuIM 语音助手。")
 
 
 def access_token(identity: str, room: str, ttl_sec: int = 600) -> str:
@@ -48,7 +35,6 @@ def access_token(identity: str, room: str, ttl_sec: int = 600) -> str:
         "sub": identity,
         "nbf": now - 10,
         "exp": now + ttl_sec,
-        # Match SuIM pkg/livekit token grant shape (microphone publish + subscribe).
         "video": {
             "roomJoin": True,
             "room": room,
@@ -69,16 +55,28 @@ async def ensure_group(rdb: redis.Redis) -> None:
             raise
 
 
+async def publish_text(room: rtc.Room, topic: str, text: str) -> None:
+    try:
+        await room.local_participant.publish_data(
+            text.encode("utf-8"),
+            reliable=True,
+            topic=topic,
+        )
+    except Exception as err:  # noqa: BLE001
+        LOG.warning("publish_data %s failed: %s", topic, err)
+
+
 async def run_session(job: dict[str, Any]) -> None:
     room_id = job["room_id"]
     identity = job.get("identity") or "agent:assistant"
-    linked = job.get("linked_user_id") or ""
+    linked = job.get("linked_user_id") or job.get("caller_id") or ""
     LOG.info(
-        "joining room=%s identity=%s linked=%s reason=%s",
+        "joining room=%s identity=%s linked=%s reason=%s llm=%s",
         room_id,
         identity,
         linked,
         job.get("reason"),
+        has_llm(),
     )
     if not LIVEKIT_API_SECRET:
         raise RuntimeError("LIVEKIT_API_SECRET is required")
@@ -88,6 +86,7 @@ async def run_session(job: dict[str, Any]) -> None:
 
     @room.on("disconnected")
     def _on_disconnected(*_args: Any) -> None:
+        LOG.info("room disconnected room=%s", room_id)
         done.set()
 
     @room.on("participant_disconnected")
@@ -102,20 +101,34 @@ async def run_session(job: dict[str, Any]) -> None:
     await room.connect(LIVEKIT_URL, token)
     LOG.info("connected room=%s participants=%d", room_id, len(room.remote_participants))
 
-    try:
-        await room.local_participant.publish_data(
-            GREETING.encode("utf-8"),
-            reliable=True,
-            topic="suim.agent.greeting",
+    async def on_transcript(role: str, text: str) -> None:
+        await publish_text(
+            room,
+            "suim.agent.transcript",
+            json.dumps({"role": role, "text": text}, ensure_ascii=False),
         )
-    except Exception as err:  # noqa: BLE001
-        LOG.warning("greeting data failed: %s", err)
+
+    voice = RoomVoice(room, linked_user_id=linked, on_transcript=on_transcript)
 
     try:
-        await asyncio.wait_for(done.wait(), timeout=60 * 30)
-    except asyncio.TimeoutError:
-        LOG.info("session timeout room=%s", room_id)
+        await voice.start()
+        listen_task = asyncio.create_task(voice.run_loop(), name="listen")
+        wait_done = asyncio.create_task(done.wait(), name="done")
+        finished, pending = await asyncio.wait(
+            {listen_task, wait_done},
+            timeout=60 * 30,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        voice.stop()
+        for task in pending:
+            task.cancel()
+        for task in finished:
+            if task is listen_task and not task.cancelled():
+                exc = task.exception()
+                if exc:
+                    raise exc
     finally:
+        voice.stop()
         await room.disconnect()
         LOG.info("left room=%s", room_id)
 
@@ -137,20 +150,58 @@ async def handle_message(rdb: redis.Redis, msg_id: str, fields: dict[str, Any]) 
 async def consume() -> None:
     if not LIVEKIT_API_SECRET:
         raise SystemExit("set LIVEKIT_API_SECRET to the LiveKit signing secret")
-    rdb = redis.from_url(REDIS_URL, decode_responses=True)
-    await ensure_group(rdb)
-    LOG.info("listening stream=%s group=%s consumer=%s", STREAM, GROUP, CONSUMER)
+
+    heartbeat = 0
     while True:
-        rows = await rdb.xreadgroup(GROUP, CONSUMER, streams={STREAM: ">"}, count=1, block=5000)
-        if not rows:
-            continue
-        for _stream, messages in rows:
-            for msg_id, fields in messages:
+        rdb = redis.from_url(
+            REDIS_URL,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=None,
+        )
+        try:
+            await rdb.ping()
+            await ensure_group(rdb)
+            LOG.info(
+                "listening stream=%s group=%s consumer=%s llm_configured=%s",
+                STREAM,
+                GROUP,
+                CONSUMER,
+                has_llm(),
+            )
+            while True:
                 try:
-                    await handle_message(rdb, msg_id, fields)
+                    rows = await rdb.xreadgroup(
+                        GROUP, CONSUMER, streams={STREAM: ">"}, count=1, block=2000
+                    )
+                except (TimeoutError, redis.TimeoutError, asyncio.TimeoutError):
+                    # Blocking XREADGROUP can surface as socket timeout; treat as idle.
+                    rows = []
                 except Exception:  # noqa: BLE001
-                    LOG.exception("job failed id=%s", msg_id)
-                    await rdb.xack(STREAM, GROUP, msg_id)
+                    LOG.exception("xreadgroup failed; reconnecting")
+                    break
+                heartbeat += 1
+                if heartbeat % 30 == 0:
+                    LOG.info("heartbeat consumer=%s", CONSUMER)
+                if not rows:
+                    continue
+                for _stream, messages in rows:
+                    for msg_id, fields in messages:
+                        LOG.info("got job id=%s", msg_id)
+                        try:
+                            await handle_message(rdb, msg_id, fields)
+                        except Exception:  # noqa: BLE001
+                            LOG.exception("job failed id=%s", msg_id)
+                            try:
+                                await rdb.xack(STREAM, GROUP, msg_id)
+                            except Exception:  # noqa: BLE001
+                                LOG.exception("xack failed id=%s", msg_id)
+        finally:
+            try:
+                await rdb.aclose()
+            except Exception:  # noqa: BLE001
+                pass
+        await asyncio.sleep(1)
 
 
 def main() -> None:

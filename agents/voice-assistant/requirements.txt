@@ -3,3 +3,7 @@ livekit-api>=0.8.0
 redis>=5.0.0
 PyJWT>=2.8.0
 PyYAML>=6.0.0
+edge-tts>=6.1.0
+openai>=1.40.0
+numpy>=1.26.0
+av>=12.0.0

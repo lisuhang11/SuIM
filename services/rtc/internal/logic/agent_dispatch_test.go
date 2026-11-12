@@ -29,7 +29,10 @@ func TestInviteBotAutoAcceptAndDispatch(t *testing.T) {
 	bot := "suim-agent"
 	caller := "ab" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	dispatch := &memAgentDispatch{}
-	svc := New(call.New(rdb), relations{friends: false}, livekit.Config{})
+	secret := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	svc := New(call.New(rdb), relations{friends: false}, livekit.Config{
+		URL: "ws://127.0.0.1:7880", Key: "suim", Secret: secret,
+	})
 	svc.UseAgents(svcconfig.AgentsConfig{
 		Enabled:    true,
 		BotUserIDs: []string{bot},
@@ -47,9 +50,16 @@ func TestInviteBotAutoAcceptAndDispatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	room := invited.GetSignalResp().GetInvite().GetRoomId()
+	accept := invited.GetSignalResp().GetAccept()
+	if accept == nil {
+		t.Fatal("expected accept reply for bot invite")
+	}
+	room := accept.GetRoomId()
 	if !validRoom(room) {
 		t.Fatalf("room %q", room)
+	}
+	if accept.GetLiveUrl() == "" || accept.GetToken() == "" {
+		t.Fatalf("bot invite must return livekit credentials")
 	}
 	if len(dispatch.jobs) != 1 {
 		t.Fatalf("jobs %d", len(dispatch.jobs))

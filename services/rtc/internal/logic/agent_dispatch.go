@@ -18,6 +18,8 @@ const (
 	defaultAgentStream   = "suim:agent:dispatch"
 	defaultAgentIdentity = "agent:assistant"
 	defaultAgentMaxLen   = 10000
+	// AgentVoiceKeyPrefix + userID stores the preferred Moss voice_id.
+	AgentVoiceKeyPrefix = "suim:agent:voice:"
 )
 
 func agentIdentity(cfg svcconfig.AgentsConfig) string {
@@ -51,6 +53,7 @@ type AgentJob struct {
 	Kind         string `json:"kind"`
 	Reason       string `json:"reason"`
 	Identity     string `json:"identity"`
+	VoiceID      string `json:"voice_id,omitempty"`
 }
 
 // AgentDispatcher publishes jobs for LiveKit Agent workers.
@@ -152,6 +155,7 @@ func (s *Service) inviteBot(ctx context.Context, caller, bot, media string) (*rt
 		Kind:         "single",
 		Reason:       "bot_invite",
 		Identity:     agentIdentity(s.agents),
+		VoiceID:      s.preferredVoiceID(ctx, caller),
 	})
 	// Return Accept (with LiveKit credentials) on the 1004 reply so the caller
 	// does not depend on a racing 2006 push that startCall may overwrite.

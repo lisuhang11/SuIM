@@ -77,6 +77,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -100,15 +102,42 @@ type session struct {
 type ctxKey struct{}
 
 type Server struct {
-	users         userpb.UserServiceClient
-	friends       relationpb.RelationServiceClient
-	groups        grouppb.GroupServiceClient
-	conversations conversationpb.ConversationServiceClient
-	third         thirdpb.ThirdServiceClient
+	users            userpb.UserServiceClient
+	friends          relationpb.RelationServiceClient
+	groups           grouppb.GroupServiceClient
+	conversations    conversationpb.ConversationServiceClient
+	third            thirdpb.ThirdServiceClient
+	rdb              redis.UniversalClient
+	httpClient       *http.Client
+	previewPython    string
+	previewScript    string
 }
 
 func New(users userpb.UserServiceClient, friends relationpb.RelationServiceClient, groups grouppb.GroupServiceClient, conversations conversationpb.ConversationServiceClient, third thirdpb.ThirdServiceClient) *Server {
-	return &Server{users: users, friends: friends, groups: groups, conversations: conversations, third: third}
+	return &Server{
+		users:         users,
+		friends:       friends,
+		groups:        groups,
+		conversations: conversations,
+		third:         third,
+		httpClient:    &http.Client{Timeout: 60 * time.Second},
+	}
+}
+
+// UsePreviewTools points at the local edge-tts preview CLI (SuIM-owned).
+func (s *Server) UsePreviewTools(python, script string) {
+	if s == nil {
+		return
+	}
+	s.previewPython = strings.TrimSpace(python)
+	s.previewScript = strings.TrimSpace(script)
+}
+
+// UseRedis stores per-user agent voice preferences.
+func (s *Server) UseRedis(rdb redis.UniversalClient) {
+	if s != nil {
+		s.rdb = rdb
+	}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -180,6 +209,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /object/complete_multipart_upload", s.auth(s.completeMultipartUpload))
 	mux.HandleFunc("POST /object/initiate_form_data", s.auth(s.initiateFormData))
 	mux.HandleFunc("POST /object/complete_form_data", s.auth(s.completeFormData))
+
+	mux.HandleFunc("GET /agent/voices", s.auth(s.listAgentVoices))
+	mux.HandleFunc("POST /agent/voices/preview", s.auth(s.previewAgentVoice))
+	mux.HandleFunc("GET /agent/voice", s.auth(s.getAgentVoice))
+	mux.HandleFunc("POST /agent/voice", s.auth(s.setAgentVoice))
 	return mw.RecoverHandler(mw.CorsHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, code: http.StatusOK}

@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
+	"github.com/redis/go-redis/v9"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
@@ -94,21 +95,36 @@ func run(cfgPath string) error {
 	}
 	defer thirdConn.Close()
 
+	apiSrv := api.New(
+		userpb.NewUserServiceClient(userConn),
+		relationpb.NewRelationServiceClient(relationConn),
+		grouppb.NewGroupServiceClient(groupConn),
+		conversationpb.NewConversationServiceClient(conversationConn),
+		thirdpb.NewThirdServiceClient(thirdConn),
+	)
+	apiSrv.UsePreviewTools(cfg.VoicePreview.Python, cfg.VoicePreview.Script)
+	if len(cfg.Redis.Address) > 0 {
+		rdb := redis.NewClient(&redis.Options{
+			Addr:       cfg.Redis.Address[0],
+			Username:   cfg.Redis.Username,
+			Password:   cfg.Redis.Password,
+			DB:         cfg.Redis.DB,
+			MaxRetries: cfg.Redis.MaxRetry,
+			PoolSize:   cfg.Redis.PoolSize,
+		})
+		defer rdb.Close()
+		apiSrv.UseRedis(rdb)
+	}
+
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
 	srv := &http.Server{
-		Handler: mw.GzipHandler(cfg.CompressionLevel, api.New(
-			userpb.NewUserServiceClient(userConn),
-			relationpb.NewRelationServiceClient(relationConn),
-			grouppb.NewGroupServiceClient(groupConn),
-			conversationpb.NewConversationServiceClient(conversationConn),
-			thirdpb.NewThirdServiceClient(thirdConn),
-		).Handler()),
+		Handler:           mw.GzipHandler(cfg.CompressionLevel, apiSrv.Handler()),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      15 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      90 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 

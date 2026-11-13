@@ -85,6 +85,7 @@ func run(cfgPath string) error {
 	defer groupConn.Close()
 
 	service := logic.New(call.New(rdb), rpc.NewRelationClient(relationpb.NewRelationServiceClient(relationConn)), cfg.LiveKit)
+	service.UseRedis(rdb)
 	service.UseGroups(rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn)))
 	if cfg.Agents.Enabled {
 		stream := cfg.Agents.Stream

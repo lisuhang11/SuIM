@@ -23,6 +23,7 @@ from livekit.agents.testing import fake_job_context
 from livekit.agents.utils import http_context
 from livekit.agents.voice import (
     AgentFalseInterruptionEvent,
+    AgentStateChangedEvent,
     ConversationItemAddedEvent,
     SpeechCreatedEvent,
     UserInputTranscribedEvent,
@@ -102,7 +103,14 @@ def _turn_detector() -> Any | None:
     return _TURN
 
 
-def build_session() -> AgentSession:
+def _build_tts(voice_id: str = "") -> Any:
+    """SuIM TTS: edge-tts voice name from preference / job / env default."""
+    voice = (voice_id or EDGE_VOICE or "").strip() or "zh-CN-XiaoxiaoNeural"
+    LOG.info("TTS provider=edge-tts voice=%s", voice)
+    return edge_tts_plugin.TTS(voice=voice, sample_rate=TTS_SAMPLE_RATE)
+
+
+def build_session(*, voice_id: str = "") -> AgentSession:
     _require_key()
     stt_kwargs: dict[str, Any] = {
         "model": OPENAI_STT_MODEL,
@@ -157,7 +165,7 @@ def build_session() -> AgentSession:
         vad=_vad(),
         stt=openai.STT(**stt_kwargs),
         llm=openai.LLM(**llm_kwargs),
-        tts=edge_tts_plugin.TTS(voice=EDGE_VOICE, sample_rate=TTS_SAMPLE_RATE),
+        tts=_build_tts(voice_id),
         turn_handling=turn_handling,
     )
 
@@ -192,13 +200,15 @@ async def run_agent_session(
     room: rtc.Room,
     *,
     linked_user_id: str = "",
-    on_transcript: Callable[[str, str], Awaitable[None]] | None = None,
+    voice_id: str = "",
+    on_transcript: Callable[..., Awaitable[None]] | None = None,
+    on_state: Callable[[str], Awaitable[None]] | None = None,
     on_publish: Callable[[str, str], Awaitable[None]] | None = None,
     playback: PlaybackTracker | None = None,
     greeting: str | None = None,
 ) -> None:
     """Run AgentSession until the linked user leaves / room closes / session ends."""
-    session = build_session()
+    session = build_session(voice_id=voice_id)
     done = asyncio.Event()
     tracker = playback or PlaybackTracker(publish=on_publish)
     if on_publish is not None:
@@ -244,16 +254,20 @@ async def run_agent_session(
         def _on_false(_ev: AgentFalseInterruptionEvent) -> None:
             LOG.info("false interruption (resume=%s)", getattr(_ev, "resumed", None))
 
+        @session.on("agent_state_changed")
+        def _on_agent_state(ev: AgentStateChangedEvent) -> None:
+            state = getattr(ev, "new_state", "") or ""
+            if on_state is not None and state:
+                asyncio.create_task(on_state(str(state)))
+
         if on_transcript is not None:
 
             @session.on("user_input_transcribed")
             def _on_user(ev: UserInputTranscribedEvent) -> None:
-                if not ev.is_final:
-                    return
                 text = (ev.transcript or "").strip()
                 if not text:
                     return
-                asyncio.create_task(on_transcript("user", text))
+                asyncio.create_task(on_transcript("user", text, is_final=bool(ev.is_final)))
 
             @session.on("conversation_item_added")
             def _on_item(ev: ConversationItemAddedEvent) -> None:
@@ -264,7 +278,7 @@ async def run_agent_session(
                 text = _item_text(item)
                 if not text:
                     return
-                asyncio.create_task(on_transcript("assistant", text))
+                asyncio.create_task(on_transcript("assistant", text, is_final=True))
 
         @session.on("close")
         def _on_close(_ev: Any = None) -> None:

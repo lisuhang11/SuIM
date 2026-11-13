@@ -114,11 +114,21 @@ async def run_session(job: dict[str, Any]) -> None:
     await room.connect(LIVEKIT_URL, token)
     LOG.info("connected room=%s participants=%d", room_id, len(room.remote_participants))
 
-    async def on_transcript(role: str, text: str) -> None:
+    async def on_transcript(role: str, text: str, *, is_final: bool = True) -> None:
         await publish_text(
             room,
             "suim.agent.transcript",
-            json.dumps({"role": role, "text": text}, ensure_ascii=False),
+            json.dumps(
+                {"role": role, "text": text, "final": bool(is_final)},
+                ensure_ascii=False,
+            ),
+        )
+
+    async def on_state(state: str) -> None:
+        await publish_text(
+            room,
+            "suim.agent.state",
+            json.dumps({"state": state}, ensure_ascii=False),
         )
 
     async def on_publish(topic: str, text: str) -> None:
@@ -126,11 +136,17 @@ async def run_session(job: dict[str, Any]) -> None:
 
     tracker.bind_publish(on_publish)
 
+    voice_id = str(job.get("voice_id") or "").strip()
+    if voice_id:
+        LOG.info("job voice_id=%s", voice_id)
+
     session_task = asyncio.create_task(
         run_agent_session(
             room,
             linked_user_id=linked,
+            voice_id=voice_id,
             on_transcript=on_transcript,
+            on_state=on_state,
             on_publish=on_publish,
             playback=tracker,
         ),

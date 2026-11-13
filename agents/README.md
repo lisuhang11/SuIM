@@ -20,7 +20,7 @@
 | `playback_tracker.py` | run 生命周期 + 客户端 `played_ms` + 打断位点 |
 | `tool_router.py` | 前台 sync / async 工具脚手架（P2） |
 | `delegation_worker.py` | 后台委派脚手架（P3） |
-| `edge_tts_plugin.py` | TTS |
+| `edge_tts_plugin.py` | SuIM TTS（edge-tts） |
 | `worker.py` | Redis 消费 + 进房 |
 
 ## 启动
@@ -71,3 +71,10 @@ agents:
 - P2：把 `tool_router` 挂到 Agent tools（async 查单不堵对话）
 - P3：`delegation_worker` 接长任务，进度可口播
 - P4：视频帧 → 多模态；可选流式 TTS 压首包
+
+## 助手音色（SuIM 自有）
+
+- 目录：apigateway 内置中文 edge-tts 音色列表（不依赖外部音色 API）
+- 偏好：Redis `suim:agent:voice:{userID}` = edge-tts voice 名（如 `zh-CN-YunxiNeural`）
+- 试听：`preview_tts.py` 本机合成短句，经 `POST /agent/voices/preview` 返回
+- 通话：rtc 派发 job 带 `voice_id` → worker 用该音色跑 edge-tts

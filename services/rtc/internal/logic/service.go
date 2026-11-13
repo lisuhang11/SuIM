@@ -2,6 +2,9 @@ package logic
 
 import (
 	"context"
+	"strings"
+
+	"github.com/redis/go-redis/v9"
 
 	"github.com/lisuhang11/SuIM/pkg/call"
 	"github.com/lisuhang11/SuIM/pkg/livekit"
@@ -29,6 +32,7 @@ type Service struct {
 	media          livekit.Config
 	agents         svcconfig.AgentsConfig
 	agentsDispatch AgentDispatcher
+	rdb            redis.UniversalClient
 }
 
 // 打开群语音。未注入时群邀请会被拒绝。
@@ -41,4 +45,23 @@ func (s *Service) UseGroups(groups Groups) {
 // 用通话状态、好友检查和 LiveKit 配置构造通话服务。
 func New(calls *call.Board, relations Relations, media livekit.Config) *Service {
 	return &Service{calls: calls, relations: relations, media: media}
+}
+
+// UseRedis enables reading per-user agent voice preferences.
+func (s *Service) UseRedis(rdb redis.UniversalClient) {
+	if s != nil {
+		s.rdb = rdb
+	}
+}
+
+func (s *Service) preferredVoiceID(ctx context.Context, userID string) string {
+	userID = strings.TrimSpace(userID)
+	if s == nil || s.rdb == nil || userID == "" {
+		return ""
+	}
+	val, err := s.rdb.Get(ctx, AgentVoiceKeyPrefix+userID).Result()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(val)
 }

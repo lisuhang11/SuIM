@@ -62,7 +62,8 @@ TTS_SAMPLE_RATE = int(os.environ.get("AGENT_TTS_SAMPLE_RATE", "24000"))
 # Turn / interruption knobs (Moss-Live Path B)
 TURN_DETECTOR = os.environ.get("AGENT_TURN_DETECTOR", "1").strip() not in {"0", "false", "False"}
 TURN_DETECTOR_VERSION = os.environ.get("AGENT_TURN_DETECTOR_VERSION", "v1-mini").strip() or "v1-mini"
-INTERRUPTION_MODE = os.environ.get("AGENT_INTERRUPTION_MODE", "adaptive").strip() or "adaptive"
+# adaptive needs LiveKit Inference credentials; default to local VAD.
+INTERRUPTION_MODE = os.environ.get("AGENT_INTERRUPTION_MODE", "vad").strip() or "vad"
 ENDPOINTING_MODE = os.environ.get("AGENT_ENDPOINTING_MODE", "dynamic").strip() or "dynamic"
 MIN_ENDPOINTING_DELAY = float(os.environ.get("AGENT_MIN_ENDPOINTING_DELAY", "0.35"))
 MAX_ENDPOINTING_DELAY = float(os.environ.get("AGENT_MAX_ENDPOINTING_DELAY", "2.5"))
@@ -267,6 +268,11 @@ async def run_agent_session(
                 text = (ev.transcript or "").strip()
                 if not text:
                     return
+                LOG.info(
+                    "user transcript final=%s text=%s",
+                    bool(ev.is_final),
+                    text[:120],
+                )
                 asyncio.create_task(on_transcript("user", text, is_final=bool(ev.is_final)))
 
             @session.on("conversation_item_added")
@@ -278,6 +284,7 @@ async def run_agent_session(
                 text = _item_text(item)
                 if not text:
                     return
+                LOG.info("assistant transcript text=%s", text[:120])
                 asyncio.create_task(on_transcript("assistant", text, is_final=True))
 
         @session.on("close")
@@ -286,14 +293,16 @@ async def run_agent_session(
 
     _wire_events()
 
+    # close_on_disconnect=False: browser StrictMode briefly drops+rejoins; worker
+    # applies its own leave grace. Ending AgentSession on the blip kills replies.
     if linked_user_id:
         room_options = room_io.RoomOptions(
             participant_identity=linked_user_id,
-            close_on_disconnect=True,
+            close_on_disconnect=False,
             delete_room_on_close=False,
         )
     else:
-        room_options = room_io.RoomOptions(close_on_disconnect=True, delete_room_on_close=False)
+        room_options = room_io.RoomOptions(close_on_disconnect=False, delete_room_on_close=False)
 
     identity = ""
     try:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import uuid
 from dataclasses import dataclass
 
 import av
@@ -51,7 +52,7 @@ class _ChunkedStream(tts.ChunkedStream):
     async def _run(self, output_emitter: tts.AudioEmitter) -> None:
         text = (self.input_text or "").strip()
         output_emitter.initialize(
-            request_id="",
+            request_id=uuid.uuid4().hex,
             sample_rate=self._tts.sample_rate,
             num_channels=NUM_CHANNELS,
             mime_type="audio/pcm",

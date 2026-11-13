@@ -88,19 +88,58 @@ async def run_session(job: dict[str, Any]) -> None:
     room = rtc.Room()
     left = asyncio.Event()
     tracker = PlaybackTracker()
+    # React StrictMode (and brief WebRTC blips) disconnect+reconnect within ~1s.
+    # Ending the job immediately makes greeting-only / no-reply sessions.
+    leave_grace_sec = float(os.environ.get("AGENT_LEAVE_GRACE_SEC", "4") or "4")
+    leave_task: asyncio.Task[None] | None = None
+
+    def _cancel_leave_watch() -> None:
+        nonlocal leave_task
+        if leave_task is not None and not leave_task.done():
+            leave_task.cancel()
+        leave_task = None
+
+    def _schedule_leave(reason: str) -> None:
+        nonlocal leave_task
+
+        async def _watch() -> None:
+            try:
+                await asyncio.sleep(max(0.5, leave_grace_sec))
+            except asyncio.CancelledError:
+                return
+            if linked:
+                still = any(p.identity == linked for p in room.remote_participants.values())
+                if still:
+                    LOG.info("linked user rejoined during grace room=%s", room_id)
+                    return
+            elif len(room.remote_participants) > 0:
+                LOG.info("remote participants returned during grace room=%s", room_id)
+                return
+            LOG.info("leaving room=%s reason=%s", room_id, reason)
+            left.set()
+
+        _cancel_leave_watch()
+        leave_task = asyncio.create_task(_watch(), name="leave-grace")
 
     @room.on("disconnected")
     def _on_disconnected(*_args: Any) -> None:
         LOG.info("room disconnected room=%s", room_id)
         left.set()
 
+    @room.on("participant_connected")
+    def _on_participant_joined(participant: rtc.RemoteParticipant) -> None:
+        if linked and participant.identity == linked:
+            LOG.info("linked user (re)joined room=%s", room_id)
+            _cancel_leave_watch()
+
     @room.on("participant_disconnected")
     def _on_participant_left(participant: rtc.RemoteParticipant) -> None:
         if linked and participant.identity == linked:
-            LOG.info("linked user left room=%s", room_id)
-            left.set()
+            LOG.info("linked user left room=%s (grace=%.1fs)", room_id, leave_grace_sec)
+            _schedule_leave("linked_user_left")
         elif len(room.remote_participants) == 0:
-            left.set()
+            LOG.info("no remote participants room=%s (grace=%.1fs)", room_id, leave_grace_sec)
+            _schedule_leave("room_empty")
 
     @room.on("data_received")
     def _on_data(data: rtc.DataPacket) -> None:
@@ -167,6 +206,7 @@ async def run_session(job: dict[str, Any]) -> None:
                 if exc:
                     raise exc
     finally:
+        _cancel_leave_watch()
         if not session_task.done():
             session_task.cancel()
             try:

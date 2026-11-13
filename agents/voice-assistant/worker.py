@@ -15,6 +15,8 @@ import jwt
 import redis.asyncio as redis
 from livekit import rtc
 
+from playback_tracker import TOPIC as PLAYBACK_TOPIC
+from playback_tracker import PlaybackTracker
 from voice_pipeline import has_llm, run_agent_session
 
 LOG = logging.getLogger("suim-agent")
@@ -85,6 +87,7 @@ async def run_session(job: dict[str, Any]) -> None:
 
     room = rtc.Room()
     left = asyncio.Event()
+    tracker = PlaybackTracker()
 
     @room.on("disconnected")
     def _on_disconnected(*_args: Any) -> None:
@@ -99,6 +102,14 @@ async def run_session(job: dict[str, Any]) -> None:
         elif len(room.remote_participants) == 0:
             left.set()
 
+    @room.on("data_received")
+    def _on_data(data: rtc.DataPacket) -> None:
+        topic = getattr(data, "topic", None) or ""
+        if topic != PLAYBACK_TOPIC:
+            return
+        payload = data.data
+        tracker.ingest_client_event(payload)
+
     token = access_token(identity, room_id)
     await room.connect(LIVEKIT_URL, token)
     LOG.info("connected room=%s participants=%d", room_id, len(room.remote_participants))
@@ -110,8 +121,19 @@ async def run_session(job: dict[str, Any]) -> None:
             json.dumps({"role": role, "text": text}, ensure_ascii=False),
         )
 
+    async def on_publish(topic: str, text: str) -> None:
+        await publish_text(room, topic, text)
+
+    tracker.bind_publish(on_publish)
+
     session_task = asyncio.create_task(
-        run_agent_session(room, linked_user_id=linked, on_transcript=on_transcript),
+        run_agent_session(
+            room,
+            linked_user_id=linked,
+            on_transcript=on_transcript,
+            on_publish=on_publish,
+            playback=tracker,
+        ),
         name="agent-session",
     )
     wait_left = asyncio.create_task(left.wait(), name="room-left")

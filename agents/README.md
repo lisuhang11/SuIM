@@ -1,6 +1,6 @@
 # SuIM LiveKit Agents
 
-Phase 2（官方 `AgentSession`）：rtc 派发任务后，worker 进 LiveKit 房间，用 **Silero VAD + OpenAI 兼容 STT/LLM + edge-tts** 对讲（可打断）。
+**Moss-Live Path B**：在现有 Redis 派发 + `AgentSession` 上做全双工话轮（TurnDetector + 自适应打断 + 播放回执），而不是直连 Moss API。
 
 ## 链路
 
@@ -8,9 +8,20 @@ Phase 2（官方 `AgentSession`）：rtc 派发任务后，worker 进 LiveKit �
 2. `services/rtc` 跳过好友校验，自动 Accept，并向呼叫方返回 `OpAccept`（含 LiveKit URL/Token）
 3. rtc `XADD` 到 `suim:agent:dispatch`
 4. `agents/voice-assistant/worker.py` 消费任务，以 `agent:assistant` 进房
-5. 在 `fake_job_context` 下启动 LiveKit Agents `AgentSession`（保留 Redis 派发，不必上 LiveKit Cloud AgentServer）
-6. Silero 端点检测 + 官方打断；STT/LLM 走 SiliconFlow（或其它 OpenAI 兼容网关）；TTS 用 edge-tts（免 TTS 密钥）
-7. 字幕经 data topic `suim.agent.transcript` 推到前端
+5. 在 `fake_job_context` 下启动 LiveKit Agents `AgentSession`
+6. **Silero VAD + TurnDetector（默认本地 `v1-mini`）+ adaptive interruption**；STT/LLM 走 SiliconFlow；TTS 用 edge-tts
+7. 字幕：`suim.agent.transcript`；播放进度：`suim.agent.playback`（双向）
+
+## 模块
+
+| 文件 | 作用 |
+|------|------|
+| `voice_pipeline.py` | AgentSession + turn_handling / 打断 / 续说 hint |
+| `playback_tracker.py` | run 生命周期 + 客户端 `played_ms` + 打断位点 |
+| `tool_router.py` | 前台 sync / async 工具脚手架（P2） |
+| `delegation_worker.py` | 后台委派脚手架（P3） |
+| `edge_tts_plugin.py` | TTS |
+| `worker.py` | Redis 消费 + 进房 |
 
 ## 启动
 
@@ -29,7 +40,7 @@ ENV
 ./run.sh
 ```
 
-前端：联系人 → AI 助手 → 语音通话。接通后应听到问候，并可连续对话、打断助手播报。
+前端：联系人 → AI 助手 → 语音通话。接通后应听到问候；助手说话时可插话打断；说「继续」应从断点附近接着说。
 
 ## 配置
 
@@ -45,17 +56,18 @@ agents:
   joinOnAccept: false
 ```
 
-## 与旧版差异
+双工相关环境变量见 `voice-assistant/.env.example`。
 
-| | 旧自研能量 VAD | 现 AgentSession |
-|--|----------------|-----------------|
-| 端点检测 | RMS 能量 | Silero VAD |
-| 打断 | 助手说话时丢弃用户音频 | 框架原生 barge-in |
-| 编排 | 手写 STT→LLM→TTS 循环 | `AgentSession` |
-| 派发 | Redis（不变） | Redis + `fake_job_context` |
+## 验收（P0/P1）
+
+- [ ] 助手播报时麦克风仍在传，插话后立刻停播
+- [ ] 短停顿（犹豫）不轻易抢答（TurnDetector + dynamic endpointing）
+- [ ] 「嗯/啊」等附和不易误打断（adaptive + false interruption resume）
+- [ ] 前端回传 `playback.progress` / `playback.stopped`；worker 日志可见打断 `played_ms`
+- [ ] 打断后说「继续」，不从头完整重念
 
 ## 下一阶段
 
-- 可选：改为 LiveKit 原生 Agent Dispatch（`AgentServer` / `agent_name`），去掉 Redis
-- 会话记忆落库、tool 回写 IM
-- 流式 TTS 插件（进一步压首包延迟）
+- P2：把 `tool_router` 挂到 Agent tools（async 查单不堵对话）
+- P3：`delegation_worker` 接长任务，进度可口播
+- P4：视频帧 → 多模态；可选流式 TTS 压首包

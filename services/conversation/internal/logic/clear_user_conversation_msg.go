@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 )
 
 // GetConversationsNeedClearMsg lists conversations whose timed clear is due now.

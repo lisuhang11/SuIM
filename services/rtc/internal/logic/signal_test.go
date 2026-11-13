@@ -161,6 +161,45 @@ func TestPrivateVideoTokenAllowsCamera(t *testing.T) {
 	}
 }
 
+// Accept must not succeed with empty LiveKit credentials when media is disabled;
+// GetToken already refuses the same configuration.
+func TestAcceptRequiresLiveKit(t *testing.T) {
+	rdb := openRedis(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	svc := New(call.New(rdb), relations{friends: true}, livekit.Config{})
+	events := make(chan call.Event, 4)
+	before, err := rdb.PubSubNumSub(ctx, call.Channel).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go call.New(rdb).Subscribe(ctx, func(ev call.Event) { events <- ev })
+	waitSubscribers(t, ctx, rdb, before[call.Channel])
+
+	caller, callee := "vl"+strconv.FormatInt(time.Now().UnixNano(), 36), "vm"+strconv.FormatInt(time.Now().UnixNano(), 36)
+	t.Cleanup(func() {
+		bg := context.Background()
+		_ = rdb.Del(bg, call.Prefix+"busy:"+caller, call.Prefix+"busy:"+callee).Err()
+	})
+	invited, err := svc.SignalMessageAssemble(rpcctx.WithUser(ctx, caller), &rtcpb.SignalMessageAssembleReq{SignalReq: inviteAudio(callee)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	room := invited.GetSignalResp().GetInvite().GetRoomId()
+	_ = waitOp(t, events, room, call.OpRing)
+
+	_, err = svc.SignalMessageAssemble(rpcctx.WithUser(ctx, callee), &rtcpb.SignalMessageAssembleReq{
+		ConnId: "accepting", SignalReq: &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_Accept{Accept: &rtcpb.SignalAcceptReq{RoomId: room}}},
+	})
+	if code, _ := errorcode.CodeOf(err); code != errorcode.Internal || !strings.Contains(err.Error(), "livekit") {
+		t.Fatalf("accept without livekit: %v", err)
+	}
+	_, err = svc.SignalGetTokenByRoomID(rpcctx.WithUser(ctx, callee), &rtcpb.SignalGetTokenByRoomIDReq{RoomId: room})
+	if code, _ := errorcode.CodeOf(err); code != errorcode.Internal || !strings.Contains(err.Error(), "livekit") {
+		t.Fatalf("get-token without livekit: %v", err)
+	}
+}
+
 func TestPrivateVoiceCancelAndReject(t *testing.T) {
 	rdb := openRedis(t)
 	ctx, cancel := context.WithCancel(context.Background())

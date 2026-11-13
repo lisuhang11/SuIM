@@ -38,7 +38,9 @@ func (s *Server) CompleteFormData(ctx context.Context, req *thirdpb.CompleteForm
 	if err != nil {
 		return nil, err
 	}
-	if size > 0 && size != ticket.Size {
+	// Size 0 must still be checked. Skipping it let empty MinIO objects register
+	// under a non-zero declared ticket size.
+	if size != ticket.Size {
 		return nil, errorcode.ErrThirdSizeMismatch
 	}
 	if err := s.bind(ctx, &model.Object{

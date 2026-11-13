@@ -68,6 +68,66 @@ func TestGroupVideoInviteSignsCamera(t *testing.T) {
 	}
 }
 
+// Host cancel must push OpCancel to the actor (multi-device sync), not remap to Hangup.
+func TestGroupCancelPushesCancelToHost(t *testing.T) {
+	rdb := openRedis(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	secret := strings.Repeat("s", 32)
+	host, a := "gc"+strconv.FormatInt(time.Now().UnixNano(), 36), "gd"+strconv.FormatInt(time.Now().UnixNano(), 36)
+	groupID := "cg" + host
+	svc := New(call.New(rdb), relations{friends: true}, livekit.Config{URL: "ws://127.0.0.1:7880", Key: "suim", Secret: secret})
+	svc.UseGroups(groupSet{members: map[string]map[string]bool{groupID: {host: true, a: true}}})
+	events := make(chan call.Event, 8)
+	before, err := rdb.PubSubNumSub(ctx, call.Channel).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	go call.New(rdb).Subscribe(ctx, func(ev call.Event) { events <- ev })
+	waitSubscribers(t, ctx, rdb, before[call.Channel])
+	t.Cleanup(func() {
+		bg := context.Background()
+		_ = rdb.Del(bg, call.Prefix+"busy:"+host, call.Prefix+"busy:"+a, call.Prefix+"group:"+groupID).Err()
+	})
+
+	invited, err := svc.SignalMessageAssemble(rpcctx.WithUser(ctx, host), &rtcpb.SignalMessageAssembleReq{
+		SignalReq: &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_InviteInGroup{InviteInGroup: &rtcpb.SignalInviteInGroupReq{
+			GroupId: groupID, InviteeUserIds: []string{a}, MediaType: call.MediaAudio,
+		}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	room := invited.GetSignalResp().GetInviteInGroup().GetRoomId()
+	_ = waitOp(t, events, room, call.OpRing)
+	if _, err := svc.SignalMessageAssemble(rpcctx.WithUser(ctx, host), &rtcpb.SignalMessageAssembleReq{
+		SignalReq: &rtcpb.SignalReq{Payload: &rtcpb.SignalReq_Cancel{Cancel: &rtcpb.SignalCancelReq{RoomId: room}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	inviteeCancel := waitOp(t, events, room, call.OpCancel)
+	if !sameIDs(inviteeCancel.Users, []string{a}) {
+		t.Fatalf("invitee cancel %+v", inviteeCancel)
+	}
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			if ev.CallID != room {
+				continue
+			}
+			if sameIDs(ev.Users, []string{host}) {
+				if ev.Op != call.OpCancel {
+					t.Fatalf("host sync op=%s want cancel event=%+v", ev.Op, ev)
+				}
+				return
+			}
+		case <-deadline:
+			t.Fatal("missing host cancel sync push")
+		}
+	}
+}
+
 func TestGroupVoiceInviteAcceptAndLeave(t *testing.T) {
 	rdb := openRedis(t)
 	ctx, cancel := context.WithCancel(context.Background())

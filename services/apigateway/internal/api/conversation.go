@@ -2,8 +2,10 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 )
 
 func (s *Server) setConversations(w http.ResponseWriter, r *http.Request) {
@@ -13,6 +15,11 @@ func (s *Server) setConversations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, id := range req.GetUserIds() {
+		// Blank slots are not "omitted" owners — reject like a foreign user id.
+		if strings.TrimSpace(id) == "" {
+			writeErr(w, errorcode.ErrNoPermission)
+			return
+		}
 		if !s.requireSelf(w, r, id) {
 			return
 		}

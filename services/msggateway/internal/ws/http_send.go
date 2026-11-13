@@ -7,6 +7,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
@@ -86,22 +89,40 @@ func (s *Server) HandleSend(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func httpFromErr(err error) (status, code int, text string) {
+func httpFromErr(err error) (httpStatus, code int, text string) {
 	code, text = fromServiceErr(err)
-	status = http.StatusBadRequest
-	if code == errInternal || code == int(errorcode.Internal) {
-		status = http.StatusInternalServerError
+	st, ok := status.FromError(err)
+	httpStatus = http.StatusBadRequest
+	if ok {
+		switch st.Code() {
+		case codes.InvalidArgument, codes.FailedPrecondition:
+			httpStatus = http.StatusBadRequest
+		case codes.NotFound:
+			httpStatus = http.StatusNotFound
+		case codes.PermissionDenied:
+			httpStatus = http.StatusForbidden
+		case codes.Unauthenticated:
+			httpStatus = http.StatusUnauthorized
+		case codes.Unavailable:
+			httpStatus = http.StatusServiceUnavailable
+		default:
+			if code == errInternal || code == int(errorcode.Internal) {
+				httpStatus = http.StatusInternalServerError
+			}
+		}
+	} else if code == errInternal || code == int(errorcode.Internal) {
+		httpStatus = http.StatusInternalServerError
 	}
 	if code == int(errorcode.MsgNotFriend) || code == int(errorcode.MsgBlocked) {
-		status = http.StatusPreconditionFailed
+		httpStatus = http.StatusPreconditionFailed
 	}
 	if code == int(errorcode.NoPermission) {
-		status = http.StatusForbidden
+		httpStatus = http.StatusForbidden
 	}
 	if code == int(errorcode.TokenRequired) || code == int(errorcode.UserInvalidToken) {
-		status = http.StatusUnauthorized
+		httpStatus = http.StatusUnauthorized
 	}
-	return status, code, text
+	return httpStatus, code, text
 }
 
 func (s *Server) tokenUser(w http.ResponseWriter, r *http.Request) (string, int32, bool) {

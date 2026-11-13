@@ -21,7 +21,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/services/msgtransfer/internal/cache"
 	svcconfig "github.com/lisuhang11/SuIM/services/msgtransfer/internal/config"

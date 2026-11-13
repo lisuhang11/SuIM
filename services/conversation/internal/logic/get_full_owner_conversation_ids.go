@@ -5,7 +5,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/idhash"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 )
 
 // 返回调用者的全部会话 ID 和当前版本。

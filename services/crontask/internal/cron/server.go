@@ -10,7 +10,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"google.golang.org/grpc"
 
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 	svcconfig "github.com/lisuhang11/SuIM/services/crontask/internal/config"

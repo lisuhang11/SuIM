@@ -85,7 +85,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relation"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
@@ -285,11 +285,12 @@ func (s *Server) requireEither(w http.ResponseWriter, r *http.Request, a, b stri
 	self := current(r).userID
 	a = strings.TrimSpace(a)
 	b = strings.TrimSpace(b)
-	if a == self || b == self || a == "" || b == "" {
-		return true
+	// Empty peer must not waive ownership: the caller has to be one named side.
+	if a != self && b != self {
+		writeErr(w, errorcode.ErrNoPermission)
+		return false
 	}
-	writeErr(w, errorcode.ErrNoPermission)
-	return false
+	return true
 }
 
 func decode(w http.ResponseWriter, r *http.Request, dst any) error {

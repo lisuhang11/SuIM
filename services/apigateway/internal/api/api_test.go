@@ -16,7 +16,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/mw"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	"github.com/lisuhang11/SuIM/proto/group"
 	"github.com/lisuhang11/SuIM/proto/relation"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
@@ -428,4 +428,69 @@ func dial(t *testing.T, lis net.Listener) *grpc.ClientConn {
 	}
 	t.Cleanup(func() { _ = conn.Close() })
 	return conn
+}
+
+func testHTTP(t *testing.T, users userpb.UserServiceServer, friends relationpb.RelationServiceServer, groups grouppb.GroupServiceServer, conversations conversationpb.ConversationServiceServer, third thirdpb.ThirdServiceServer) string {
+	t.Helper()
+	if users == nil {
+		users = &userStub{}
+	}
+	if friends == nil {
+		friends = &relationStub{}
+	}
+	if groups == nil {
+		groups = &groupStub{}
+	}
+	if conversations == nil {
+		conversations = &conversationStub{}
+	}
+	if third == nil {
+		third = &thirdStub{}
+	}
+	userLis := serve(t, func(gs *grpc.Server) { userpb.RegisterUserServiceServer(gs, users) })
+	relLis := serve(t, func(gs *grpc.Server) { relationpb.RegisterRelationServiceServer(gs, friends) })
+	groupLis := serve(t, func(gs *grpc.Server) { grouppb.RegisterGroupServiceServer(gs, groups) })
+	conversationLis := serve(t, func(gs *grpc.Server) { conversationpb.RegisterConversationServiceServer(gs, conversations) })
+	thirdLis := serve(t, func(gs *grpc.Server) { thirdpb.RegisterThirdServiceServer(gs, third) })
+	httpSrv := httptest.NewServer(New(
+		userpb.NewUserServiceClient(dial(t, userLis)),
+		relationpb.NewRelationServiceClient(dial(t, relLis)),
+		grouppb.NewGroupServiceClient(dial(t, groupLis)),
+		conversationpb.NewConversationServiceClient(dial(t, conversationLis)),
+		thirdpb.NewThirdServiceClient(dial(t, thirdLis)),
+	).Handler())
+	t.Cleanup(httpSrv.Close)
+	return httpSrv.URL
+}
+
+// Empty peer must not waive the "caller is one side" check — otherwise any
+// authed user can probe is_friend/is_black for unrelated accounts.
+func TestRequireEitherRejectsForeignEmptyPeer(t *testing.T) {
+	base := testHTTP(t, nil, nil, nil, nil, nil)
+	res := post(t, base+"/friend/is_friend", "good", `{"user1":"u2","user2":""}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("empty user2 bypass %+v", res)
+	}
+	res = post(t, base+"/friend/is_black", "good", `{"user1":"u2","user2":""}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("empty user2 black bypass %+v", res)
+	}
+	res = post(t, base+"/friend/is_friend", "good", `{"user1":"u1","user2":""}`)
+	if res.Status != http.StatusOK || res.Code != 0 {
+		t.Fatalf("self with empty peer should still pass %+v", res)
+	}
+}
+
+// user_ids entries that trim to empty are not "omitted" — reject them like a foreign owner.
+func TestSetConversationRejectsEmptyOwnerID(t *testing.T) {
+	conversations := &conversationStub{}
+	base := testHTTP(t, nil, nil, nil, conversations, nil)
+	res := post(t, base+"/conversation/set", "good",
+		`{"user_ids":[""],"conversation":{"conversation_id":"si_u1_u2","conversation_type":1,"user_id":"u2","is_pinned":true}}`)
+	if res.Status != http.StatusForbidden || res.Code != int32(errorcode.NoPermission) {
+		t.Fatalf("empty owner id %+v ids=%v", res, conversations.userIDs)
+	}
+	if len(conversations.userIDs) != 0 {
+		t.Fatalf("should not forward empty owners: %v", conversations.userIDs)
+	}
 }

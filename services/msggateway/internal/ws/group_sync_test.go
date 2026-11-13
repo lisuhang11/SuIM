@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/proto/group"
 )
 
@@ -57,6 +58,49 @@ func postSync(t *testing.T, srv *Server) map[string]any {
 		t.Fatal(err)
 	}
 	return body
+}
+
+// Business InvalidArgument/NotFound must not collapse to HTTP 500 / code 1001
+// (errArgs aliases errorcode.Internal).
+func TestSyncGroupsMapsGroupBusinessErrors(t *testing.T) {
+	cases := []struct {
+		name   string
+		err    error
+		status int
+		code   int32
+	}{
+		{"invalid args", errorcode.ErrGroupInvalidArgs, http.StatusBadRequest, int32(errorcode.GroupInvalidArgs)},
+		{"not found", errorcode.ErrGroupNotFound, http.StatusNotFound, int32(errorcode.GroupNotFound)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := New(Options{Tokens: fakeTokens{}, Joined: errJoined{err: tc.err}})
+			req := httptest.NewRequest(http.MethodPost, "/msg/sync_groups", nil)
+			req.Header.Set("Authorization", "Bearer t")
+			rr := httptest.NewRecorder()
+			srv.HandleSyncGroups(rr, req)
+			if rr.Code != tc.status {
+				t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+			}
+			var body map[string]any
+			if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if body["code"] != float64(tc.code) {
+				t.Fatalf("body %+v want code %d", body, tc.code)
+			}
+		})
+	}
+}
+
+type errJoined struct{ err error }
+
+func (e errJoined) IncrementalJoined(context.Context, string, string, uint64) (*grouppb.GetIncrementalJoinGroupsResp, error) {
+	return nil, e.err
+}
+
+func (e errJoined) ListJoined(context.Context, string) ([]*grouppb.GroupInfo, error) {
+	return nil, e.err
 }
 
 type fakeJoined struct {

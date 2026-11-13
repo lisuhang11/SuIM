@@ -120,6 +120,9 @@ func signalReply(userID string, in *msgpb.CallSignal, resp *rtcpb.SignalResp) (*
 			UserIds: payload.InviteInGroup.GetInviteeUserIds(),
 		}, nil
 	case *rtcpb.SignalResp_Accept:
+		if payload.Accept.GetRoomId() == "" {
+			return nil, errorcode.ErrInternal.WithMsg("empty rtc response")
+		}
 		return &msgpb.CallSignal{
 			Op: msgpb.CallOp_CALL_ACCEPT, CallId: payload.Accept.GetRoomId(),
 			Url: payload.Accept.GetLiveUrl(), Token: payload.Accept.GetToken(), CalleeId: userID,

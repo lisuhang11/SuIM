@@ -244,8 +244,33 @@ func (m *memObjects) InsertObject(_ context.Context, obj *model.Object) error {
 	return nil
 }
 
-func (m *memObjects) FindExpired(context.Context, time.Time, []string, int) ([]*model.Object, error) {
-	return nil, nil
+func (m *memObjects) FindExpired(_ context.Context, expireAt time.Time, causes []string, limit int) ([]*model.Object, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if limit <= 0 {
+		limit = 100
+	}
+	allow := map[string]struct{}{}
+	for _, c := range causes {
+		allow[c] = struct{}{}
+	}
+	var out []*model.Object
+	for _, obj := range m.names {
+		if obj == nil || !obj.CreateTime.Before(expireAt) {
+			continue
+		}
+		if len(allow) > 0 {
+			if _, ok := allow[obj.Cause]; !ok {
+				continue
+			}
+		}
+		cp := *obj
+		out = append(out, &cp)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
 }
 
 func (m *memObjects) DeleteByName(_ context.Context, name string) error {

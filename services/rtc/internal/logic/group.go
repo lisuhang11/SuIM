@@ -200,6 +200,8 @@ func (s *Service) afterGroup(ctx context.Context, step call.GroupStep, op, connI
 			s.publishGroup(ctx, step, call.OpReject, []string{step.Actor}, connID, "")
 		case call.OpTimeout:
 			s.publishGroup(ctx, step, call.OpTimeout, []string{step.Actor}, "", call.ReasonEnded)
+		case call.OpCancel:
+			s.publishGroup(ctx, step, call.OpCancel, []string{step.Actor}, connID, call.ReasonEnded)
 		default:
 			s.publishGroup(ctx, step, call.OpHangup, []string{step.Actor}, connID, call.ReasonEnded)
 		}
@@ -212,7 +214,10 @@ func (s *Service) afterGroup(ctx context.Context, step call.GroupStep, op, connI
 	case call.OpReject:
 		s.publishGroup(ctx, step, call.OpReject, []string{step.Actor}, connID, "")
 		s.publishGroup(ctx, step, call.OpLeft, step.Joined, "", "")
-	case call.OpHangup, call.OpCancel:
+	case call.OpCancel:
+		s.publishGroup(ctx, step, call.OpCancel, []string{step.Actor}, connID, "")
+		s.publishGroup(ctx, step, call.OpLeft, step.Joined, "", "")
+	case call.OpHangup:
 		s.publishGroup(ctx, step, call.OpHangup, []string{step.Actor}, connID, "")
 		s.publishGroup(ctx, step, call.OpLeft, step.Joined, "", "")
 	case call.OpJoined:

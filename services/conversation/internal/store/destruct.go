@@ -8,21 +8,24 @@ import (
 )
 
 // FindDueDestruct lists conversations whose timed clear window has elapsed.
-// Condition: is_msg_destruct=1, msg_destruct_time>0, and
-// latest_msg_destruct_time + msg_destruct_time*1000 < tsMs.
+// Condition: is_msg_destruct=1, msg_destruct_time>0, and either never cleared
+// or DATE_ADD(latest, INTERVAL msg_destruct_time SECOND) < ts.
+// Compare DATETIME values from Go. UNIX_TIMESTAMP()/FROM_UNIXTIME() are avoided:
+// on some MySQL sessions they return 0 / skewed instants and keep cleared rows "due".
 func (s *Store) FindDueDestruct(ctx context.Context, tsMs int64, limit int) ([]*model.Conversation, error) {
 	if limit <= 0 {
 		limit = 100
 	}
+	when := time.UnixMilli(tsMs).UTC()
 	rows, err := s.db.QueryContext(ctx, conversationSelect+`
 WHERE is_msg_destruct = 1
   AND msg_destruct_time <> 0
   AND (
     latest_msg_destruct_time IS NULL
-    OR (UNIX_TIMESTAMP(latest_msg_destruct_time)*1000 + msg_destruct_time*1000) < ?
+    OR DATE_ADD(latest_msg_destruct_time, INTERVAL msg_destruct_time SECOND) < ?
   )
 ORDER BY RAND()
-LIMIT ?`, tsMs, limit)
+LIMIT ?`, when, limit)
 	if err != nil {
 		return nil, err
 	}

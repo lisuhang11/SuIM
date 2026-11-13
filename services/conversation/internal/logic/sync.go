@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	"github.com/lisuhang11/SuIM/services/conversation/internal/model"
 )
 

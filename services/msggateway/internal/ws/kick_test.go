@@ -82,6 +82,29 @@ func TestKickPlatformSameTokenDoesNotNotify(t *testing.T) {
 	}
 }
 
+// Local same-token replace must match remote replaced(same): keepOnline, no kick frame.
+func TestLocalSameTokenReplaceKeepsOnline(t *testing.T) {
+	server := New(Options{Tokens: &scriptTokens{}})
+	old := &Client{userID: "a", platformID: 5, token: "same", encoder: jsonEncoder{}, conn: &memSocket{}, server: server}
+	server.hub.Add(old)
+	newer := &Client{userID: "a", platformID: 5, token: "same", encoder: jsonEncoder{}, conn: &memSocket{}, server: server}
+	quiet, kicked := server.hub.Add(newer)
+	if len(quiet) != 1 || len(kicked) != 0 {
+		t.Fatalf("quiet=%d kicked=%d", len(quiet), len(kicked))
+	}
+	server.retireLocals(quiet, kicked, newer.token)
+	if old.kicked.Load() || !old.closed.Load() || !old.keepOnline.Load() {
+		t.Fatalf("kicked=%v closed=%v keep=%v", old.kicked.Load(), old.closed.Load(), old.keepOnline.Load())
+	}
+	sock := old.conn.(*memSocket)
+	sock.mu.Lock()
+	n := len(sock.writes)
+	sock.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("writes %d", n)
+	}
+}
+
 func TestKickPlatformRejectsOtherToken(t *testing.T) {
 	server := New(Options{Tokens: &scriptTokens{}})
 	if _, err := server.KickPlatform(context.Background(), &gatewaypb.KickPlatformReq{UserId: "a", PlatformId: 5, Token: "nope"}); err == nil {

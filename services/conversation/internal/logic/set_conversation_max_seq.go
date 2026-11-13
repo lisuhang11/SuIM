@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 )
 
 // 写下这些人的可见上限。序号表在消息服务，conversation.max_seq 留在这里。

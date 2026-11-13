@@ -75,6 +75,31 @@ func TestDeliverSkipsBackgroundIOS(t *testing.T) {
 	}
 }
 
+type errGroups struct{}
+
+func (errGroups) MemberUserIDs(context.Context, string, string) ([]string, error) {
+	return nil, context.DeadlineExceeded
+}
+func (errGroups) Joined(context.Context, string) ([]JoinedGroup, error) { return nil, nil }
+
+// Group membership failure must not degrade to sender-only 1:1 push.
+func TestDeliverGroupDoesNotFallbackToSenderOnly(t *testing.T) {
+	server := New(Options{Groups: errGroups{}})
+	sender := &Client{userID: "a", platformID: 5, encoder: jsonEncoder{}, conn: &memSocket{}, server: server}
+	member := &Client{userID: "m1", platformID: 5, encoder: jsonEncoder{}, conn: &memSocket{}, server: server}
+	server.hub.Add(sender)
+	server.hub.Add(member)
+	server.Deliver(context.Background(), &msgpb.MsgData{
+		SessionType: 2, GroupId: "g", SendId: "a", ContentType: 101, Content: []byte("hi"),
+	}, "g_g")
+	if n := len(sender.conn.(*memSocket).writes); n != 0 {
+		t.Fatalf("sender writes %d, want 0 when membership lookup fails", n)
+	}
+	if n := len(member.conn.(*memSocket).writes); n != 0 {
+		t.Fatalf("member writes %d", n)
+	}
+}
+
 func TestFailDialWritesTextWhenRequested(t *testing.T) {
 	server := &Server{upgrader: websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

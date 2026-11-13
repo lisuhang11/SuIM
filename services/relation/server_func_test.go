@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -23,6 +25,107 @@ import (
 	"github.com/lisuhang11/SuIM/services/relation/internal/model"
 	"github.com/lisuhang11/SuIM/services/relation/internal/store"
 )
+
+// TestFriendRequestMessageLimit locks the 512-rune request message bound.
+func TestFriendRequestMessageLimit(t *testing.T) {
+	a, b := prefixed("ml-a"), prefixed("ml-b")
+	ctx, srv, _ := openRelation(t, a, b)
+
+	tooLong := strings.Repeat("字", 513)
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: tooLong}); !isCode(err, codes.InvalidArgument, errorcode.RelationInvalidMessage) {
+		t.Fatalf("513 runes code=%v err=%v", status.Code(err), err)
+	}
+	ok := strings.Repeat("字", 512)
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: ok}); err != nil {
+		t.Fatalf("512 runes: %v", err)
+	}
+	recv, err := srv.GetRecvFriendRequests(ctx, &relationpb.GetRecvFriendRequestsReq{UserId: b, HandleResults: []int32{0}})
+	if err != nil || recv.GetTotal() != 1 || utf8.RuneCountInString(recv.GetRequests()[0].GetMessage()) != 512 {
+		t.Fatalf("stored message %+v err=%v", recv, err)
+	}
+}
+
+// TestKeptSideReapplyAfterOneSidedDelete: after A deletes B, B still lists A and may
+// send a request to A (one-sided is not "already friends"). Agree restores both sides.
+func TestKeptSideReapplyAfterOneSidedDelete(t *testing.T) {
+	a, b := prefixed("ks-a"), prefixed("ks-b")
+	ctx, srv, _ := openRelation(t, a, b)
+
+	becomeFriends(t, ctx, srv, a, b)
+	if _, err := srv.DeleteFriend(ctx, &relationpb.DeleteFriendReq{UserId: a, FriendId: b}); err != nil {
+		t.Fatal(err)
+	}
+	friend, err := srv.IsFriend(ctx, &relationpb.IsFriendReq{User1: a, User2: b})
+	if err != nil || friend.GetInUser1Friends() || !friend.GetInUser2Friends() {
+		t.Fatalf("one-sided %+v err=%v", friend, err)
+	}
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: b, ToUserId: a, Message: "still here"}); err != nil {
+		t.Fatalf("kept side reapply: %v", err)
+	}
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: b, ToUserId: a, Message: "again"}); !isCode(err, codes.AlreadyExists, errorcode.RelationRequestRepeated) {
+		t.Fatalf("pending reapply code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: b, ToUserId: a, HandleResult: 1, HandleMsg: "ok"}); err != nil {
+		t.Fatal(err)
+	}
+	friend, err = srv.IsFriend(ctx, &relationpb.IsFriendReq{User1: a, User2: b})
+	if err != nil || !friend.GetInUser1Friends() || !friend.GetInUser2Friends() {
+		t.Fatalf("restored %+v err=%v", friend, err)
+	}
+}
+
+// TestFriendCacheFollowsDeleteAcrossInstances: delete on one process must drop the
+// peer process's friend-list cache so IsFriend stops looking mutual.
+func TestFriendCacheFollowsDeleteAcrossInstances(t *testing.T) {
+	a, b := prefixed("ci-a"), prefixed("ci-b")
+	ctx, left, _ := openRelation(t, a, b)
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	rdb := redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379", Password: env["REDIS_PASSWORD"]})
+	t.Cleanup(func() { _ = rdb.Close() })
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		t.Skipf("redis is not reachable: %v", err)
+	}
+	topic := fmt.Sprintf("suim:relation:cache:delete:ci:%d", time.Now().UnixNano())
+	t.Cleanup(func() {
+		_ = rdb.Del(context.Background(), relationcache.FriendIDsKey(a), relationcache.FriendIDsKey(b)).Err()
+	})
+	cfg := relationcache.DefaultConfig()
+	cfg.Topic = topic
+	listsA, stopA := relationcache.NewLists(ctx, rdb, cfg)
+	listsB, stopB := relationcache.NewLists(ctx, rdb, cfg)
+	t.Cleanup(stopA)
+	t.Cleanup(stopB)
+	waitRelationSubscribers(t, ctx, rdb, topic, 2)
+	left.UseCache(listsA)
+
+	st, err := store.Open(ctx, mysqlDSN(readMySQL(t)), 8, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	right := logic.New(st, knownUsers{a: {}, b: {}}, logic.Hooks{})
+	right.UseCache(listsB)
+
+	becomeFriends(t, ctx, left, a, b)
+	friend, err := right.IsFriend(ctx, &relationpb.IsFriendReq{User1: a, User2: b})
+	if err != nil || !friend.GetInUser1Friends() || !friend.GetInUser2Friends() {
+		t.Fatalf("warm right %+v err=%v", friend, err)
+	}
+	if _, err := left.DeleteFriend(ctx, &relationpb.DeleteFriendReq{UserId: a, FriendId: b}); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		friend, err = right.IsFriend(ctx, &relationpb.IsFriendReq{User1: a, User2: b})
+		if err == nil && !friend.GetInUser1Friends() && friend.GetInUser2Friends() {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("right cache stuck %+v err=%v", friend, err)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
 
 func TestOneSidedDeleteThenReapply(t *testing.T) {
 	a, b := prefixed("od-a"), prefixed("od-b")
@@ -350,6 +453,30 @@ func TestConcurrentFriendRequest(t *testing.T) {
 
 func prefixed(name string) string {
 	return fmt.Sprintf("%s-%d", name, time.Now().UnixNano())
+}
+
+func readMySQL(t *testing.T) config.MySQL {
+	t.Helper()
+	env := readEnvFile(t, filepath.Join("..", "..", ".env"))
+	return config.MySQL{
+		Address: []string{"127.0.0.1:3306"}, Username: env["MYSQL_USER"], Password: env["MYSQL_PASSWORD"],
+		Database: env["MYSQL_DATABASE"], MaxOpenConn: 8, MaxIdleConn: 4,
+	}
+}
+
+func waitRelationSubscribers(t *testing.T, ctx context.Context, rdb redis.UniversalClient, topic string, want int64) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		n, err := rdb.PubSubNumSub(ctx, topic).Result()
+		if err == nil && n[topic] >= want {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("subscribers %v err=%v", n, err)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 func openRelation(t *testing.T, ids ...string) (context.Context, *logic.Server, config.MySQL) {

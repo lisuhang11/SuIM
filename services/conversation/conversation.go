@@ -19,7 +19,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	svcconfig "github.com/lisuhang11/SuIM/services/conversation/internal/config"
 	"github.com/lisuhang11/SuIM/services/conversation/internal/logic"

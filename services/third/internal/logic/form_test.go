@@ -12,6 +12,36 @@ import (
 	"github.com/lisuhang11/SuIM/services/third/internal/model"
 )
 
+// TestFormCompleteRejectsEmptyObjectSizeMismatch: Head size 0 must not skip the
+// declared-size check and must not register the object.
+func TestFormCompleteRejectsEmptyObjectSizeMismatch(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 10, 23, 1, 0, 0, 0, time.UTC)
+	store := &memParts{}
+	objects := &memObjects{}
+	srv := New(&memSessions{}, objects, store, Options{
+		Limits: DefaultLimits,
+		Secret: "0123456789abcdef",
+		Now:    func() time.Time { return now },
+	})
+	opened, err := srv.InitiateFormData(ctx, &thirdpb.InitiateFormDataReq{
+		UserId: "u1", Name: "u1/empty.png", Size: 4, ContentType: "image/png", Cause: "msg",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := opened.GetFormData()["key"]
+	store.setHead(key, 0, `"cccccccccccccccccccccccccccccccc"`)
+	if _, err := srv.CompleteFormData(ctx, &thirdpb.CompleteFormDataReq{
+		UserId: "u1", Id: opened.GetId(), UrlPrefix: "https://cdn/",
+	}); err == nil || !errors.Is(err, errorcode.ErrThirdSizeMismatch) {
+		t.Fatalf("zero-size object err=%v", err)
+	}
+	if _, err := objects.FindByName(ctx, "u1/empty.png"); err != model.ErrNotFound {
+		t.Fatalf("row written despite size mismatch: %v", err)
+	}
+}
+
 func TestFormUpload(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 10, 23, 1, 0, 0, 0, time.UTC)

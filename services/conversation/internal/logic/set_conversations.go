@@ -3,7 +3,7 @@ package logic
 import (
 	"context"
 
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 )
 
 // 给每个 owner 应用同一份部分更新。没有会话行会先创建。min_seq 和 max_seq 被忽略。单聊的 is_private_chat 同时写到对方那一行。

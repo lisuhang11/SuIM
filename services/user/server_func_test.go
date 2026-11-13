@@ -22,6 +22,70 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+// TestReplacePlatformSession locks the gateway kick contract: keep this token,
+// revoke every other live token on the same platform, leave other platforms alone.
+func TestReplacePlatformSession(t *testing.T) {
+	ctx, srv, cfg, cleanup := openUser(t, "suim:user:token:delete:replace")
+	defer cleanup()
+	email := fmt.Sprintf("replace-%d@example.com", time.Now().UnixNano())
+	id := registerUser(t, ctx, srv, cfg, email, "Ada")
+
+	if _, err := srv.ReplacePlatformSession(ctx, &userpb.ReplacePlatformSessionReq{}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("empty token: %v", err)
+	}
+
+	old, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keep := plantLiveToken(t, ctx, cfg, id, 1)
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: old.GetToken()}); err != nil {
+		t.Fatalf("old platform-1 token should still be live before replace: %v", err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: keep}); err != nil {
+		t.Fatalf("planted token: %v", err)
+	}
+
+	if _, err := srv.ReplacePlatformSession(ctx, &userpb.ReplacePlatformSessionReq{Token: keep}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: keep}); err != nil {
+		t.Fatalf("kept token revoked: %v", err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: old.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("same-platform sibling still valid: %v", err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: other.GetToken()}); err != nil {
+		t.Fatalf("other platform revoked: %v", err)
+	}
+	if _, err := srv.ReplacePlatformSession(ctx, &userpb.ReplacePlatformSessionReq{Token: keep}); err != nil {
+		t.Fatalf("idempotent replace: %v", err)
+	}
+}
+
+func TestSearchSelfReturnsFullProfile(t *testing.T) {
+	ctx, srv, cfg, cleanup := openUser(t, "suim:user:token:delete:search-self")
+	defer cleanup()
+	email := fmt.Sprintf("selfsearch-%d@example.com", time.Now().UnixNano())
+	id := registerUser(t, ctx, srv, cfg, email, "Ada")
+	session, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, err := srv.SearchUsers(ctx, &userpb.SearchUsersReq{Keyword: id, Token: session.GetToken()})
+	if err != nil || len(found.GetUsers()) != 1 {
+		t.Fatalf("self search: %+v err=%v", found, err)
+	}
+	card := found.GetUsers()[0]
+	if card.GetEmail() != email || !card.GetHasPassword() || card.GetUserId() != id {
+		t.Fatalf("self search should return private fields: %+v", card)
+	}
+}
+
 func TestDisabledLogin(t *testing.T) {
 	ctx, srv, cfg, cleanup := openUser(t, "suim:user:token:delete:disabled")
 	defer cleanup()
@@ -314,6 +378,33 @@ func registerUser(t *testing.T, ctx context.Context, srv *logic.Server, cfg conf
 	id := reg.GetUser().GetUserId()
 	t.Cleanup(func() { cleanupUser(t, cfg, id) })
 	return id
+}
+
+// plantLiveToken inserts a second live JWT on the platform without going through Login,
+// so ReplacePlatformSession has a sibling session to revoke.
+func plantLiveToken(t *testing.T, ctx context.Context, cfg config.MySQL, userID string, platformID int32) string {
+	t.Helper()
+	issuer := token.NewIssuer(config.JWT{Secret: "test-secret", ExpireSeconds: 3600})
+	tokID, err := logic.NewID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, exp, err := issuer.Sign(tokID, userID, platformID, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("mysql", mysqlDSN(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO auth_tokens (id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+		tokID, userID, platformID, raw, token.Hash(raw), "token", exp.UTC()); err != nil {
+		t.Fatal(err)
+	}
+	return raw
 }
 
 func waitSubscribers(t *testing.T, ctx context.Context, rdb redis.UniversalClient, topic string, want int64) {

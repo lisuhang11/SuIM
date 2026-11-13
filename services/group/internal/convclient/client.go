@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 )
 
 // Client writes conversation rows and per-user sequence ceilings through the conversation service.

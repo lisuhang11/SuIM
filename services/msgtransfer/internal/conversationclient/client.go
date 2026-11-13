@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
 )
 

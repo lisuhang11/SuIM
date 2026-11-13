@@ -5,7 +5,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	"github.com/lisuhang11/SuIM/services/conversation/internal/model"
 	"github.com/lisuhang11/SuIM/services/conversation/internal/store"
 )

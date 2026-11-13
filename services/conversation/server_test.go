@@ -19,7 +19,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/idhash"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/services/conversation/internal/logic"
 	"github.com/lisuhang11/SuIM/services/conversation/internal/model"

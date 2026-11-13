@@ -32,6 +32,67 @@ func TestSingleSendRequiresFriends(t *testing.T) {
 	}
 }
 
+// TestSessionType4RequiresFriends: sn_ chats are still person-to-person. A normal
+// (non-notification) message must not skip friend/block checks via the default branch.
+func TestSessionType4RequiresFriends(t *testing.T) {
+	prod := &fakeProducer{}
+	srv := New(nil, prod, &fakeRelations{friend1: true}, nil)
+	_, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", RecvId: "b", SessionType: 4, Content: []byte("hi"), ClientMsgId: "c1",
+	}})
+	if code, _ := errorcode.CodeOf(err); code != errorcode.MsgNotFriend {
+		t.Fatalf("code %d err %v", code, err)
+	}
+	if prod.n != 0 {
+		t.Fatalf("published %d", prod.n)
+	}
+}
+
+func TestCannotMessageYourself(t *testing.T) {
+	prod := &fakeProducer{}
+	srv := New(nil, prod, &fakeRelations{friend1: true, friend2: true}, nil)
+	_, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{
+		SendId: "a", RecvId: "a", SessionType: 1, Content: []byte("hi"), ClientMsgId: "c1",
+	}})
+	if code, _ := errorcode.CodeOf(err); code != errorcode.MsgInvalidArgs || prod.n != 0 {
+		t.Fatalf("code %d published %d err %v", code, prod.n, err)
+	}
+}
+
+func TestPullRespectsMinSeqFloor(t *testing.T) {
+	hist := &fakeHistory{min: 5, max: 10, msgs: []*msgpb.MsgData{{Seq: 5}, {Seq: 10}}}
+	srv := New(hist, nil, nil, nil)
+	resp, err := srv.PullMessageBySeqs(context.Background(), &msgpb.PullMessageBySeqsReq{
+		UserId:    "a",
+		SeqRanges: []*msgpb.SeqRange{{ConversationId: "si_a_b", Begin: 1, End: 10, Num: 20}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hist.begin != 5 || hist.end != 10 {
+		t.Fatalf("range begin=%d end=%d", hist.begin, hist.end)
+	}
+	pull := resp.Msgs["si_a_b"]
+	if pull == nil || pull.MaxSeq != 10 {
+		t.Fatalf("pull %+v", pull)
+	}
+}
+
+func TestDestructMsgsRequiresTimestamp(t *testing.T) {
+	srv := New(&fakeHistory{}, nil, nil, nil)
+	_, err := srv.DestructMsgs(context.Background(), &msgpb.DestructMsgsReq{})
+	if code, _ := errorcode.CodeOf(err); code != errorcode.MsgInvalidArgs {
+		t.Fatalf("empty timestamp code=%d err=%v", code, err)
+	}
+	if _, err := srv.DestructMsgs(context.Background(), &msgpb.DestructMsgsReq{Timestamp: 1}); err == nil {
+		t.Fatal("fake store should refuse destruct")
+	}
+	_, err = srv.GetLastMessageSeqByTime(context.Background(), &msgpb.GetLastMessageSeqByTimeReq{})
+	if code, _ := errorcode.CodeOf(err); code != errorcode.MsgInvalidArgs {
+		t.Fatalf("empty conversation code=%d err=%v", code, err)
+	}
+}
+
 func TestSingleSendRejectsBlock(t *testing.T) {
 	srv := New(nil, &fakeProducer{}, &fakeRelations{friend1: true, friend2: true, black2: true}, nil)
 	_, err := srv.SendMsg(context.Background(), &msgpb.SendMsgReq{MsgData: &msgpb.MsgData{

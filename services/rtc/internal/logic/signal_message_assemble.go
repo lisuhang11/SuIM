@@ -108,6 +108,7 @@ func (s *Service) accept(ctx context.Context, userID, connID, roomID string) (*r
 			Kind:         "single",
 			Reason:       "human_accept",
 			Identity:     agentIdentity(s.agents),
+			VoiceID:      s.preferredVoiceID(ctx, sig.CallerID),
 		})
 	}
 	return &rtcpb.SignalMessageAssembleResp{SignalResp: &rtcpb.SignalResp{Payload: &rtcpb.SignalResp_Accept{
@@ -169,7 +170,7 @@ func (s *Service) authorize(ctx context.Context, caller, callee string) error {
 }
 func (s *Service) sign(identity, room, media string) (string, string, error) {
 	if s == nil || !s.media.Enabled() {
-		return "", "", nil
+		return "", "", errorcode.ErrInternal.WithMsg("livekit is not configured")
 	}
 	url, token, err := s.media.SignCall(identity, room, media, time.Now())
 	if err != nil {

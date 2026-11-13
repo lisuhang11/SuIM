@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 )
 
 // 返回调用者自己的一行会话。没有这一行是未找到，别人的行不能读。

@@ -171,27 +171,26 @@ func replyErr(c *Client, req *Req, err error) error {
 }
 
 func fromServiceErr(err error) (int, string) {
-	if code, ok := errorcode.CodeOf(err); ok {
-		switch code {
-		case errorcode.MsgNotFriend, errorcode.MsgBlocked, errorcode.MsgInvalidArgs, errorcode.NoPermission:
-			return int(code), status.Convert(err).Message()
-		}
-	}
-	st, ok := status.FromError(err)
-	if !ok {
-		return errInternal, "msg service"
+	st := status.Convert(err)
+	msg := st.Message()
+	// Prefer real business codes. errArgs (1001) aliases errorcode.Internal, so
+	// collapsing InvalidArgument into errArgs loses GroupInvalidArgs etc. on HTTP.
+	if code, ok := errorcode.CodeOf(err); ok && code != errorcode.Internal {
+		return int(code), msg
 	}
 	switch st.Code() {
 	case codes.InvalidArgument:
-		return errArgs, st.Message()
+		return errArgs, msg
 	case codes.PermissionDenied:
-		return int(errorcode.NoPermission), st.Message()
+		return int(errorcode.NoPermission), msg
 	case codes.FailedPrecondition:
 		if code, ok := errorcode.CodeOf(err); ok {
-			return int(code), st.Message()
+			return int(code), msg
 		}
+	case codes.Unknown:
+		return errInternal, "msg service"
 	}
-	return errInternal, st.Message()
+	return errInternal, msg
 }
 
 func (s *Server) lastMessages(c *Client, req *Req) error {

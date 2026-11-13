@@ -181,17 +181,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("websocket connected", "userID", client.userID, "platformID", client.platformID, "sdkVersion", client.sdkVersion)
 	quiet, kicked := s.hub.Add(client)
-	for _, old := range quiet {
-		old.close()
-	}
-	for _, old := range kicked {
-		old.Kick()
-	}
+	s.retireLocals(quiet, kicked, client.token)
 	go client.readLoop()
 	s.report(client.userID, []int32{int32(client.platformID)}, nil)
 	s.notifyOnline(client.userID)
 	s.afterUserOnline(client)
 	go s.claimPlatform(client)
+}
+
+// retireLocals closes older sockets on this process after hub.Add.
+// Same-token peers are replaced quietly (keepOnline); other tokens get a kick frame.
+func (s *Server) retireLocals(quiet, kicked []*Client, token string) {
+	for _, old := range quiet {
+		old.replaced(token)
+	}
+	for _, old := range kicked {
+		old.Kick()
+	}
 }
 
 // Deliver pushes one sequenced message to the online members of its conversation.
@@ -239,13 +245,17 @@ func acceptsOnlinePush(c *Client) bool {
 
 func (s *Server) recipients(ctx context.Context, msg *msgpb.MsgData) []string {
 	if msg.SessionType == 2 || msg.SessionType == 3 {
-		if s.groups != nil && msg.GroupId != "" {
-			ids, err := s.groups.MemberUserIDs(ctx, msg.GroupId, msg.SendId)
-			if err == nil && len(ids) > 0 {
-				return uniqueIDs(ids)
-			}
-			slog.Warn("group members", "err", err, "groupID", msg.GroupId)
+		// Fail closed: never pretend a group push is a 1:1 to SendId/RecvId.
+		if s.groups == nil || msg.GroupId == "" {
+			slog.Warn("group members unavailable", "groupID", msg.GroupId)
+			return nil
 		}
+		ids, err := s.groups.MemberUserIDs(ctx, msg.GroupId, msg.SendId)
+		if err != nil || len(ids) == 0 {
+			slog.Warn("group members", "err", err, "groupID", msg.GroupId)
+			return nil
+		}
+		return uniqueIDs(ids)
 	}
 	return uniqueIDs([]string{msg.SendId, msg.RecvId})
 }

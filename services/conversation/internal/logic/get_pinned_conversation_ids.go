@@ -3,7 +3,7 @@ package logic
 import (
 	"context"
 
-	conversationpb "github.com/lisuhang11/SuIM/proto/conversationpb"
+	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 )
 
 // 返回调用者置顶的会话。

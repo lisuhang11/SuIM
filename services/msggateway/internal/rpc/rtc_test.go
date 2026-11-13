@@ -47,6 +47,14 @@ func TestAssembleForwardsCaller(t *testing.T) {
 	}
 }
 
+func TestAssembleAcceptRejectsEmptyRoom(t *testing.T) {
+	out, err := signalReply("callee-1", &msgpb.CallSignal{Op: msgpb.CallOp_CALL_ACCEPT, CallId: "room", Media: msgpb.CallMedia_CALL_AUDIO},
+		&rtcpb.SignalResp{Payload: &rtcpb.SignalResp_Accept{Accept: &rtcpb.SignalAcceptResp{LiveUrl: "wss://x", Token: "t"}}})
+	if err == nil || out != nil {
+		t.Fatalf("out=%+v err=%v", out, err)
+	}
+}
+
 type captureRtc struct {
 	rtcpb.UnimplementedRtcServiceServer
 	room    string

@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	sessionSingle = 1
-	sessionGroup  = 2
-	sessionSuper  = 3
+	sessionSingle       = 1
+	sessionGroup        = 2
+	sessionSuper        = 3
+	sessionNotification = 4 // sn_ person-to-person; still needs friend/block checks
 
 	roleOwner             = 100
 	roleAdmin             = 60
@@ -119,7 +120,7 @@ func (s *Server) authorizeSend(ctx context.Context, msg *msgpb.MsgData) error {
 	switch msg.SessionType {
 	case sessionGroup, sessionSuper:
 		return s.authorizeGroupSend(ctx, msg)
-	case sessionSingle:
+	case sessionSingle, sessionNotification:
 		return s.authorizeSingleSend(ctx, msg)
 	default:
 		return nil

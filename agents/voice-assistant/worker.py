@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Consume SuIM rtc agent dispatch jobs and run LiveKit Agents AgentSession."""
+"""消费 rtc 派发的语音助手任务：进 LiveKit 房并跑 AgentSession。"""
 
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ LIVEKIT_API_SECRET = os.environ.get("LIVEKIT_API_SECRET", "")
 
 
 def access_token(identity: str, room: str, ttl_sec: int = 600) -> str:
+    """签发可进房、可发麦的 LiveKit JWT；密钥缺失时由调用方先校验。"""
     now = int(time.time())
     claims = {
         "iss": LIVEKIT_API_KEY,
@@ -49,6 +50,7 @@ def access_token(identity: str, room: str, ttl_sec: int = 600) -> str:
 
 
 async def ensure_group(rdb: redis.Redis) -> None:
+    """确保派发流上的消费者组存在；已存在则忽略 BUSYGROUP。"""
     try:
         await rdb.xgroup_create(STREAM, GROUP, id="$", mkstream=True)
         LOG.info("created consumer group %s on %s", GROUP, STREAM)
@@ -58,6 +60,7 @@ async def ensure_group(rdb: redis.Redis) -> None:
 
 
 async def publish_text(room: rtc.Room, topic: str, text: str) -> None:
+    """经 data channel 发可靠文本；房间已关时只打警告。"""
     try:
         await room.local_participant.publish_data(
             text.encode("utf-8"),
@@ -69,6 +72,7 @@ async def publish_text(room: rtc.Room, topic: str, text: str) -> None:
 
 
 async def run_session(job: dict[str, Any]) -> None:
+    """进指定房间跑一轮语音会话，直到用户离开（含短暂断线宽限）或会话结束。"""
     room_id = job["room_id"]
     identity = job.get("identity") or "agent:assistant"
     linked = job.get("linked_user_id") or job.get("caller_id") or ""
@@ -88,8 +92,7 @@ async def run_session(job: dict[str, Any]) -> None:
     room = rtc.Room()
     left = asyncio.Event()
     tracker = PlaybackTracker()
-    # React StrictMode (and brief WebRTC blips) disconnect+reconnect within ~1s.
-    # Ending the job immediately makes greeting-only / no-reply sessions.
+    # 前端 StrictMode / 短暂 WebRTC 闪断约 1s 内会重连；立刻退房会导致只播问候、后续无应答。
     leave_grace_sec = float(os.environ.get("AGENT_LEAVE_GRACE_SEC", "4") or "4")
     leave_task: asyncio.Task[None] | None = None
 
@@ -100,6 +103,7 @@ async def run_session(job: dict[str, Any]) -> None:
         leave_task = None
 
     def _schedule_leave(reason: str) -> None:
+        """宽限后再确认用户是否仍在；宽限内重连则取消退房。"""
         nonlocal leave_task
 
         async def _watch() -> None:
@@ -146,9 +150,9 @@ async def run_session(job: dict[str, Any]) -> None:
         topic = getattr(data, "topic", None) or ""
         if topic != PLAYBACK_TOPIC:
             return
-        payload = data.data
-        tracker.ingest_client_event(payload)
+        tracker.ingest_client_event(data.data)
 
+    # 进房 → 起会话 → 等人走或会话关
     token = access_token(identity, room_id)
     await room.connect(LIVEKIT_URL, token)
     LOG.info("connected room=%s participants=%d", room_id, len(room.remote_participants))
@@ -218,6 +222,7 @@ async def run_session(job: dict[str, Any]) -> None:
 
 
 async def handle_message(rdb: redis.Redis, msg_id: str, fields: dict[str, Any]) -> None:
+    """解析一条派发消息并跑会话；无论成败都 ack，避免卡在 PEL。"""
     raw = fields.get("body") or fields.get(b"body")
     if isinstance(raw, bytes):
         raw = raw.decode("utf-8")
@@ -232,6 +237,7 @@ async def handle_message(rdb: redis.Redis, msg_id: str, fields: dict[str, Any]) 
 
 
 async def consume() -> None:
+    """阻塞消费派发流；读失败则重连 Redis，进程级信号由 main 取消本协程。"""
     if not LIVEKIT_API_SECRET:
         raise SystemExit("set LIVEKIT_API_SECRET to the LiveKit signing secret")
     if not has_llm():
@@ -290,6 +296,7 @@ async def consume() -> None:
 
 
 def main() -> None:
+    """注册 SIGINT/SIGTERM 后启动消费循环。"""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

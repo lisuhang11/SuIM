@@ -1,12 +1,7 @@
-"""LiveKit Agents AgentSession pipeline (Moss-Live Path B) for SuIM voice bot.
+"""Moss-Live Path B：在已进房的 LiveKit Room 上跑 AgentSession（全双工话轮）。
 
-Keeps SuIM's Redis room dispatch: worker connects the room itself, then runs
-AgentSession under fake_job_context (no LiveKit Cloud / AgentServer required).
-
-Path B P0/P1:
-- Silero VAD + local TurnDetector (v1-mini) for semantic endpointing
-- Adaptive interruption + false-interruption resume + backchannel boundary
-- PlaybackTracker for run lifecycle / client played_ms / interrupt resume hint
+由 worker 自行连房后调用；用 fake_job_context，不依赖 LiveKit Cloud AgentServer。
+含 VAD、本地 TurnDetector、打断与 PlaybackTracker 续说 hint。
 """
 
 from __future__ import annotations
@@ -48,7 +43,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "").strip() or None
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_STT_MODEL = os.environ.get("OPENAI_STT_MODEL", "whisper-1")
-# SenseVoice / some gateways reject unknown language=; detect_language omits it.
+# SenseVoice 等网关不认 language= 时开自动检测。
 STT_DETECT_LANGUAGE = os.environ.get("OPENAI_STT_DETECT_LANGUAGE", "1").strip() not in {
     "0",
     "false",
@@ -59,10 +54,9 @@ STT_LANGUAGE = os.environ.get("OPENAI_STT_LANGUAGE", "").strip()
 EDGE_VOICE = os.environ.get("AGENT_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
 TTS_SAMPLE_RATE = int(os.environ.get("AGENT_TTS_SAMPLE_RATE", "24000"))
 
-# Turn / interruption knobs (Moss-Live Path B)
 TURN_DETECTOR = os.environ.get("AGENT_TURN_DETECTOR", "1").strip() not in {"0", "false", "False"}
 TURN_DETECTOR_VERSION = os.environ.get("AGENT_TURN_DETECTOR_VERSION", "v1-mini").strip() or "v1-mini"
-# adaptive needs LiveKit Inference credentials; default to local VAD.
+# adaptive 依赖 LiveKit Inference 凭证；默认本地 VAD。
 INTERRUPTION_MODE = os.environ.get("AGENT_INTERRUPTION_MODE", "vad").strip() or "vad"
 ENDPOINTING_MODE = os.environ.get("AGENT_ENDPOINTING_MODE", "dynamic").strip() or "dynamic"
 MIN_ENDPOINTING_DELAY = float(os.environ.get("AGENT_MIN_ENDPOINTING_DELAY", "0.35"))
@@ -75,6 +69,7 @@ _TURN: Any | None = None
 
 
 def has_llm() -> bool:
+    """是否已配置可用的 LLM/STT 密钥。"""
     return bool(OPENAI_API_KEY)
 
 
@@ -86,6 +81,7 @@ def _require_key() -> None:
 
 
 def _vad() -> Any:
+    """懒加载并复用 Silero VAD。"""
     global _VAD
     if _VAD is None:
         LOG.info("loading Silero VAD")
@@ -94,24 +90,25 @@ def _vad() -> Any:
 
 
 def _turn_detector() -> Any | None:
+    """懒加载本地 TurnDetector；关闭环境变量时返回 None。v1 需云端凭证。"""
     global _TURN
     if not TURN_DETECTOR:
         return None
     if _TURN is None:
         LOG.info("loading TurnDetector version=%s", TURN_DETECTOR_VERSION)
-        # v1-mini runs locally; v1 needs LiveKit Inference credentials.
         _TURN = inference.TurnDetector(version=TURN_DETECTOR_VERSION)  # type: ignore[arg-type]
     return _TURN
 
 
 def _build_tts(voice_id: str = "") -> Any:
-    """SuIM TTS: edge-tts voice name from preference / job / env default."""
+    """按 job/偏好/环境默认音色构造 edge-tts 后端。"""
     voice = (voice_id or EDGE_VOICE or "").strip() or "zh-CN-XiaoxiaoNeural"
     LOG.info("TTS provider=edge-tts voice=%s", voice)
     return edge_tts_plugin.TTS(voice=voice, sample_rate=TTS_SAMPLE_RATE)
 
 
 def build_session(*, voice_id: str = "") -> AgentSession:
+    """组装 STT/LLM/TTS 与话轮参数；缺密钥时抛错。"""
     _require_key()
     stt_kwargs: dict[str, Any] = {
         "model": OPENAI_STT_MODEL,
@@ -172,6 +169,7 @@ def build_session(*, voice_id: str = "") -> AgentSession:
 
 
 def _item_text(item: Any) -> str:
+    """从对话条目取出纯文本；无文本则空串。"""
     text = getattr(item, "text_content", None)
     if callable(text):
         text = text()
@@ -185,6 +183,7 @@ def _item_text(item: Any) -> str:
 
 
 def _speech_text(handle: Any) -> str:
+    """汇总一条 speech 里助手侧文本，供播放追踪与续说 hint。"""
     items = getattr(handle, "chat_items", None) or []
     parts: list[str] = []
     for item in items:
@@ -208,7 +207,7 @@ async def run_agent_session(
     playback: PlaybackTracker | None = None,
     greeting: str | None = None,
 ) -> None:
-    """Run AgentSession until the linked user leaves / room closes / session ends."""
+    """在已连接的房间上跑双工会话，直到会话 close；不因用户短暂断线自行结束。"""
     session = build_session(voice_id=voice_id)
     done = asyncio.Event()
     tracker = playback or PlaybackTracker(publish=on_publish)
@@ -225,7 +224,7 @@ async def run_agent_session(
             run_id = getattr(handle, "id", "") or f"speech-{id(handle)}"
 
             async def _started() -> None:
-                # chat_items may fill as synthesis progresses; seed empty then refresh on done.
+                # 合成过程中 chat_items 可能后填，先空文本再在结束时刷新。
                 await tracker.on_speech_started(run_id, text=_speech_text(handle))
 
             asyncio.create_task(_started())
@@ -293,8 +292,7 @@ async def run_agent_session(
 
     _wire_events()
 
-    # close_on_disconnect=False: browser StrictMode briefly drops+rejoins; worker
-    # applies its own leave grace. Ending AgentSession on the blip kills replies.
+    # 不因短暂断线关会话；退房宽限由 worker 负责。
     if linked_user_id:
         room_options = room_io.RoomOptions(
             participant_identity=linked_user_id,
@@ -310,8 +308,7 @@ async def run_agent_session(
     except Exception:  # noqa: BLE001
         identity = "agent:assistant"
 
-    # fake_job_context alone does not bind aiohttp; adaptive interruption / TurnDetector
-    # need http_context.open() when not running under AgentServer.
+    # fake_job_context 不绑 aiohttp；TurnDetector / adaptive 在无 AgentServer 时需 http_context。
     async with http_context.open():
         with fake_job_context(room=room, agent_identity=identity):
             agent = Agent(instructions=base_instructions)

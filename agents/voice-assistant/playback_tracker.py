@@ -1,9 +1,4 @@
-"""Moss-Live-style playback progress tracking for LiveKit AgentSession.
-
-Agent publishes run lifecycle on topic ``suim.agent.playback``.
-Client reports actual hear-progress on the same topic; the tracker keeps the
-latest ``played_ms`` so interrupted replies can resume from a rough cut point.
-"""
+"""跟踪助手播报进度：服务端发 lifecycle，客户端回传 played_ms，供打断后续说。"""
 
 from __future__ import annotations
 
@@ -23,6 +18,8 @@ PublishFn = Callable[[str, str], Awaitable[None]]
 
 @dataclass
 class PlaybackRun:
+    """单次助手播报；played_ms 以客户端回执为准，缺省时用墙上时间估算。"""
+
     run_id: str
     text: str = ""
     started_at: float = field(default_factory=time.time)
@@ -32,6 +29,8 @@ class PlaybackRun:
 
 
 class PlaybackTracker:
+    """维护活跃/最近打断的播报，并向 suim.agent.playback 发事件。"""
+
     def __init__(self, publish: PublishFn | None = None) -> None:
         self._publish = publish
         self._runs: dict[str, PlaybackRun] = {}
@@ -39,6 +38,7 @@ class PlaybackTracker:
         self.last_interrupt: PlaybackRun | None = None
 
     def bind_publish(self, publish: PublishFn) -> None:
+        """绑定经 data channel 发 JSON 的回调；可晚于构造注入。"""
         self._publish = publish
 
     async def _emit(self, payload: dict[str, Any]) -> None:
@@ -50,6 +50,7 @@ class PlaybackTracker:
             LOG.warning("playback emit failed: %s", err)
 
     async def on_speech_started(self, run_id: str, *, text: str = "") -> None:
+        """标记一轮播报开始并通知前端。"""
         run = PlaybackRun(run_id=run_id, text=text or "")
         self._runs[run_id] = run
         self._active_id = run_id
@@ -62,6 +63,7 @@ class PlaybackTracker:
         )
 
     async def on_speech_finished(self, run_id: str, *, interrupted: bool) -> None:
+        """标记结束或打断；打断时写入 last_interrupt 供续说。"""
         run = self._runs.get(run_id)
         if run is None:
             run = PlaybackRun(run_id=run_id)
@@ -95,6 +97,7 @@ class PlaybackTracker:
             self._active_id = None
 
     def ingest_client_event(self, raw: str | bytes) -> None:
+        """吸收客户端进度/停止事件；坏 JSON 静默忽略。"""
         try:
             if isinstance(raw, bytes):
                 raw = raw.decode("utf-8")
@@ -123,11 +126,13 @@ class PlaybackTracker:
             self.last_interrupt = run
 
     def set_text(self, run_id: str, text: str) -> None:
+        """在合成完成后再补全文案；空串不覆盖。"""
         run = self._runs.get(run_id)
         if run is not None and text:
             run.text = text
 
     def resume_hint(self) -> str:
+        """给模型的续说提示；无打断记录时返回空串。"""
         run = self.last_interrupt
         if run is None or not run.text:
             return ""

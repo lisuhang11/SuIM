@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthesize a short preview clip with edge-tts (SuIM-owned, no Moss)."""
+"""本机用 edge-tts 合成试听短句，供网关 /agent/voices/preview 调用。"""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ async def _run(voice: str, text: str, out: str) -> None:
 
 
 def main() -> None:
+    """把 --voice/--text 合成到 --out；失败时非 0 退出。"""
     parser = argparse.ArgumentParser()
     parser.add_argument("--voice", required=True)
     parser.add_argument("--text", required=True)

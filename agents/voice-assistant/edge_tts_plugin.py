@@ -1,4 +1,4 @@
-"""Minimal edge-tts backend for LiveKit Agents (no paid TTS key)."""
+"""LiveKit Agents 用的 edge-tts 后端；无需付费 TTS Key。"""
 
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ class _Opts:
 
 
 class TTS(tts.TTS):
+    """非流式 edge-tts：整句合成后再推 PCM。"""
+
     def __init__(self, *, voice: str = "zh-CN-XiaoxiaoNeural", sample_rate: int = SAMPLE_RATE) -> None:
         super().__init__(
             capabilities=tts.TTSCapabilities(streaming=False),
@@ -41,6 +43,7 @@ class TTS(tts.TTS):
     def synthesize(
         self, text: str, *, conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS
     ) -> tts.ChunkedStream:
+        """返回一段可 await 的合成流；空文本仍会 flush。"""
         return _ChunkedStream(tts=self, input_text=text, conn_options=conn_options)
 
 
@@ -61,6 +64,7 @@ class _ChunkedStream(tts.ChunkedStream):
             output_emitter.flush()
             return
 
+        # MP3 → PCM 再推给 Agents 播放管线
         communicate = edge_tts.Communicate(text, self._tts._opts.voice)
         mp3 = bytearray()
         async for chunk in communicate.stream():
@@ -77,6 +81,7 @@ class _ChunkedStream(tts.ChunkedStream):
 
 
 def _mp3_to_pcm(mp3: bytes, sample_rate: int) -> bytes:
+    """把 edge-tts 的 MP3 转成 s16le mono PCM。"""
     container = av.open(io.BytesIO(mp3), format="mp3")
     resampler = av.audio.resampler.AudioResampler(format="s16", layout="mono", rate=sample_rate)
     pcm = bytearray()

@@ -1,8 +1,4 @@
-"""Background client-delegation scaffold (Moss-Live FG/BG split).
-
-Foreground session enqueues a DelegationJob; this helper runs it without
-blocking audio I/O and reports progress/results via callbacks.
-"""
+"""后台委派脚手架：前台只入队，进度/结果经回调回传，不堵麦。"""
 
 from __future__ import annotations
 
@@ -22,6 +18,8 @@ ResultFn = Callable[[str, str], Awaitable[None]]  # delegation_id, result
 
 @dataclass
 class DelegationJob:
+    """一次后台目标；未传 id 时自动生成。"""
+
     objective: str
     purpose: Purpose = "task"
     context: list[dict[str, str]] = field(default_factory=list)
@@ -29,6 +27,8 @@ class DelegationJob:
 
 
 class DelegationWorker:
+    """并发跑多份委派；cancel 后不再回调结果。"""
+
     def __init__(
         self,
         *,
@@ -43,6 +43,7 @@ class DelegationWorker:
         self._cancels: dict[str, asyncio.Event] = {}
 
     def enqueue(self, job: DelegationJob) -> str:
+        """入队并立即返回 delegation id。"""
         cancel = asyncio.Event()
         self._cancels[job.id] = cancel
         task = asyncio.create_task(self._run(job, cancel), name=f"delegation-{job.id[:8]}")
@@ -74,6 +75,7 @@ class DelegationWorker:
             self._cancels.pop(job.id, None)
 
     def cancel(self, delegation_id: str) -> bool:
+        """取消指定委派；不存在则 False。"""
         ev = self._cancels.get(delegation_id)
         task = self._jobs.get(delegation_id)
         if ev is None and task is None:
@@ -85,5 +87,6 @@ class DelegationWorker:
         return True
 
     def cancel_all(self) -> None:
+        """取消全部未完成委派。"""
         for did in list(self._cancels):
             self.cancel(did)

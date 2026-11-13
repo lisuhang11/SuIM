@@ -1,10 +1,4 @@
-"""Foreground tool routing: sync vs async (Moss-Live style).
-
-Sync tools block the current reply (keep them <~2s).
-Async tools should return a short ack string immediately and schedule work
-off the audio path; call ``complete_async`` when the result is ready so the
-session can speak again without holding the mic loop.
-"""
+"""前台工具路由：同步工具阻塞当前回复；异步工具先回短答再后台出结果。"""
 
 from __future__ import annotations
 
@@ -22,6 +16,8 @@ AsyncResultHandler = Callable[[str, str], Awaitable[None]]
 
 
 class ExecutionMode(str, Enum):
+    """SYNC 宜短；ASYNC_* 只返回 ack，结果经回调送回。"""
+
     SYNC = "sync"
     ASYNC_QUERY = "async_query"
     ASYNC_EFFECT = "async_effect"
@@ -29,6 +25,8 @@ class ExecutionMode(str, Enum):
 
 @dataclass
 class ToolSpec:
+    """一条可注册工具；handler 缺失时 invoke 返回未知提示。"""
+
     name: str
     description: str
     mode: ExecutionMode = ExecutionMode.SYNC
@@ -36,18 +34,23 @@ class ToolSpec:
 
 
 class ToolRouter:
+    """按名调用工具；异步任务可 cancel_all。"""
+
     def __init__(self, on_async_result: AsyncResultHandler | None = None) -> None:
         self._specs: dict[str, ToolSpec] = {}
         self._tasks: dict[str, asyncio.Task[Any]] = {}
         self._on_async_result = on_async_result
 
     def register(self, spec: ToolSpec) -> None:
+        """登记或覆盖同名工具。"""
         self._specs[spec.name] = spec
 
     def list_specs(self) -> list[ToolSpec]:
+        """当前已登记工具快照。"""
         return list(self._specs.values())
 
     async def invoke(self, name: str, **kwargs: Any) -> str:
+        """同步返回结果；异步立即返回口头 ack，结果走 on_async_result。"""
         spec = self._specs.get(name)
         if spec is None or spec.handler is None:
             return f"未知工具: {name}"
@@ -76,6 +79,7 @@ class ToolRouter:
             await self._on_async_result(call_id, result)
 
     def cancel_all(self) -> None:
+        """取消所有未完成的异步工具任务。"""
         for task in list(self._tasks.values()):
             task.cancel()
         self._tasks.clear()

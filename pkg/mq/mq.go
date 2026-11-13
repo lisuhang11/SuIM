@@ -38,6 +38,19 @@ func (m *Message) Ack(ctx context.Context) error {
 	return m.ack(ctx)
 }
 
+// Bind attaches receive context and an ack function for backend adapters
+// (Redis / Kafka / memory) that live outside this package.
+func Bind(m *Message, ctx context.Context, ack func(context.Context) error) {
+	if m == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	m.ctx = ctx
+	m.ack = ack
+}
+
 // Producer appends records to one topic.
 type Producer interface {
 	Send(ctx context.Context, key string, value []byte) error

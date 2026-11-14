@@ -2,7 +2,7 @@
 
 在 SuIM 里连续对 `user` / `relation` / `conversation` / `third` / `msg` / `apigateway` / `msggateway` / `rtc` 做过一轮 `/tdd` 之后，体会最深的不是「测试框架怎么用」，而是：**怎样用最小的可执行断言，把「本来应该怎样」钉死，再改实现。**
 
-本文不以教科书式的 TDD 教义为主，而是以 `tdd` skill 为纲，结合这轮真实修 bug 的过程，整理「学测试」时真正有用的几件事。
+本文不以教科书式的 TDD 教义为主，而是以 Cursor 的 `tdd` skill 为纲，结合这轮真实修 bug 的过程，整理「学测试」时真正有用的几件事。
 
 代码主路径：各服务 `internal/**/**_test.go`；skill 原文：`~/.cursor/skills/tdd/SKILL.md`。
 
@@ -255,3 +255,15 @@ Skill 强制输出 fail-before / pass-after。
 
 ------
 
+## 附录：这轮 SuIM `/tdd` 映射（便于回翻代码）
+
+| 服务 | 代表回归 | 锁住的合同 |
+|------|----------|------------|
+| conversation | destruct 到期查询 | SQL 时间语义与 Go UTC 一致 |
+| third | form complete size | `size` 必须严格等于 ticket |
+| msg | `SessionType=4` 鉴权 | `sn_` 普通消息也要好友/拉黑 |
+| apigateway | `requireEither` / 空 `user_ids` | 空对端/空 owner 不得放行 |
+| msggateway | HTTP 业务码；群推送；同 token 顶号；Accept 空房 | 对外状态码与推送对象正确 |
+| rtc | LiveKit 必填；VoiceID；群 Cancel 推送 | 配置/偏好/信令 op 与旁路对称 |
+
+以上用例都在对应包的 `*_test.go` 里，可直接 `go test` 复查。

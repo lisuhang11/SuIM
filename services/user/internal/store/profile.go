@@ -158,7 +158,7 @@ func (s *Store) ChangePassword(ctx context.Context, userID, passwordHash string)
 	if n == 0 {
 		return nil, ErrNotFound
 	}
-	live, err := revokeUserTx(ctx, tx, userID)
+	live, err := revokeUserTx(ctx, tx, userID, model.RevokePassword)
 	if err != nil {
 		return nil, err
 	}
@@ -166,12 +166,12 @@ func (s *Store) ChangePassword(ctx context.Context, userID, passwordHash string)
 		return nil, err
 	}
 	if err := s.dropSnapshots(ctx, live); err != nil {
-		return tokenHashes(live), err
+		return tokenIDs(live), err
 	}
-	return tokenHashes(live), nil
+	return tokenIDs(live), nil
 }
 
-// DeleteUser removes the account and its tokens. Returned hashes are the live tokens that were dropped.
+// DeleteUser removes the account and its tokens. Returned JTIs are the live tokens that were dropped.
 func (s *Store) DeleteUser(ctx context.Context, userID string) ([]string, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -201,9 +201,9 @@ func (s *Store) DeleteUser(ctx context.Context, userID string) ([]string, error)
 		return nil, err
 	}
 	if err := s.dropSnapshots(ctx, live); err != nil {
-		return tokenHashes(live), err
+		return tokenIDs(live), err
 	}
-	return tokenHashes(live), nil
+	return tokenIDs(live), nil
 }
 
 // RevokeUser marks every live token of the user revoked.
@@ -214,7 +214,7 @@ func (s *Store) RevokeUser(ctx context.Context, userID string) ([]string, error)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	live, err := revokeUserTx(ctx, tx, userID)
+	live, err := revokeUserTx(ctx, tx, userID, model.RevokeBan)
 	if err != nil {
 		return nil, err
 	}
@@ -222,17 +222,19 @@ func (s *Store) RevokeUser(ctx context.Context, userID string) ([]string, error)
 		return nil, err
 	}
 	if err := s.dropSnapshots(ctx, live); err != nil {
-		return tokenHashes(live), err
+		return tokenIDs(live), err
 	}
-	return tokenHashes(live), nil
+	return tokenIDs(live), nil
 }
 
-func revokeUserTx(ctx context.Context, tx *sql.Tx, userID string) ([]model.Token, error) {
+func revokeUserTx(ctx context.Context, tx *sql.Tx, userID string, reason uint8) ([]model.Token, error) {
 	live, err := listLiveUser(ctx, tx, userID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE auth_tokens SET is_revoked = 1 WHERE user_id = ? AND is_revoked = 0`, userID); err != nil {
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE auth_tokens SET revoked_at = UTC_TIMESTAMP(3), revoke_reason = ?
+		WHERE user_id = ? AND revoked_at IS NULL`, reason, userID); err != nil {
 		return nil, err
 	}
 	return live, nil

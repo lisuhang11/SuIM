@@ -46,18 +46,19 @@ func (s *Server) LoginPhone(ctx context.Context, req *userpb.LoginPhoneReq) (*us
 	if !user.IsActive {
 		return nil, errorcode.ErrUserDisabled
 	}
-	tok, err := s.issue(user.UserID, req.GetPlatformId())
+	pair, err := s.issuePair(user.UserID, req.GetPlatformId(), "", "")
 	if err != nil {
 		return nil, err
 	}
-	revoked, err := s.store.StartSession(ctx, tok)
+	revoked, err := s.store.StartSession(ctx, pair.Access, pair.Refresh)
 	s.invalidate(ctx, revoked)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("create session")
 	}
 	return &userpb.LoginResp{
 		User:              toPB(user),
-		Token:             tok.Raw,
+		Token:             pair.Access.Raw,
+		RefreshToken:      pair.Refresh.Raw,
 		ExpireTimeSeconds: s.issuer.ExpireSeconds(),
 	}, nil
 }

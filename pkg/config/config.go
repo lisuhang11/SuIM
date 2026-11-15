@@ -36,8 +36,11 @@ type Sentinel struct {
 }
 
 type JWT struct {
-	Secret        string `yaml:"secret"`
-	ExpireSeconds int64  `yaml:"expireSeconds"`
+	Secret              string `yaml:"secret"`
+	ExpireSeconds       int64  `yaml:"expireSeconds"`       // refresh TTL
+	AccessExpireSeconds int64  `yaml:"accessExpireSeconds"` // access TTL; 0 → 3600
+	Issuer              string `yaml:"issuer"`
+	Audience            string `yaml:"audience"`
 }
 
 // Load reads a YAML file into out. Values come only from the file.

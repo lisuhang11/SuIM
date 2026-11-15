@@ -12,6 +12,9 @@ service UserService {
   // LoginPhone consumes a login-scene code and issues a session.
   // A register-scene code cannot be used here.
   rpc LoginPhone(LoginPhoneReq) returns (LoginResp);
+  // RefreshToken rotates refresh and returns a new access+refresh pair.
+  // Replaying a used refresh revokes the whole token family.
+  rpc RefreshToken(RefreshTokenReq) returns (LoginResp);
   rpc GetUserByID(GetUserByIDReq) returns (GetUserByIDResp);
   rpc GetUsersByIDs(GetUsersByIDsReq) returns (GetUsersByIDsResp);
   rpc SearchUsers(SearchUsersReq) returns (SearchUsersResp);
@@ -81,6 +84,11 @@ message LoginResp {
   UserInfo user = 1;
   string token = 2;
   int64 expire_time_seconds = 3;
+  string refresh_token = 4;
+}
+
+message RefreshTokenReq {
+  string refresh_token = 1;
 }
 
 // LoginPhoneReq logs in with a login-scene SMS code. The server does not accept a scene field.
@@ -227,4 +235,5 @@ message RegisterPhoneResp {
   UserInfo user = 1;
   string token = 2;
   int64 expire_time_seconds = 3;
+  string refresh_token = 4;
 }

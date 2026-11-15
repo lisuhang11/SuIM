@@ -90,11 +90,11 @@ func (s *Server) UseHooks(hooks Hooks) {
 	}
 }
 
-func (s *Server) invalidate(ctx context.Context, hashes []string) {
-	if s.tokens == nil || len(hashes) == 0 {
+func (s *Server) invalidate(ctx context.Context, jtis []string) {
+	if s.tokens == nil || len(jtis) == 0 {
 		return
 	}
-	s.tokens.Del(ctx, hashes...)
+	s.tokens.Del(ctx, jtis...)
 }
 
 // 返回给资料主人以外的人的名片，不含账号和手机号。
@@ -117,7 +117,7 @@ func projectUser(u *model.User, viewerID string) *userpb.UserInfo {
 
 // 修改类接口使用的会话用户。请求里的用户 ID 为空时就是令牌用户，填了别人则在读写之前拒绝。
 func (s *Server) actorID(ctx context.Context, raw, requested string) (string, error) {
-	claims, _, err := s.loadUsable(ctx, strings.TrimSpace(raw), model.TokenType)
+	claims, _, err := s.loadUsableAccess(ctx, strings.TrimSpace(raw))
 	if err != nil {
 		return "", err
 	}
@@ -140,7 +140,7 @@ func (s *Server) viewerID(ctx context.Context, raw string) (string, error) {
 	if raw == "" {
 		return "", nil
 	}
-	claims, _, err := s.loadUsable(ctx, raw, model.TokenType)
+	claims, _, err := s.loadUsableAccess(ctx, raw)
 	if err != nil {
 		return "", err
 	}

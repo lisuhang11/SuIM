@@ -87,6 +87,9 @@ func (c *Config) Validate() error {
 	if c.JWT.Secret == "" || c.JWT.ExpireSeconds <= 0 {
 		return fmt.Errorf("jwt secret and expireSeconds are required")
 	}
+	if c.JWT.AccessExpireSeconds < 0 {
+		return fmt.Errorf("jwt accessExpireSeconds must be >= 0")
+	}
 	if !c.ProfileCache.Enable() {
 		c.ProfileCache = LocalCache{
 			Topic: "suim:user:profile:delete", SlotNum: 100, SlotSize: 2000, SuccessExpire: 300, FailedExpire: 5,

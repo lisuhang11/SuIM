@@ -32,18 +32,19 @@ CREATE TABLE IF NOT EXISTS `user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户基础信息表';
 
 CREATE TABLE IF NOT EXISTS `auth_tokens` (
-    `id`          VARCHAR(36)  NOT NULL COMMENT '令牌ID',
-    `user_id`     VARCHAR(64)  NOT NULL COMMENT '用户ID',
-    `platform_id` INT          NOT NULL COMMENT '平台ID',
-    `token`       TEXT         NOT NULL COMMENT 'JWT令牌原文',
-    `token_hash`  VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '令牌SHA-256摘要(hex)，按令牌查询走此索引',
-    `token_type`  VARCHAR(50)  NOT NULL COMMENT '令牌类型',
-    `expires_at`  DATETIME(3)  NOT NULL COMMENT '过期时间',
-    `is_revoked`  TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否已撤销',
-    `created_at`  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-    `updated_at`  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    `id`            VARCHAR(36)       NOT NULL COMMENT 'jti',
+    `user_id`       VARCHAR(64)       NOT NULL COMMENT '用户ID',
+    `platform_id`   INT               NOT NULL COMMENT '平台ID',
+    `family_id`     VARCHAR(36)       NOT NULL COMMENT '刷新族ID，轮换/重放检测',
+    `parent_jti`    VARCHAR(36)       NULL COMMENT '轮换前一个 refresh jti',
+    `token_hash`    VARCHAR(64)       NULL COMMENT 'opaque 令牌 SHA-256；JWT 不存原文/摘要',
+    `token_type`    VARCHAR(16)       NOT NULL COMMENT 'access|refresh',
+    `expires_at`    DATETIME(3)       NOT NULL COMMENT '过期时间',
+    `revoked_at`    DATETIME(3)       NULL COMMENT '撤销时间，NULL 表示有效',
+    `revoke_reason` TINYINT UNSIGNED  NULL COMMENT '1 logout 2 kick 3 password 4 replay 5 ban',
+    `created_at`    DATETIME(3)       NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     PRIMARY KEY (`id`),
-    INDEX `idx_user_id` (`user_id`),
     INDEX `idx_user_platform` (`user_id`, `platform_id`),
+    INDEX `idx_family` (`family_id`),
     INDEX `idx_token_hash` (`token_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='认证令牌表';

@@ -22,6 +22,7 @@ type snapshot struct {
 	ID         string    `json:"id"`
 	UserID     string    `json:"user_id"`
 	PlatformID int32     `json:"platform_id"`
+	FamilyID   string    `json:"family_id"`
 	Type       string    `json:"token_type"`
 	ExpiresAt  time.Time `json:"expires_at"`
 	IsRevoked  bool      `json:"is_revoked"`
@@ -73,6 +74,7 @@ func (s *Store) putSnapshot(ctx context.Context, tok *model.Token) error {
 		ID:         tok.ID,
 		UserID:     tok.UserID,
 		PlatformID: tok.PlatformID,
+		FamilyID:   tok.FamilyID,
 		Type:       tok.Type,
 		ExpiresAt:  tok.ExpiresAt.UTC(),
 		IsRevoked:  tok.IsRevoked,
@@ -80,11 +82,11 @@ func (s *Store) putSnapshot(ctx context.Context, tok *model.Token) error {
 	if err != nil {
 		return err
 	}
-	return s.rdb.Set(ctx, snapshotPrefix+tok.Hash, b, ttl).Err()
+	return s.rdb.Set(ctx, snapshotPrefix+tok.ID, b, ttl).Err()
 }
 
-func (s *Store) getSnapshot(ctx context.Context, hash string) (*model.Token, error) {
-	raw, err := s.rdb.Get(ctx, snapshotPrefix+hash).Bytes()
+func (s *Store) getSnapshot(ctx context.Context, jti string) (*model.Token, error) {
+	raw, err := s.rdb.Get(ctx, snapshotPrefix+jti).Bytes()
 	if errors.Is(err, redis.Nil) {
 		return nil, nil
 	}
@@ -99,7 +101,7 @@ func (s *Store) getSnapshot(ctx context.Context, hash string) (*model.Token, err
 		ID:         snap.ID,
 		UserID:     snap.UserID,
 		PlatformID: snap.PlatformID,
-		Hash:       hash,
+		FamilyID:   snap.FamilyID,
 		Type:       snap.Type,
 		ExpiresAt:  snap.ExpiresAt,
 		IsRevoked:  snap.IsRevoked,
@@ -113,12 +115,12 @@ func (s *Store) dropSnapshots(ctx context.Context, tokens []model.Token) error {
 	keys := make([]string, 0, len(tokens))
 	pipe := s.rdb.Pipeline()
 	for _, tok := range tokens {
-		keys = append(keys, snapshotPrefix+tok.Hash)
+		keys = append(keys, snapshotPrefix+tok.ID)
 		ttl := time.Until(tok.ExpiresAt)
 		if ttl <= 0 {
 			ttl = time.Minute
 		}
-		pipe.Set(ctx, denyPrefix+tok.Hash, "1", ttl)
+		pipe.Set(ctx, denyPrefix+tok.ID, "1", ttl)
 	}
 	pipe.Del(ctx, keys...)
 	_, err := pipe.Exec(ctx)
@@ -130,11 +132,11 @@ func (s *Store) deny(ctx context.Context, tok *model.Token) error {
 	if ttl <= 0 {
 		ttl = time.Minute
 	}
-	return s.rdb.Set(ctx, denyPrefix+tok.Hash, "1", ttl).Err()
+	return s.rdb.Set(ctx, denyPrefix+tok.ID, "1", ttl).Err()
 }
 
-func (s *Store) denied(ctx context.Context, hash string) (bool, error) {
-	n, err := s.rdb.Exists(ctx, denyPrefix+hash).Result()
+func (s *Store) denied(ctx context.Context, jti string) (bool, error) {
+	n, err := s.rdb.Exists(ctx, denyPrefix+jti).Result()
 	if err != nil {
 		return false, err
 	}

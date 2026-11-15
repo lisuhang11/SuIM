@@ -94,12 +94,34 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 		"ALTER TABLE `user` MODIFY email VARCHAR(255) NULL COMMENT '邮箱'",
 		"ALTER TABLE `user` ADD UNIQUE INDEX uk_account (account)",
 		"ALTER TABLE `user` ADD UNIQUE INDEX uk_phone (area_code, phone_number)",
+		"ALTER TABLE `auth_tokens` ADD COLUMN family_id VARCHAR(36) NULL COMMENT '刷新族ID'",
+		"ALTER TABLE `auth_tokens` ADD COLUMN parent_jti VARCHAR(36) NULL COMMENT '轮换前一个 refresh jti'",
+		"ALTER TABLE `auth_tokens` ADD COLUMN revoked_at DATETIME(3) NULL COMMENT '撤销时间'",
+		"ALTER TABLE `auth_tokens` ADD COLUMN revoke_reason TINYINT UNSIGNED NULL COMMENT '撤销原因'",
+		"ALTER TABLE `auth_tokens` MODIFY token TEXT NULL COMMENT '已废弃，JWT 不再存原文'",
+		"ALTER TABLE `auth_tokens` MODIFY token_hash VARCHAR(64) NULL COMMENT 'opaque 摘要；JWT 为空'",
+		"ALTER TABLE `auth_tokens` ADD INDEX idx_family (family_id)",
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !isDuplicateColumn(err) && !isDuplicateKey(err) {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
+	// Backfill family/revoked from legacy rows; ignore failures on fresh installs without is_revoked.
+	for _, stmt := range []string{
+		`UPDATE auth_tokens SET family_id = id WHERE family_id IS NULL OR family_id = ''`,
+		`UPDATE auth_tokens SET revoked_at = COALESCE(updated_at, created_at, UTC_TIMESTAMP(3)) WHERE is_revoked = 1 AND revoked_at IS NULL`,
+		`UPDATE auth_tokens SET family_id = id WHERE family_id IS NULL`,
+	} {
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !isUnknownColumn(err) {
+			return fmt.Errorf("migrate auth_tokens backfill: %w", err)
+		}
+	}
 	return nil
+}
+
+func isUnknownColumn(err error) bool {
+	var me *mysqldriver.MySQLError
+	return errors.As(err, &me) && me.Number == 1054
 }
 
 func isDuplicateColumn(err error) bool {
@@ -199,42 +221,52 @@ func (s *Store) GetUserByPhone(ctx context.Context, area, national string) (*mod
 	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE area_code = ? AND phone_number = ?`, area, national)
 }
 
-// StartSession revokes every live token of this user on this platform, then stores the new token.
-func (s *Store) StartSession(ctx context.Context, tok *model.Token) ([]string, error) {
+const tokenColumns = `id, user_id, platform_id, family_id, parent_jti, token_hash, token_type, expires_at, revoked_at, revoke_reason`
+
+// StartSession revokes every live token of this user on this platform, then stores access+refresh.
+func (s *Store) StartSession(ctx context.Context, access, refresh *model.Token) ([]string, error) {
+	if access == nil || refresh == nil {
+		return nil, fmt.Errorf("access and refresh tokens are required")
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	live, err := listLive(ctx, tx, tok.UserID, tok.PlatformID)
+	live, err := listLive(ctx, tx, access.UserID, access.PlatformID)
 	if err != nil {
 		return nil, err
 	}
-	if err := revokeAllTx(ctx, tx, tok.UserID, tok.PlatformID); err != nil {
+	if err := revokeAllTx(ctx, tx, access.UserID, access.PlatformID, model.RevokeKick); err != nil {
 		return nil, err
 	}
-	if err := insertTokenTx(ctx, tx, tok); err != nil {
+	if err := insertTokenTx(ctx, tx, access); err != nil {
+		return nil, err
+	}
+	if err := insertTokenTx(ctx, tx, refresh); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	hashes := tokenHashes(live)
+	ids := tokenIDs(live)
 	if err := s.dropSnapshots(ctx, live); err != nil {
-		return hashes, err
+		return ids, err
 	}
-	if err := s.putSnapshot(ctx, tok); err != nil {
-		return hashes, err
+	if err := s.putSnapshot(ctx, access); err != nil {
+		return ids, err
 	}
-	return hashes, nil
+	if err := s.putSnapshot(ctx, refresh); err != nil {
+		return ids, err
+	}
+	return ids, nil
 }
 
-// RevokeOtherSessions revokes live tokens of one user on one platform except keepHash.
-// keepHash itself stays valid. The returned hashes are the revoked ones.
-func (s *Store) RevokeOtherSessions(ctx context.Context, userID string, platformID int32, keepHash string) ([]string, error) {
-	if keepHash == "" {
-		return nil, fmt.Errorf("token hash is required")
+// RevokeOtherSessions revokes live tokens of one user on one platform except keepFamilyID.
+func (s *Store) RevokeOtherSessions(ctx context.Context, userID string, platformID int32, keepFamilyID string) ([]string, error) {
+	if keepFamilyID == "" {
+		return nil, fmt.Errorf("family id is required")
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -248,7 +280,7 @@ func (s *Store) RevokeOtherSessions(ctx context.Context, userID string, platform
 	}
 	var drop []model.Token
 	for _, tok := range live {
-		if tok.Hash != keepHash {
+		if tok.FamilyID != keepFamilyID {
 			drop = append(drop, tok)
 		}
 	}
@@ -259,19 +291,23 @@ func (s *Store) RevokeOtherSessions(ctx context.Context, userID string, platform
 		return nil, nil
 	}
 	if _, err := tx.ExecContext(ctx, `
-		UPDATE auth_tokens SET is_revoked = 1
-		WHERE user_id = ? AND platform_id = ? AND is_revoked = 0 AND token_hash <> ?`,
-		userID, platformID, keepHash); err != nil {
+		UPDATE auth_tokens SET revoked_at = UTC_TIMESTAMP(3), revoke_reason = ?
+		WHERE user_id = ? AND platform_id = ? AND revoked_at IS NULL AND family_id <> ?`,
+		model.RevokeKick, userID, platformID, keepFamilyID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return tokenHashes(drop), s.dropSnapshots(ctx, drop)
+	return tokenIDs(drop), s.dropSnapshots(ctx, drop)
 }
 
 // RevokeSession marks every live token of the user on one platform revoked and drops their Redis snapshots.
 func (s *Store) RevokeSession(ctx context.Context, userID string, platformID int32) ([]string, error) {
+	return s.revokeSessionReason(ctx, userID, platformID, model.RevokeLogout)
+}
+
+func (s *Store) revokeSessionReason(ctx context.Context, userID string, platformID int32, reason uint8) ([]string, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -282,48 +318,51 @@ func (s *Store) RevokeSession(ctx context.Context, userID string, platformID int
 	if err != nil {
 		return nil, err
 	}
-	if err := revokeAllTx(ctx, tx, userID, platformID); err != nil {
+	if err := revokeAllTx(ctx, tx, userID, platformID, reason); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return tokenHashes(live), s.dropSnapshots(ctx, live)
+	return tokenIDs(live), s.dropSnapshots(ctx, live)
 }
 
-func tokenHashes(tokens []model.Token) []string {
+func tokenIDs(tokens []model.Token) []string {
 	if len(tokens) == 0 {
 		return nil
 	}
-	hashes := make([]string, 0, len(tokens))
+	ids := make([]string, 0, len(tokens))
 	for _, tok := range tokens {
-		if tok.Hash != "" {
-			hashes = append(hashes, tok.Hash)
+		if tok.ID != "" {
+			ids = append(ids, tok.ID)
 		}
 	}
-	return hashes
+	return ids
 }
 
-// Lookup returns the token row. Redis is the hot snapshot; a miss reads MySQL and backfills.
-func (s *Store) Lookup(ctx context.Context, hash string) (*model.Token, error) {
-	if ok, err := s.denied(ctx, hash); err != nil {
+// Lookup returns the token row by jti. Redis is the hot snapshot; a miss reads MySQL and backfills.
+func (s *Store) Lookup(ctx context.Context, jti string) (*model.Token, error) {
+	if jti == "" {
+		return nil, ErrNotFound
+	}
+	if ok, err := s.denied(ctx, jti); err != nil {
 		return nil, err
 	} else if ok {
-		tok, err := s.getTokenMySQL(ctx, hash)
+		tok, err := s.getTokenByID(ctx, jti)
 		if err != nil {
 			return nil, err
 		}
 		tok.IsRevoked = true
 		return tok, nil
 	}
-	snap, err := s.getSnapshot(ctx, hash)
+	snap, err := s.getSnapshot(ctx, jti)
 	if err != nil {
 		return nil, err
 	}
 	if snap != nil {
 		return snap, nil
 	}
-	tok, err := s.getTokenMySQL(ctx, hash)
+	tok, err := s.getTokenByID(ctx, jti)
 	if err != nil {
 		return nil, err
 	}
@@ -339,21 +378,116 @@ func (s *Store) Lookup(ctx context.Context, hash string) (*model.Token, error) {
 	return tok, nil
 }
 
-func revokeAllTx(ctx context.Context, tx *sql.Tx, userID string, platformID int32) error {
-	_, err := tx.ExecContext(ctx, `UPDATE auth_tokens SET is_revoked = 1 WHERE user_id = ? AND platform_id = ? AND is_revoked = 0`, userID, platformID)
+// RotateRefresh revokes the presented refresh (and its sibling access in the same family generation),
+// inserts the new pair, and returns JTIs that must leave local/Redis caches.
+// If the presented refresh was already revoked, the whole family is revoked (replay) and ErrNotFound is returned.
+func (s *Store) RotateRefresh(ctx context.Context, presentedJTI string, access, refresh *model.Token) ([]string, error) {
+	if presentedJTI == "" || access == nil || refresh == nil {
+		return nil, fmt.Errorf("rotate requires presented jti and new pair")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	old, err := getTokenByIDTx(ctx, tx, presentedJTI, true)
+	if err != nil {
+		return nil, err
+	}
+	if old.Type != model.TokenTypeRefresh {
+		return nil, ErrNotFound
+	}
+	if old.IsRevoked {
+		live, rerr := revokeFamilyTx(ctx, tx, old.FamilyID, model.RevokeReplay)
+		if rerr != nil {
+			return nil, rerr
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		_ = s.dropSnapshots(ctx, live)
+		return tokenIDs(live), ErrNotFound
+	}
+	if old.UserID != refresh.UserID || old.PlatformID != refresh.PlatformID {
+		return nil, ErrNotFound
+	}
+	access.UserID = old.UserID
+	access.PlatformID = old.PlatformID
+	access.FamilyID = old.FamilyID
+	access.ParentJTI = old.ID
+	refresh.UserID = old.UserID
+	refresh.PlatformID = old.PlatformID
+	refresh.FamilyID = old.FamilyID
+	refresh.ParentJTI = old.ID
+
+	siblings, err := listLiveFamily(ctx, tx, old.FamilyID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE auth_tokens SET revoked_at = UTC_TIMESTAMP(3), revoke_reason = ?
+		WHERE family_id = ? AND revoked_at IS NULL`, model.RevokeKick, old.FamilyID); err != nil {
+		return nil, err
+	}
+	if err := insertTokenTx(ctx, tx, access); err != nil {
+		return nil, err
+	}
+	if err := insertTokenTx(ctx, tx, refresh); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	ids := tokenIDs(siblings)
+	if err := s.dropSnapshots(ctx, siblings); err != nil {
+		return ids, err
+	}
+	if err := s.putSnapshot(ctx, access); err != nil {
+		return ids, err
+	}
+	if err := s.putSnapshot(ctx, refresh); err != nil {
+		return ids, err
+	}
+	return ids, nil
+}
+
+func revokeAllTx(ctx context.Context, tx *sql.Tx, userID string, platformID int32, reason uint8) error {
+	_, err := tx.ExecContext(ctx, `
+		UPDATE auth_tokens SET revoked_at = UTC_TIMESTAMP(3), revoke_reason = ?
+		WHERE user_id = ? AND platform_id = ? AND revoked_at IS NULL`, reason, userID, platformID)
 	return err
+}
+
+func revokeFamilyTx(ctx context.Context, tx *sql.Tx, familyID string, reason uint8) ([]model.Token, error) {
+	live, err := listLiveFamily(ctx, tx, familyID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE auth_tokens SET revoked_at = UTC_TIMESTAMP(3), revoke_reason = ?
+		WHERE family_id = ? AND revoked_at IS NULL`, reason, familyID); err != nil {
+		return nil, err
+	}
+	return live, nil
 }
 
 func listLive(ctx context.Context, tx *sql.Tx, userID string, platformID int32) ([]model.Token, error) {
 	return listLiveQuery(ctx, tx, `
-		SELECT id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked
-		FROM auth_tokens WHERE user_id = ? AND platform_id = ? AND is_revoked = 0 FOR UPDATE`, userID, platformID)
+		SELECT `+tokenColumns+`
+		FROM auth_tokens WHERE user_id = ? AND platform_id = ? AND revoked_at IS NULL FOR UPDATE`, userID, platformID)
 }
 
 func listLiveUser(ctx context.Context, tx *sql.Tx, userID string) ([]model.Token, error) {
 	return listLiveQuery(ctx, tx, `
-		SELECT id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked
-		FROM auth_tokens WHERE user_id = ? AND is_revoked = 0 FOR UPDATE`, userID)
+		SELECT `+tokenColumns+`
+		FROM auth_tokens WHERE user_id = ? AND revoked_at IS NULL FOR UPDATE`, userID)
+}
+
+func listLiveFamily(ctx context.Context, tx *sql.Tx, familyID string) ([]model.Token, error) {
+	return listLiveQuery(ctx, tx, `
+		SELECT `+tokenColumns+`
+		FROM auth_tokens WHERE family_id = ? AND revoked_at IS NULL FOR UPDATE`, familyID)
 }
 
 func listLiveQuery(ctx context.Context, tx *sql.Tx, query string, args ...any) ([]model.Token, error) {
@@ -374,18 +508,36 @@ func listLiveQuery(ctx context.Context, tx *sql.Tx, query string, args ...any) (
 }
 
 func insertTokenTx(ctx context.Context, tx *sql.Tx, tok *model.Token) error {
+	var parent any
+	if tok.ParentJTI != "" {
+		parent = tok.ParentJTI
+	}
+	var hash any
+	if tok.Hash != "" {
+		hash = tok.Hash
+	}
 	_, err := tx.ExecContext(ctx, `
-		INSERT INTO auth_tokens (id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-		tok.ID, tok.UserID, tok.PlatformID, tok.Raw, tok.Hash, tok.Type, tok.ExpiresAt.UTC())
+		INSERT INTO auth_tokens (id, user_id, platform_id, family_id, parent_jti, token_hash, token_type, expires_at, revoked_at, revoke_reason)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+		tok.ID, tok.UserID, tok.PlatformID, tok.FamilyID, parent, hash, tok.Type, tok.ExpiresAt.UTC())
 	return err
 }
 
-func (s *Store) getTokenMySQL(ctx context.Context, hash string) (*model.Token, error) {
-	row := s.db.QueryRowContext(ctx, `
-		SELECT id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked
-		FROM auth_tokens WHERE token_hash = ?`, hash)
+func (s *Store) getTokenByID(ctx context.Context, jti string) (*model.Token, error) {
+	row := s.db.QueryRowContext(ctx, `SELECT `+tokenColumns+` FROM auth_tokens WHERE id = ?`, jti)
 	tok, err := scanToken(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return tok, err
+}
+
+func getTokenByIDTx(ctx context.Context, tx *sql.Tx, jti string, forUpdate bool) (*model.Token, error) {
+	q := `SELECT ` + tokenColumns + ` FROM auth_tokens WHERE id = ?`
+	if forUpdate {
+		q += ` FOR UPDATE`
+	}
+	tok, err := scanToken(tx.QueryRowContext(ctx, q, jti))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -398,10 +550,23 @@ type scanner interface {
 
 func scanToken(sc scanner) (*model.Token, error) {
 	var tok model.Token
-	var revoked int
-	if err := sc.Scan(&tok.ID, &tok.UserID, &tok.PlatformID, &tok.Raw, &tok.Hash, &tok.Type, &tok.ExpiresAt, &revoked); err != nil {
+	var parent, hash sql.NullString
+	var revokedAt sql.NullTime
+	var reason sql.NullInt64
+	if err := sc.Scan(
+		&tok.ID, &tok.UserID, &tok.PlatformID, &tok.FamilyID, &parent, &hash,
+		&tok.Type, &tok.ExpiresAt, &revokedAt, &reason,
+	); err != nil {
 		return nil, err
 	}
-	tok.IsRevoked = revoked == 1
+	tok.ParentJTI = parent.String
+	tok.Hash = hash.String
+	if revokedAt.Valid {
+		tok.RevokedAt = revokedAt.Time
+		tok.IsRevoked = true
+	}
+	if reason.Valid {
+		tok.RevokeReason = uint8(reason.Int64)
+	}
 	return &tok, nil
 }

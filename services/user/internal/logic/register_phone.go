@@ -120,18 +120,19 @@ func (s *Server) phonePasswordHash(password string) (string, error) {
 }
 
 func (s *Server) finishPhoneRegister(ctx context.Context, user *model.User, platformID int32) (*userpb.RegisterPhoneResp, error) {
-	tok, err := s.issue(user.UserID, platformID)
+	pair, err := s.issuePair(user.UserID, platformID, "", "")
 	if err != nil {
 		return nil, err
 	}
-	revoked, err := s.store.StartSession(ctx, tok)
+	revoked, err := s.store.StartSession(ctx, pair.Access, pair.Refresh)
 	s.invalidate(ctx, revoked)
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("create session")
 	}
 	return &userpb.RegisterPhoneResp{
 		User:              toPB(user),
-		Token:             tok.Raw,
+		Token:             pair.Access.Raw,
+		RefreshToken:      pair.Refresh.Raw,
 		ExpireTimeSeconds: s.issuer.ExpireSeconds(),
 	}, nil
 }

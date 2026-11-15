@@ -3,27 +3,58 @@ package logic
 import (
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/services/user/internal/model"
-	"github.com/lisuhang11/SuIM/services/user/internal/token"
 )
 
-func (s *Server) issue(userID string, platformID int32) (*model.Token, error) {
-	// 1. 生成令牌 ID 并签名。
+type sessionPair struct {
+	Access  *model.Token
+	Refresh *model.Token
+}
+
+func (s *Server) issuePair(userID string, platformID int32, familyID, parentJTI string) (*sessionPair, error) {
 	now := s.now().UTC()
-	id, err := s.newID()
-	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("create token id")
+	if familyID == "" {
+		id, err := s.newID()
+		if err != nil {
+			return nil, errorcode.ErrInternal.WithMsg("create family id")
+		}
+		familyID = id
 	}
-	raw, exp, err := s.issuer.Sign(id, userID, platformID, now)
+	accessID, err := s.newID()
 	if err != nil {
-		return nil, errorcode.ErrInternal.WithMsg("sign token")
+		return nil, errorcode.ErrInternal.WithMsg("create access id")
 	}
-	return &model.Token{
-		ID:         id,
-		UserID:     userID,
-		PlatformID: platformID,
-		Raw:        raw,
-		Hash:       token.Hash(raw),
-		Type:       model.TokenType,
-		ExpiresAt:  exp.UTC(),
+	refreshID, err := s.newID()
+	if err != nil {
+		return nil, errorcode.ErrInternal.WithMsg("create refresh id")
+	}
+	accessRaw, accessExp, err := s.issuer.SignAccess(accessID, userID, platformID, now)
+	if err != nil {
+		return nil, errorcode.ErrInternal.WithMsg("sign access")
+	}
+	refreshRaw, refreshExp, err := s.issuer.SignRefresh(refreshID, userID, platformID, now)
+	if err != nil {
+		return nil, errorcode.ErrInternal.WithMsg("sign refresh")
+	}
+	return &sessionPair{
+		Access: &model.Token{
+			ID:         accessID,
+			UserID:     userID,
+			PlatformID: platformID,
+			FamilyID:   familyID,
+			ParentJTI:  parentJTI,
+			Raw:        accessRaw,
+			Type:       model.TokenTypeAccess,
+			ExpiresAt:  accessExp.UTC(),
+		},
+		Refresh: &model.Token{
+			ID:         refreshID,
+			UserID:     userID,
+			PlatformID: platformID,
+			FamilyID:   familyID,
+			ParentJTI:  parentJTI,
+			Raw:        refreshRaw,
+			Type:       model.TokenTypeRefresh,
+			ExpiresAt:  refreshExp.UTC(),
+		},
 	}, nil
 }

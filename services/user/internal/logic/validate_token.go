@@ -13,12 +13,10 @@ import (
 
 // 确认令牌签名正确且会话仍有效。账号已停用或不存在时视为无效。
 func (s *Server) ValidateToken(ctx context.Context, req *userpb.ValidateTokenReq) (*userpb.ValidateTokenResp, error) {
-	// 1. 解析 token，并核对该会话仍有效。
-	claims, _, err := s.loadUsable(ctx, req.GetToken(), model.TokenType)
+	claims, _, err := s.loadUsableAccess(ctx, req.GetToken())
 	if err != nil {
 		return nil, err
 	}
-	// 2. 查用户，停用账号视为无效。
 	user, err := s.userByID(ctx, claims.UserID)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -32,21 +30,34 @@ func (s *Server) ValidateToken(ctx context.Context, req *userpb.ValidateTokenReq
 	return &userpb.ValidateTokenResp{Valid: true, User: toPB(user), PlatformId: claims.PlatformID}, nil
 }
 
-func (s *Server) loadUsable(ctx context.Context, raw, wantType string) (*token.Claims, *model.Token, error) {
-	// 1. 验签，并核对令牌类型。
+func (s *Server) loadUsableAccess(ctx context.Context, raw string) (*token.Claims, *model.Token, error) {
+	return s.loadUsable(ctx, raw, true)
+}
+
+func (s *Server) loadUsableRefresh(ctx context.Context, raw string) (*token.Claims, *model.Token, error) {
+	return s.loadUsable(ctx, raw, false)
+}
+
+func (s *Server) loadUsable(ctx context.Context, raw string, access bool) (*token.Claims, *model.Token, error) {
 	claims, err := s.issuer.Parse(raw)
-	if err != nil || claims.Type != wantType {
+	if err != nil {
 		return nil, nil, errorcode.ErrUserInvalidToken
 	}
-	// 2. 先查本地缓存，未命中再查 Redis 和 MySQL。
-	hash := token.Hash(raw)
+	if access {
+		if !model.IsAccess(claims.Type) {
+			return nil, nil, errorcode.ErrUserInvalidToken
+		}
+	} else if claims.Type != model.TokenTypeRefresh {
+		return nil, nil, errorcode.ErrUserInvalidToken
+	}
+	jti := claims.ID
 	var tok *model.Token
 	if s.tokens != nil {
-		tok, err = s.tokens.Get(ctx, hash, func(ctx context.Context) (*model.Token, error) {
-			return s.store.Lookup(ctx, hash)
+		tok, err = s.tokens.Get(ctx, jti, func(ctx context.Context) (*model.Token, error) {
+			return s.store.Lookup(ctx, jti)
 		})
 	} else {
-		tok, err = s.store.Lookup(ctx, hash)
+		tok, err = s.store.Lookup(ctx, jti)
 	}
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, errorcode.ErrUserInvalidToken
@@ -54,8 +65,7 @@ func (s *Server) loadUsable(ctx context.Context, raw, wantType string) (*token.C
 	if err != nil {
 		return nil, nil, errorcode.ErrInternal.WithMsg("lookup token")
 	}
-	// 3. 拒绝已撤销、身份不一致或已过期的令牌。
-	if tok.IsRevoked || tok.UserID != claims.UserID || tok.PlatformID != claims.PlatformID || tok.Type != wantType || !tok.ExpiresAt.After(s.now()) {
+	if tok.IsRevoked || tok.UserID != claims.UserID || tok.PlatformID != claims.PlatformID || tok.Type != claims.Type || !tok.ExpiresAt.After(s.now()) {
 		return nil, nil, errorcode.ErrUserInvalidToken
 	}
 	return claims, tok, nil

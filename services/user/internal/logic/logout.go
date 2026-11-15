@@ -10,12 +10,10 @@ import (
 
 // 作废这个用户在该平台上的会话。签名正确但已过期的令牌也可以退出。
 func (s *Server) Logout(ctx context.Context, req *userpb.LogoutReq) (*userpb.LogoutResp, error) {
-	// 1. 解析 token。过期但签名有效也接受。
 	claims, err := s.issuer.ParseIgnoreExpiry(req.GetToken())
-	if err != nil || claims.Type != model.TokenType {
+	if err != nil || (!model.IsAccess(claims.Type) && claims.Type != model.TokenTypeRefresh) {
 		return nil, errorcode.ErrUserInvalidToken
 	}
-	// 2. 作废该用户在该平台的会话。
 	revoked, err := s.store.RevokeSession(ctx, claims.UserID, claims.PlatformID)
 	s.invalidate(ctx, revoked)
 	if err != nil {

@@ -87,6 +87,20 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, resp)
 }
 
+func (s *Server) refreshToken(w http.ResponseWriter, r *http.Request) {
+	var req userpb.RefreshTokenReq
+	if err := decode(w, r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	resp, err := s.users.RefreshToken(r.Context(), &req)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeOK(w, resp)
+}
+
 func (s *Server) getUser(w http.ResponseWriter, r *http.Request) {
 	var req userpb.GetUserByIDReq
 	if err := decode(w, r, &req); err != nil {

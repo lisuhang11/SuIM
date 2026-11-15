@@ -36,6 +36,7 @@ service UserService {
 
 // UserInfo is the public profile. RegisterReq.username is stored as nickname.
 // birth_time is Unix milliseconds. gender is 0 unknown, 1 male, 2 female.
+// is_active / allow_* flags are 0 or 1.
 message UserInfo {
   string user_id = 1;
   string email = 2;

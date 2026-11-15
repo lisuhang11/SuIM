@@ -185,8 +185,8 @@ func userPatch(req *userpb.UpdateUserReq) (model.UserPatch, error) {
 }
 
 func allowOpt(value int32) (int32, error) {
-	if value != 1 && value != 2 {
-		return 0, errorcode.ErrUserInvalidProfile.WithMsg("allow flag must be 1 or 2")
+	if value != 0 && value != 1 {
+		return 0, errorcode.ErrUserInvalidProfile.WithMsg("allow flag must be 0 or 1")
 	}
 	return value, nil
 }

@@ -134,7 +134,8 @@ func userPatch(req *userpb.UpdateUserReq) (model.UserPatch, error) {
 		if ms == 0 {
 			patch.ClearBirth = true
 		} else {
-			birth := time.UnixMilli(ms)
+			t := time.UnixMilli(ms).UTC()
+			birth := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 			patch.BirthTime = &birth
 		}
 	}

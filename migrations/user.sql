@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     `phone_number`        VARCHAR(32)   NULL                    COMMENT '手机号',
     `account`             VARCHAR(64)   NULL                    COMMENT '账号',
     `gender`              INT           NOT NULL DEFAULT 0      COMMENT '性别：0未知 1男 2女',
-    `birth_time`          DATETIME(3)   NULL                    COMMENT '生日',
+    `birth_time`          DATE          NULL                    COMMENT '生日',
     `level`               INT           NOT NULL DEFAULT 0      COMMENT '等级',
     `allow_vibration`     INT           NOT NULL DEFAULT 1      COMMENT '是否允许震动：1允许 2不允许',
     `allow_beep`          INT           NOT NULL DEFAULT 1      COMMENT '是否允许提示音：1允许 2不允许',

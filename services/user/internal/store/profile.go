@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
 
@@ -83,7 +84,8 @@ func (s *Store) UpdateProfile(ctx context.Context, userID string, patch model.Us
 		args = append(args, nil)
 	} else if patch.BirthTime != nil {
 		sets = append(sets, "birth_time = ?")
-		args = append(args, patch.BirthTime.UTC())
+		t := patch.BirthTime.UTC()
+		args = append(args, time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC))
 	}
 	if patch.Level != nil {
 		sets = append(sets, "level = ?")

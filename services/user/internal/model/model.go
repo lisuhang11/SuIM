@@ -41,7 +41,6 @@ type User struct {
 	ProtocolAgreedAt time.Time
 	RegisterIP       string
 	RegisterReceipt  string
-	HasPassword      bool
 	CreateTime       time.Time
 }
 

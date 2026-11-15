@@ -99,12 +99,12 @@ func seedUserBench(t *testing.T, ctx context.Context, db *sql.DB) string {
 		}
 		var b strings.Builder
 		args := make([]any, 0, (end-start+1)*5)
-		b.WriteString(`INSERT INTO user (user_id, email, password_hash, nickname, is_active, account, has_password) VALUES `)
+		b.WriteString(`INSERT INTO user (user_id, email, password_hash, nickname, is_active, account) VALUES `
 		for n := start; n <= end; n++ {
 			if n > start {
 				b.WriteByte(',')
 			}
-			b.WriteString("(?,?,?,?,1,?,1)")
+			b.WriteString("(?,?,?,?,1,?)")
 			id := userBenchID(n)
 			email := id + "@bench.test"
 			args = append(args, id, email, string(hash), "n"+id, email)

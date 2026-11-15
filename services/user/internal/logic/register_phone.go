@@ -89,7 +89,6 @@ func (s *Server) RegisterPhone(ctx context.Context, req *userpb.RegisterPhoneReq
 		ProtocolAgreedAt: s.now().UTC(),
 		RegisterIP:       ip,
 		RegisterReceipt:  got,
-		HasPassword:      true,
 	}
 	if err := s.beforeRegister(ctx, user); err != nil {
 		return nil, err

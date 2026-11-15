@@ -126,7 +126,7 @@ func TestPhoneRegister(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { cleanupUser(t, mysqlCfg, reg.GetUser().GetUserId()) })
-	if reg.GetToken() == "" || !reg.GetUser().GetHasPassword() || reg.GetUser().GetRegisterType() != model.RegisterTypePhone || reg.GetUser().GetNickname() != "用户"+phone[len(phone)-4:] {
+	if reg.GetToken() == "" || reg.GetUser().GetRegisterType() != model.RegisterTypePhone || reg.GetUser().GetNickname() != "用户"+phone[len(phone)-4:] {
 		t.Fatalf("register %+v", reg.GetUser())
 	}
 	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: reg.GetToken()}); err != nil {
@@ -212,9 +212,6 @@ func TestPhoneRegister(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { cleanupUser(t, mysqlCfg, noPass.GetUser().GetUserId()) })
-	if !noPass.GetUser().GetHasPassword() {
-		t.Fatal("phone registration did not store a login password")
-	}
 	if _, err := srv.Login(ctx, &userpb.LoginReq{Account: noPassPhone, Password: "secret1", PlatformId: 1}); !isCode(err, codes.Unauthenticated, errorcode.UserBadCredential) {
 		t.Fatalf("phone number accepted as account err=%v", err)
 	}

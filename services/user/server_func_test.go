@@ -115,7 +115,7 @@ func TestSearchSelfReturnsFullProfile(t *testing.T) {
 		t.Fatalf("self search: %+v err=%v", found, err)
 	}
 	card := found.GetUsers()[0]
-	if card.GetEmail() != email || !card.GetHasPassword() || card.GetUserId() != id {
+	if card.GetEmail() != email || card.GetUserId() != id {
 		t.Fatalf("self search should return private fields: %+v", card)
 	}
 }

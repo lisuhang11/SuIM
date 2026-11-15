@@ -188,7 +188,6 @@ type profileSnap struct {
 	AllowAddFriend   int32  `json:"allow_add_friend,omitempty"`
 	RegisterType     int32  `json:"register_type,omitempty"`
 	Ex               string `json:"ex,omitempty"`
-	HasPassword      bool   `json:"has_password"`
 }
 
 func loadProfile(ctx context.Context, rdb redis.UniversalClient, userID string) (*model.User, bool, error) {
@@ -233,7 +232,6 @@ func snapOf(u *model.User) profileSnap {
 		AllowAddFriend:   u.AllowAddFriend,
 		RegisterType:     u.RegisterType,
 		Ex:               u.Ex,
-		HasPassword:      u.HasPassword,
 	}
 	if !u.CreateTime.IsZero() {
 		snap.CreateTime = u.CreateTime.UnixMilli()
@@ -263,7 +261,6 @@ func (s profileSnap) user() *model.User {
 		AllowAddFriend:   s.AllowAddFriend,
 		RegisterType:     s.RegisterType,
 		Ex:               s.Ex,
-		HasPassword:      s.HasPassword,
 	}
 	if s.CreateTime > 0 {
 		u.CreateTime = time.UnixMilli(s.CreateTime).UTC()

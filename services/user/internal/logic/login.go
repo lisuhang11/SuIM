@@ -31,8 +31,7 @@ func (s *Server) Login(ctx context.Context, req *userpb.LoginReq) (*userpb.Login
 		}
 		return nil, errorcode.ErrInternal.WithMsg("query user")
 	}
-	match := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.GetPassword())) == nil
-	if !user.HasPassword || !match {
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.GetPassword())) != nil {
 		return nil, errorcode.ErrUserBadCredential
 	}
 	if !user.IsActive {

@@ -56,8 +56,8 @@ message UserInfo {
   int32 allow_add_friend = 17;
   int32 register_type = 18;
   string ex = 19;
-  // has_password is set only on the caller's own profile. A public card leaves it false.
-  bool has_password = 20;
+  reserved 20;
+  reserved "has_password";
 }
 
 message RegisterReq {

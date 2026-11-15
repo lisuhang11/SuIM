@@ -90,8 +90,8 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 		"ALTER TABLE `user` ADD COLUMN protocol_agreed_at DATETIME(3) NULL COMMENT '同意协议时间'",
 		"ALTER TABLE `user` ADD COLUMN register_ip VARCHAR(64) NOT NULL DEFAULT '' COMMENT '注册 IP'",
 		"ALTER TABLE `user` ADD COLUMN register_receipt VARCHAR(64) NULL COMMENT '手机号注册核销回执'",
-		"ALTER TABLE `user` ADD COLUMN has_password TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否设置了可登录密码'",
 		"ALTER TABLE `user` MODIFY email VARCHAR(255) NULL COMMENT '邮箱'",
+		"ALTER TABLE `user` DROP COLUMN has_password",
 		"ALTER TABLE `user` ADD UNIQUE INDEX uk_account (account)",
 		"ALTER TABLE `user` ADD UNIQUE INDEX uk_phone (area_code, phone_number)",
 		"ALTER TABLE `auth_tokens` ADD COLUMN family_id VARCHAR(36) NULL COMMENT '刷新族ID'",
@@ -102,7 +102,7 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 		"ALTER TABLE `auth_tokens` MODIFY token_hash VARCHAR(64) NULL COMMENT 'opaque 摘要；JWT 为空'",
 		"ALTER TABLE `auth_tokens` ADD INDEX idx_family (family_id)",
 	} {
-		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !isDuplicateColumn(err) && !isDuplicateKey(err) {
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !isDuplicateColumn(err) && !isDuplicateKey(err) && !isCantDrop(err) {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}
@@ -122,6 +122,11 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 func isUnknownColumn(err error) bool {
 	var me *mysqldriver.MySQLError
 	return errors.As(err, &me) && me.Number == 1054
+}
+
+func isCantDrop(err error) bool {
+	var me *mysqldriver.MySQLError
+	return errors.As(err, &me) && me.Number == 1091
 }
 
 func isDuplicateColumn(err error) bool {
@@ -162,7 +167,7 @@ const userColumns = `user_id, email, password_hash, nickname, avatar_url,
 	app_manger_level, global_recv_msg_opt, is_active, create_time,
 	area_code, phone_number, account, gender, birth_time, level,
 	allow_vibration, allow_beep, allow_add_friend, register_type, ex,
-	protocol_version, protocol_agreed_at, register_ip, register_receipt, has_password`
+	protocol_version, protocol_agreed_at, register_ip, register_receipt`
 
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE email = ?`, email)
@@ -189,7 +194,7 @@ func (s *Store) getUser(ctx context.Context, query string, args ...any) (*model.
 
 func scanUser(sc scanner) (*model.User, error) {
 	var u model.User
-	var active, hasPassword int
+	var active int
 	var email, phone, account, receipt sql.NullString
 	var birth, agreed sql.NullTime
 	err := sc.Scan(
@@ -197,13 +202,12 @@ func scanUser(sc scanner) (*model.User, error) {
 		&u.AppMangerLevel, &u.GlobalRecvMsgOpt, &active, &u.CreateTime,
 		&u.AreaCode, &phone, &account, &u.Gender, &birth, &u.Level,
 		&u.AllowVibration, &u.AllowBeep, &u.AllowAddFriend, &u.RegisterType, &u.Ex,
-		&u.ProtocolVersion, &agreed, &u.RegisterIP, &receipt, &hasPassword,
+		&u.ProtocolVersion, &agreed, &u.RegisterIP, &receipt,
 	)
 	if err != nil {
 		return nil, err
 	}
 	u.IsActive = active == 1
-	u.HasPassword = hasPassword == 1
 	u.Email = email.String
 	u.PhoneNumber = phone.String
 	u.Account = account.String

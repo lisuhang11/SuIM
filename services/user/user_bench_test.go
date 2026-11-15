@@ -119,15 +119,15 @@ func seedUserBench(t *testing.T, ctx context.Context, db *sql.DB) string {
 
 func insertBenchToken(t *testing.T, ctx context.Context, db *sql.DB, issuer *token.Issuer, userID string) string {
 	t.Helper()
-	raw, exp, err := issuer.Sign("bench-token-00000000000000000001", userID, 1, time.Now().UTC())
+	jti := "bench-token-00000000000000000001"
+	raw, exp, err := issuer.SignAccess(jti, userID, 1, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
 	}
-	hash := token.Hash(raw)
 	if _, err := db.ExecContext(ctx, `
-		INSERT INTO auth_tokens (id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked)
-		VALUES (?, ?, 1, ?, ?, ?, ?, 0)`,
-		"bench-token-00000000000000000001", userID, raw, hash, model.TokenType, exp.UTC()); err != nil {
+		INSERT INTO auth_tokens (id, user_id, platform_id, family_id, parent_jti, token_hash, token_type, expires_at, revoked_at, revoke_reason)
+		VALUES (?, ?, 1, ?, NULL, NULL, ?, ?, NULL, NULL)`,
+		jti, userID, jti, model.TokenTypeAccess, exp.UTC()); err != nil {
 		t.Fatal(err)
 	}
 	return raw
@@ -143,8 +143,11 @@ func deleteBenchTokenKeys(t *testing.T, ctx context.Context, rdb redis.Universal
 		if raw == "" {
 			continue
 		}
-		hash := token.Hash(raw)
-		keys = append(keys, "suim:token:"+hash, "suim:token:deny:"+hash)
+		claims, err := token.NewIssuer(config.JWT{Secret: benchJWTSecret, ExpireSeconds: 3600}).Parse(raw)
+		if err != nil {
+			continue
+		}
+		keys = append(keys, "suim:token:"+claims.ID, "suim:token:deny:"+claims.ID)
 	}
 	if len(keys) == 0 {
 		return

@@ -62,7 +62,8 @@ func TestSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	const expireSeconds int64 = 2592000
+	const refreshSeconds int64 = 2592000
+	const accessSeconds int64 = 3600
 	tokenCache, stopCache := logic.NewTokenCache(ctx, rdb, svcconfig.LocalCache{
 		Topic:         "suim:user:token:delete:test",
 		SlotNum:       4,
@@ -72,8 +73,9 @@ func TestSession(t *testing.T) {
 	})
 	t.Cleanup(stopCache)
 	srv := logic.New(st, token.NewIssuer(config.JWT{
-		Secret:        "test-secret",
-		ExpireSeconds: expireSeconds,
+		Secret:              "test-secret",
+		ExpireSeconds:       refreshSeconds,
+		AccessExpireSeconds: accessSeconds,
 	}), tokenCache)
 
 	email := fmt.Sprintf("itest-%d@example.com", time.Now().UnixNano())
@@ -102,8 +104,8 @@ func TestSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.GetToken() == "" || first.GetExpireTimeSeconds() != expireSeconds {
-		t.Fatalf("login token=%q expire=%d", first.GetToken(), first.GetExpireTimeSeconds())
+	if first.GetToken() == "" || first.GetRefreshToken() == "" || first.GetExpireTimeSeconds() != accessSeconds {
+		t.Fatalf("login token=%q refresh=%q expire=%d", first.GetToken(), first.GetRefreshToken(), first.GetExpireTimeSeconds())
 	}
 	valid, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: first.GetToken()})
 	if err != nil || !valid.GetValid() || valid.GetUser().GetUserId() != reg.GetUser().GetUserId() || valid.GetPlatformId() != 1 {

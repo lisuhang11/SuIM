@@ -24,7 +24,7 @@ func TestPerfUser(t *testing.T) {
 
 	t.Logf("EXPLAIN get_user %s", explainUser(t, ctx, db, `SELECT user_id, email, password_hash, nickname, is_active FROM user WHERE user_id = ?`, hot))
 	t.Logf("EXPLAIN get_email %s", explainUser(t, ctx, db, `SELECT user_id, email, password_hash, nickname, is_active FROM user WHERE email = ?`, hot+"@bench.test"))
-	t.Logf("EXPLAIN token %s", explainUser(t, ctx, db, `SELECT id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked FROM auth_tokens WHERE token_hash = ?`, token.Hash(raw)))
+	t.Logf("EXPLAIN token %s", explainUser(t, ctx, db, `SELECT id, user_id, platform_id, family_id, token_type, expires_at, revoked_at FROM auth_tokens WHERE id = ?`, "bench-token-00000000000000000001"))
 
 	plain := logic.New(st, issuer, nil)
 	timeCalls(t, "get_user", 30, func() {
@@ -50,9 +50,9 @@ func TestPerfUser(t *testing.T) {
 		}
 	})
 
-	hash := token.Hash(raw)
+	jti := "bench-token-00000000000000000001"
 	timeCalls(t, "validate_mysql", 30, func() {
-		if err := rdb.Del(ctx, "suim:token:"+hash).Err(); err != nil {
+		if err := rdb.Del(ctx, "suim:token:"+jti).Err(); err != nil {
 			t.Fatal(err)
 		}
 		mustValidate(t, ctx, plain, raw, hot)

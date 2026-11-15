@@ -67,6 +67,40 @@ func TestReplacePlatformSession(t *testing.T) {
 	}
 }
 
+func TestRefreshTokenRotationAndReplay(t *testing.T) {
+	ctx, srv, cfg, cleanup := openUser(t, "suim:user:token:delete:refresh")
+	defer cleanup()
+	email := fmt.Sprintf("refresh-%d@example.com", time.Now().UnixNano())
+	registerUser(t, ctx, srv, cfg, email, "Ada")
+	login, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldAccess, oldRefresh := login.GetToken(), login.GetRefreshToken()
+	if oldAccess == "" || oldRefresh == "" {
+		t.Fatal("login missing access/refresh pair")
+	}
+	next, err := srv.RefreshToken(ctx, &userpb.RefreshTokenReq{RefreshToken: oldRefresh})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.GetToken() == "" || next.GetRefreshToken() == "" || next.GetRefreshToken() == oldRefresh {
+		t.Fatalf("rotation failed: %+v", next)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: oldAccess}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("old access still valid: %v", err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: next.GetToken()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.RefreshToken(ctx, &userpb.RefreshTokenReq{RefreshToken: oldRefresh}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("replay: %v", err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: next.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("family should die after replay: %v", err)
+	}
+}
+
 func TestSearchSelfReturnsFullProfile(t *testing.T) {
 	ctx, srv, cfg, cleanup := openUser(t, "suim:user:token:delete:search-self")
 	defer cleanup()
@@ -137,16 +171,20 @@ func TestExpiredSessionCanLogout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hash := token.Hash(session.GetToken())
+	claims, err := token.NewIssuer(config.JWT{Secret: "test-secret", ExpireSeconds: 3600}).Parse(session.GetToken())
+	if err != nil {
+		t.Fatal(err)
+	}
+	jti := claims.ID
 	db, err := sql.Open("mysql", mysqlDSN(cfg))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.ExecContext(ctx, `UPDATE auth_tokens SET expires_at = ? WHERE token_hash = ?`, time.Now().Add(-time.Minute).UTC(), hash); err != nil {
+	if _, err := db.ExecContext(ctx, `UPDATE auth_tokens SET expires_at = ? WHERE id = ?`, time.Now().Add(-time.Minute).UTC(), jti); err != nil {
 		t.Fatal(err)
 	}
-	if err := rdb.Del(ctx, "suim:token:"+hash).Err(); err != nil {
+	if err := rdb.Del(ctx, "suim:token:"+jti).Err(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: session.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
@@ -399,9 +437,9 @@ func plantLiveToken(t *testing.T, ctx context.Context, cfg config.MySQL, userID 
 	}
 	defer db.Close()
 	if _, err := db.ExecContext(ctx, `
-		INSERT INTO auth_tokens (id, user_id, platform_id, token, token_hash, token_type, expires_at, is_revoked)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-		tokID, userID, platformID, raw, token.Hash(raw), "token", exp.UTC()); err != nil {
+		INSERT INTO auth_tokens (id, user_id, platform_id, family_id, parent_jti, token_hash, token_type, expires_at, revoked_at, revoke_reason)
+		VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, NULL, NULL)`,
+		tokID, userID, platformID, tokID, "access", exp.UTC()); err != nil {
 		t.Fatal(err)
 	}
 	return raw

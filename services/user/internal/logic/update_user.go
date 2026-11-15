@@ -141,7 +141,7 @@ func userPatch(req *userpb.UpdateUserReq) (model.UserPatch, error) {
 	}
 	if req.Level != nil {
 		level := req.GetLevel()
-		if level < 0 {
+		if level < 0 || level > 255 {
 			return patch, errorcode.ErrUserInvalidProfile.WithMsg("level is invalid")
 		}
 		patch.Level = &level
@@ -169,7 +169,7 @@ func userPatch(req *userpb.UpdateUserReq) (model.UserPatch, error) {
 	}
 	if req.RegisterType != nil {
 		kind := req.GetRegisterType()
-		if kind < 0 {
+		if kind < 0 || kind > 255 {
 			return patch, errorcode.ErrUserInvalidProfile.WithMsg("register_type is invalid")
 		}
 		patch.RegisterType = &kind

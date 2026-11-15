@@ -22,7 +22,7 @@ func (s *Store) GetUsersByIDs(ctx context.Context, ids []string) ([]*model.User,
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+userColumns+`
-		FROM user WHERE user_id IN (`+placeholders+`)`, args...)
+		FROM user WHERE user_id IN (`+placeholders+`) AND `+liveUser, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (s *Store) UpdateProfile(ctx context.Context, userID string, patch model.Us
 	}
 	sets = append(sets, "updated_at = CURRENT_TIMESTAMP(3)")
 	args = append(args, userID)
-	res, err := s.db.ExecContext(ctx, `UPDATE user SET `+strings.Join(sets, ", ")+` WHERE user_id = ?`, args...)
+	res, err := s.db.ExecContext(ctx, `UPDATE user SET `+strings.Join(sets, ", ")+` WHERE user_id = ? AND `+liveUser, args...)
 	if err != nil {
 		var me *mysqldriver.MySQLError
 		if errors.As(err, &me) && me.Number == 1062 {
@@ -147,7 +147,7 @@ func (s *Store) ChangePassword(ctx context.Context, userID, passwordHash string)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	res, err := tx.ExecContext(ctx, `UPDATE user SET password_hash = ? WHERE user_id = ?`, passwordHash, userID)
+	res, err := tx.ExecContext(ctx, `UPDATE user SET password_hash = ? WHERE user_id = ? AND `+liveUser, passwordHash, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,8 @@ func (s *Store) ChangePassword(ctx context.Context, userID, passwordHash string)
 	return tokenIDs(live), nil
 }
 
-// DeleteUser removes the account and its tokens. Returned JTIs are the live tokens that were dropped.
+// DeleteUser soft-deletes the account: sets deleted_at, frees unique identities, revokes tokens.
+// Returned JTIs are the live tokens that were dropped.
 func (s *Store) DeleteUser(ctx context.Context, userID string) ([]string, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -179,14 +180,15 @@ func (s *Store) DeleteUser(ctx context.Context, userID string) ([]string, error)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	live, err := listLiveUser(ctx, tx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM auth_tokens WHERE user_id = ?`, userID); err != nil {
-		return nil, err
-	}
-	res, err := tx.ExecContext(ctx, `DELETE FROM user WHERE user_id = ?`, userID)
+	res, err := tx.ExecContext(ctx, `
+		UPDATE user SET
+			deleted_at = UTC_TIMESTAMP(3),
+			is_active = 0,
+			email = NULL,
+			phone_number = NULL,
+			account = NULL,
+			register_receipt = NULL
+		WHERE user_id = ? AND `+liveUser, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +198,10 @@ func (s *Store) DeleteUser(ctx context.Context, userID string) ([]string, error)
 	}
 	if n == 0 {
 		return nil, ErrNotFound
+	}
+	live, err := revokeUserTx(ctx, tx, userID, model.RevokeDelete)
+	if err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

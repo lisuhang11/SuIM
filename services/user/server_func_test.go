@@ -67,6 +67,47 @@ func TestReplacePlatformSession(t *testing.T) {
 	}
 }
 
+func TestSoftDeleteAndLastLoginIP(t *testing.T) {
+	ctx, srv, cfg, cleanup := openUser(t, "suim:user:token:delete:softdel")
+	defer cleanup()
+	email := fmt.Sprintf("softdel-%d@example.com", time.Now().UnixNano())
+	id := registerUser(t, ctx, srv, cfg, email, "Ada")
+	login, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1, ClientIp: "203.0.113.9"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("mysql", mysqlDSN(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var ip string
+	var deleted sql.NullTime
+	if err := db.QueryRowContext(ctx, `SELECT last_login_ip, deleted_at FROM user WHERE user_id = ?`, id).Scan(&ip, &deleted); err != nil {
+		t.Fatal(err)
+	}
+	if ip != "203.0.113.9" || deleted.Valid {
+		t.Fatalf("last_login_ip=%q deleted=%v", ip, deleted.Valid)
+	}
+	if _, err := srv.DeleteUser(ctx, &userpb.DeleteUserReq{Token: login.GetToken()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.GetUserByID(ctx, &userpb.GetUserByIDReq{UserId: id}); !isCode(err, codes.NotFound, errorcode.UserNotFound) {
+		t.Fatalf("soft-deleted still visible: %v", err)
+	}
+	if _, err := srv.Login(ctx, &userpb.LoginReq{Email: email, Password: "secret1", PlatformId: 1}); !isCode(err, codes.Unauthenticated, errorcode.UserBadCredential) {
+		t.Fatalf("soft-deleted still login: %v", err)
+	}
+	if _, err := srv.ValidateToken(ctx, &userpb.ValidateTokenReq{Token: login.GetToken()}); !isCode(err, codes.Unauthenticated, errorcode.UserInvalidToken) {
+		t.Fatalf("token survived soft delete: %v", err)
+	}
+	reg, err := srv.Register(ctx, &userpb.RegisterReq{Username: "Ada2", Email: email, Password: "secret1"})
+	if err != nil {
+		t.Fatalf("email not freed after soft delete: %v", err)
+	}
+	t.Cleanup(func() { cleanupUser(t, cfg, reg.GetUser().GetUserId()) })
+}
+
 func TestRefreshTokenRotationAndReplay(t *testing.T) {
 	ctx, srv, cfg, cleanup := openUser(t, "suim:user:token:delete:refresh")
 	defer cleanup()

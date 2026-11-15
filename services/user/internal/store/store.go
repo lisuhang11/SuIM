@@ -90,10 +90,13 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 		"ALTER TABLE `user` ADD COLUMN protocol_agreed_at DATETIME(3) NULL COMMENT '同意协议时间'",
 		"ALTER TABLE `user` ADD COLUMN register_ip VARCHAR(64) NOT NULL DEFAULT '' COMMENT '注册 IP'",
 		"ALTER TABLE `user` ADD COLUMN register_receipt VARCHAR(64) NULL COMMENT '手机号注册核销回执'",
+		"ALTER TABLE `user` ADD COLUMN last_login_ip VARCHAR(64) NOT NULL DEFAULT '' COMMENT '最近登录 IP'",
+		"ALTER TABLE `user` ADD COLUMN deleted_at DATETIME(3) NULL COMMENT '软删除时间'",
 		"ALTER TABLE `user` MODIFY email VARCHAR(255) NULL COMMENT '邮箱'",
 		"ALTER TABLE `user` DROP COLUMN has_password",
 		"ALTER TABLE `user` ADD UNIQUE INDEX uk_account (account)",
 		"ALTER TABLE `user` ADD UNIQUE INDEX uk_phone (area_code, phone_number)",
+		"ALTER TABLE `user` ADD INDEX idx_deleted_at (deleted_at)",
 		"ALTER TABLE `auth_tokens` ADD COLUMN family_id VARCHAR(36) NULL COMMENT '刷新族ID'",
 		"ALTER TABLE `auth_tokens` ADD COLUMN parent_jti VARCHAR(36) NULL COMMENT '轮换前一个 refresh jti'",
 		"ALTER TABLE `auth_tokens` ADD COLUMN revoked_at DATETIME(3) NULL COMMENT '撤销时间'",
@@ -167,18 +170,21 @@ const userColumns = `user_id, email, password_hash, nickname, avatar_url,
 	app_manger_level, global_recv_msg_opt, is_active, create_time,
 	area_code, phone_number, account, gender, birth_time, level,
 	allow_vibration, allow_beep, allow_add_friend, register_type, ex,
-	protocol_version, protocol_agreed_at, register_ip, register_receipt`
+	protocol_version, protocol_agreed_at, register_ip, register_receipt,
+	last_login_ip, deleted_at`
+
+const liveUser = `deleted_at IS NULL`
 
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
-	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE email = ?`, email)
+	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE email = ? AND `+liveUser, email)
 }
 
 func (s *Store) GetUserByAccount(ctx context.Context, account string) (*model.User, error) {
-	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE account = ?`, account)
+	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE account = ? AND `+liveUser, account)
 }
 
 func (s *Store) GetUserByID(ctx context.Context, userID string) (*model.User, error) {
-	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE user_id = ?`, userID)
+	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE user_id = ? AND `+liveUser, userID)
 }
 
 func (s *Store) getUser(ctx context.Context, query string, args ...any) (*model.User, error) {
@@ -196,13 +202,14 @@ func scanUser(sc scanner) (*model.User, error) {
 	var u model.User
 	var active int
 	var email, phone, account, receipt sql.NullString
-	var birth, agreed sql.NullTime
+	var birth, agreed, deleted sql.NullTime
 	err := sc.Scan(
 		&u.UserID, &email, &u.PasswordHash, &u.Nickname, &u.AvatarURL,
 		&u.AppMangerLevel, &u.GlobalRecvMsgOpt, &active, &u.CreateTime,
 		&u.AreaCode, &phone, &account, &u.Gender, &birth, &u.Level,
 		&u.AllowVibration, &u.AllowBeep, &u.AllowAddFriend, &u.RegisterType, &u.Ex,
 		&u.ProtocolVersion, &agreed, &u.RegisterIP, &receipt,
+		&u.LastLoginIP, &deleted,
 	)
 	if err != nil {
 		return nil, err
@@ -218,11 +225,24 @@ func scanUser(sc scanner) (*model.User, error) {
 	if agreed.Valid {
 		u.ProtocolAgreedAt = agreed.Time
 	}
+	if deleted.Valid {
+		u.DeletedAt = deleted.Time
+	}
 	return &u, nil
 }
 
 func (s *Store) GetUserByPhone(ctx context.Context, area, national string) (*model.User, error) {
-	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE area_code = ? AND phone_number = ?`, area, national)
+	return s.getUser(ctx, `SELECT `+userColumns+` FROM user WHERE area_code = ? AND phone_number = ? AND `+liveUser, area, national)
+}
+
+// TouchLastLoginIP records the latest login IP for risk control.
+func (s *Store) TouchLastLoginIP(ctx context.Context, userID, ip string) error {
+	if userID == "" || ip == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE user SET last_login_ip = ? WHERE user_id = ? AND `+liveUser, ip, userID)
+	return err
 }
 
 const tokenColumns = `id, user_id, platform_id, family_id, parent_jti, token_hash, token_type, expires_at, revoked_at, revoke_reason`

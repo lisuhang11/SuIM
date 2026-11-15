@@ -55,6 +55,7 @@ func (s *Server) LoginPhone(ctx context.Context, req *userpb.LoginPhoneReq) (*us
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("create session")
 	}
+	s.recordLoginIP(ctx, user.UserID, req.GetClientIp())
 	return &userpb.LoginResp{
 		User:              toPB(user),
 		Token:             pair.Access.Raw,

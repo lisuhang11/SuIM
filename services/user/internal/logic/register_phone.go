@@ -128,6 +128,7 @@ func (s *Server) finishPhoneRegister(ctx context.Context, user *model.User, plat
 	if err != nil {
 		return nil, errorcode.ErrInternal.WithMsg("create session")
 	}
+	s.recordLoginIP(ctx, user.UserID, user.RegisterIP)
 	return &userpb.RegisterPhoneResp{
 		User:              toPB(user),
 		Token:             pair.Access.Raw,

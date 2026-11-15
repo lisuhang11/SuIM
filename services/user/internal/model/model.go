@@ -15,6 +15,7 @@ const (
 	RevokePassword uint8 = 3
 	RevokeReplay   uint8 = 4
 	RevokeBan      uint8 = 5
+	RevokeDelete   uint8 = 6
 )
 
 type User struct {
@@ -41,7 +42,14 @@ type User struct {
 	ProtocolAgreedAt time.Time
 	RegisterIP       string
 	RegisterReceipt  string
+	LastLoginIP      string
+	DeletedAt        time.Time
 	CreateTime       time.Time
+}
+
+// Deleted reports whether the account has been soft-deleted.
+func (u *User) Deleted() bool {
+	return u != nil && !u.DeletedAt.IsZero()
 }
 
 const RegisterTypePhone int32 = 1

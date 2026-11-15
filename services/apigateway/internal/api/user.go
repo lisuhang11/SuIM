@@ -65,6 +65,7 @@ func (s *Server) loginPhone(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	req.ClientIp = clientIP(r)
 	resp, err := s.users.LoginPhone(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)
@@ -79,6 +80,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	req.ClientIp = clientIP(r)
 	resp, err := s.users.Login(r.Context(), &req)
 	if err != nil {
 		writeErr(w, err)

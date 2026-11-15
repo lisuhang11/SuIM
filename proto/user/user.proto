@@ -78,6 +78,8 @@ message LoginReq {
   int32 platform_id = 3;
   string phone = 4;
   string account = 5;
+  // client_ip is set by the gateway.
+  string client_ip = 6;
 }
 
 message LoginResp {
@@ -96,6 +98,8 @@ message LoginPhoneReq {
   string phone = 1;
   string code = 2;
   int32 platform_id = 3;
+  // client_ip is set by the gateway.
+  string client_ip = 4;
 }
 
 message GetUserByIDReq {

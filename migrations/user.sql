@@ -22,12 +22,15 @@ CREATE TABLE IF NOT EXISTS `user` (
     `protocol_agreed_at`  DATETIME(3)   NULL                    COMMENT '同意协议时间',
     `register_ip`         VARCHAR(64)   NOT NULL DEFAULT ''     COMMENT '注册 IP',
     `register_receipt`    VARCHAR(64)   NULL                    COMMENT '手机号注册核销回执',
+    `last_login_ip`       VARCHAR(64)   NOT NULL DEFAULT ''     COMMENT '最近登录 IP',
+    `deleted_at`          DATETIME(3)   NULL                    COMMENT '软删除时间，NULL 表示未删除',
     `create_time`         DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     `updated_at`          DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
     PRIMARY KEY (`user_id`),
     UNIQUE INDEX `idx_email` (`email`),
     UNIQUE INDEX `uk_account` (`account`),
-    UNIQUE INDEX `uk_phone` (`area_code`, `phone_number`)
+    UNIQUE INDEX `uk_phone` (`area_code`, `phone_number`),
+    INDEX `idx_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户基础信息表';
 
 CREATE TABLE IF NOT EXISTS `auth_tokens` (
@@ -40,7 +43,7 @@ CREATE TABLE IF NOT EXISTS `auth_tokens` (
     `token_type`    VARCHAR(16)       NOT NULL COMMENT 'access|refresh',
     `expires_at`    DATETIME(3)       NOT NULL COMMENT '过期时间',
     `revoked_at`    DATETIME(3)       NULL COMMENT '撤销时间，NULL 表示有效',
-    `revoke_reason` TINYINT UNSIGNED  NULL COMMENT '1 logout 2 kick 3 password 4 replay 5 ban',
+    `revoke_reason` TINYINT UNSIGNED  NULL COMMENT '1 logout 2 kick 3 password 4 replay 5 ban 6 delete',
     `created_at`    DATETIME(3)       NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     PRIMARY KEY (`id`),
     INDEX `idx_user_platform` (`user_id`, `platform_id`),

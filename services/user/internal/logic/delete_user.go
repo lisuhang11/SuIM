@@ -16,7 +16,7 @@ func (s *Server) DeleteUser(ctx context.Context, req *userpb.DeleteUserReq) (*us
 	if err != nil {
 		return nil, err
 	}
-	// 2. 删除用户及其全部 token。
+	// 2. 软删除账号：打 deleted_at、释放唯一标识、作废全部 token。
 	revoked, err := s.store.DeleteUser(ctx, id)
 	s.invalidate(ctx, revoked)
 	if err != nil {

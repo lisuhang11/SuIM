@@ -1,0 +1,36 @@
+# Two hosts are required because the gateway serves both HTTP API endpoints
+# and websocket upgrades under "/", while apigateway serves the REST API.
+# Point both names at the ingress controller (or add them to your local hosts
+# file). For a quick single-service check use kubectl port-forward instead.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: suim
+  namespace: suim
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.suim.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: apigateway
+                port:
+                  number: 8089
+    - host: ws.suim.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: msggateway-ws
+                port:
+                  number: 10001

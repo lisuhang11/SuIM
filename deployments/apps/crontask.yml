@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crontask
+  namespace: suim
+  labels:
+    app.kubernetes.io/name: suim
+    app.kubernetes.io/component: crontask
+spec:
+  # Single replica: scheduled jobs are not deduplicated across instances.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: suim
+      app.kubernetes.io/component: crontask
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: suim
+        app.kubernetes.io/component: crontask
+    spec:
+      containers:
+        - name: crontask
+          image: suim/crontask:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "services/crontask/etc/crontask.yaml"]
+          env:
+            - name: CONFIG_PATH
+              value: /config
+            - name: SUIMENV_MYSQL_PASSWORD
+              valueFrom: { secretKeyRef: { name: suim-secret, key: mysql-password } }
+            - name: SUIMENV_REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: suim-secret, key: redis-password } }
+          volumeMounts:
+            - { name: config, mountPath: /config, readOnly: true }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+      volumes:
+        - name: config
+          configMap: { name: suim-config }

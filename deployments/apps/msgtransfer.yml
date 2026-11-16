@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: msgtransfer
+  namespace: suim
+  labels:
+    app.kubernetes.io/name: suim
+    app.kubernetes.io/component: msgtransfer
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: suim
+      app.kubernetes.io/component: msgtransfer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: suim
+        app.kubernetes.io/component: msgtransfer
+    spec:
+      containers:
+        - name: msgtransfer
+          image: suim/msgtransfer:dev
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "services/msgtransfer/etc/msgtransfer.yaml"]
+          env:
+            - name: CONFIG_PATH
+              value: /config
+            - name: SUIMENV_REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: suim-secret, key: redis-password } }
+          volumeMounts:
+            - { name: config, mountPath: /config, readOnly: true }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+      volumes:
+        - name: config
+          configMap: { name: suim-config }

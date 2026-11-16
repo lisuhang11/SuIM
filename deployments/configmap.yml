@@ -1,0 +1,345 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: suim-config
+  namespace: suim
+  labels:
+    app.kubernetes.io/name: suim
+# Each key is mounted at /config/<key> and selected with CONFIG_PATH.
+# Addresses point at in-cluster Services; secrets are injected as SUIMENV_*
+# variables by each Deployment. Business settings stay in these files.
+data:
+  user.yaml: |
+    listenIP: 0.0.0.0
+    registerIP: 0.0.0.0
+    port: 8080
+    mysql:
+      address: [mysql:3306]
+      username: root
+      password: ""
+      database: suim_user
+      maxOpenConn: 20
+      maxIdleConn: 10
+      connMaxLifeTime: 300
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    jwt:
+      secret: ""
+    sms:
+      accountSID: ""
+      authToken: ""
+      appID: ""
+      pepper: ""
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8080 }
+    webhooks:
+      url: ""
+      beforeUserRegister: { enable: false, timeout: 5, failedContinue: false }
+      afterUserRegister: { enable: false, timeout: 5, failedContinue: false }
+      beforeUserUpdate: { enable: false, timeout: 5, failedContinue: false }
+
+  group.yaml: |
+    listenIP: 0.0.0.0
+    registerIP: 0.0.0.0
+    port: 8083
+    mysql:
+      address: [mysql:3306]
+      username: root
+      password: ""
+      database: suim_group
+      maxOpenConn: 20
+      maxIdleConn: 10
+      connMaxLifeTime: 300
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8083 }
+    webhooks:
+      url: ""
+      beforeGroupCreate: { enable: false, timeout: 5, failedContinue: false }
+      afterGroupCreate: { enable: false, timeout: 5, failedContinue: false }
+      beforeJoinGroup: { enable: false, timeout: 5, failedContinue: false }
+      afterJoinGroup: { enable: false, timeout: 5, failedContinue: false }
+      beforeQuitGroup: { enable: false, timeout: 5, failedContinue: false }
+      afterQuitGroup: { enable: false, timeout: 5, failedContinue: false }
+
+  third.yaml: |
+    listenIP: 0.0.0.0
+    registerIP: 0.0.0.0
+    port: 8084
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    minio:
+      endpoint: minio:9000
+      signEndpoint: minio:9000
+      accessKey: ""
+      secretKey: ""
+      bucket: suim
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8084 }
+    webhooks:
+      url: ""
+
+  relation.yaml: |
+    listenIP: 0.0.0.0
+    registerIP: 0.0.0.0
+    port: 8082
+    mysql:
+      address: [mysql:3306]
+      username: root
+      password: ""
+      database: suim_relation
+      maxOpenConn: 20
+      maxIdleConn: 10
+      connMaxLifeTime: 300
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8082 }
+
+  conversation.yaml: |
+    listenIP: 0.0.0.0
+    registerIP: 0.0.0.0
+    port: 8085
+    mysql:
+      address: [mysql:3306]
+      username: root
+      password: ""
+      database: suim_conversation
+      maxOpenConn: 20
+      maxIdleConn: 10
+      connMaxLifeTime: 300
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8085 }
+    webhooks:
+      url: ""
+      beforeConversationSetPrivate: { enable: false, timeout: 5, failedContinue: false }
+      afterConversationSetPrivate: { enable: false, timeout: 5, failedContinue: false }
+      beforeUpdateConversation: { enable: false, timeout: 5, failedContinue: false }
+      afterUpdateConversation: { enable: false, timeout: 5, failedContinue: false }
+      beforeSetConversationDraft: { enable: false, timeout: 5, failedContinue: false }
+      afterSetConversationDraft: { enable: false, timeout: 5, failedContinue: false }
+      beforeMarkConversationAsRead: { enable: false, timeout: 5, failedContinue: false }
+      afterMarkConversationAsRead: { enable: false, timeout: 5, failedContinue: false }
+
+  msg.yaml: |
+    port: 8086
+    mysql:
+      address: [mysql:3306]
+      username: root
+      password: ""
+      database: suim_msg
+      maxOpenConn: 20
+      maxIdleConn: 10
+      connMaxLifeTime: 300
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8086 }
+    webhooks:
+      url: ""
+      beforeSendMsg: { enable: false, timeout: 5, failedContinue: false }
+      afterSendMsg: { enable: false, timeout: 5, failedContinue: false }
+      beforeSendGroupMsg: { enable: false, timeout: 5, failedContinue: false }
+      afterSendGroupMsg: { enable: false, timeout: 5, failedContinue: false }
+
+  msggateway.yaml: |
+    listenIP: 0.0.0.0
+    port: 8085
+    wsPort: 10001
+    advertiseIP: ""
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8085 }
+    webhooks:
+      url: ""
+      afterOnline: { enable: false, timeout: 5, failedContinue: false }
+      afterOffline: { enable: false, timeout: 5, failedContinue: false }
+      afterKickOff: { enable: false, timeout: 5, failedContinue: false }
+
+  msgtransfer.yaml: |
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    queue:
+      streamPrefix: mq
+      maxLen: 100000
+
+  push.yaml: |
+    listenIP: 0.0.0.0
+    registerIP: 0.0.0.0
+    port: 10180
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 10180 }
+    queue:
+      streamPrefix: mq
+      maxLen: 100000
+      consumerGroup: push
+    push:
+      enable: dummy
+      maxConcurrentWorkers: 8
+      getui:
+        pushURL: ""
+        appKey: ""
+        masterSecret: ""
+        intent: ""
+        channelID: ""
+        channelName: ""
+      fcm:
+        credentialsFile: ""
+        authURL: ""
+      jpush:
+        appKey: ""
+        masterSecret: ""
+        pushURL: ""
+        pushIntent: ""
+      iosPush:
+        pushSound: default
+        badgeCount: true
+        production: false
+    webhooks:
+      url: ""
+      beforeOfflinePush: { enable: false, timeout: 5, failedContinue: false }
+
+  rtc.yaml: |
+    port: 8088
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    redis2:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 1
+      maxRetry: 3
+      poolSize: 10
+    livekit:
+      url: ""
+      key: ""
+      secret: ""
+      agents:
+        enabled: false
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8088 }
+
+  apigateway.yaml: |
+    listenIP: 0.0.0.0
+    port: 8089
+    mysql:
+      address: [mysql:3306]
+      username: root
+      password: ""
+      database: suim_user
+      maxOpenConn: 20
+      maxIdleConn: 10
+      connMaxLifeTime: 300
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    jwt:
+      secret: ""
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8089 }
+    voicePreview:
+      python: python3
+      script: agents/voice-preview.py
+
+  crontask.yaml: |
+    mysql:
+      address: [mysql:3306]
+      username: root
+      password: ""
+      database: suim_crontask
+      maxOpenConn: 20
+      maxIdleConn: 10
+      connMaxLifeTime: 300
+    redis:
+      address: [redis:6379]
+      username: ""
+      password: ""
+      redisMode: standalone
+      db: 0
+      maxRetry: 3
+      poolSize: 10
+    registry:
+      type: kubernetes
+      k8s: { namespace: suim, port: 8090 }

@@ -1,0 +1,12 @@
+.git
+.codebuddy
+open-im-server-reference
+项目总结与思考
+docs
+bin
+logs
+run
+agents
+*.md
+*.log
+.env

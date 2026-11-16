@@ -1,0 +1,40 @@
+listenIP: 0.0.0.0
+port: 8089
+
+mysql:
+  address:
+    - 127.0.0.1:3306
+  username: root
+  password: suIM123
+  database: suim_user
+  maxOpenConn: 20
+  maxIdleConn: 10
+  connMaxLifeTime: 300
+
+redis:
+  address:
+    - 127.0.0.1:6379
+  username: ""
+  password: suIM123
+  redisMode: standalone
+  db: 0
+  maxRetry: 3
+  poolSize: 10
+
+registry:
+  type: etcd
+  etcd:
+    endpoints:
+      - 127.0.0.1:2379
+    rootDir: /services
+    username: ""
+    password: ""
+    dialTimeout: 5
+    ttl: 10
+
+jwt:
+  secret: change-me-in-production
+
+voicePreview:
+  python: python3
+  script: agents/voice-preview.py

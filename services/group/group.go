@@ -17,6 +17,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mw"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -156,7 +157,8 @@ func run(cfgPath, migratePath string) error {
 		AfterSetGroupMemberInfo:  w.AfterSetGroupMemberInfo,
 	})
 
-	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor))
+	prommetrics.Start(ctx, "group", cfg.ListenIP, cfg.MetricsPort)
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, prommetrics.UnaryServerInterceptor("group")))
 	grouppb.RegisterGroupServiceServer(srv, groupServer)
 
 	id, err := newID()

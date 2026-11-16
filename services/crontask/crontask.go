@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	svcconfig "github.com/lisuhang11/SuIM/services/crontask/internal/config"
@@ -79,6 +80,7 @@ func run(cfgPath string) error {
 	}
 	defer conversationConn.Close()
 
+	prommetrics.Start(ctx, "crontask", "0.0.0.0", cfg.MetricsPort)
 	slog.Info("crontask service starting",
 		"cron", cfg.CronTask.CronExecuteTime,
 		"retainDays", cfg.CronTask.RetainChatRecords,

@@ -22,6 +22,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/online"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -161,7 +162,8 @@ func run(cfgPath string) error {
 		_ = wsLis.Close()
 		return fmt.Errorf("listen rpc: %w", err)
 	}
-	rpcSrv := grpc.NewServer(grpc.UnaryInterceptor(mw.UnaryRecover))
+	prommetrics.Start(ctx, "msggateway", cfg.ListenIP, cfg.MetricsPort)
+	rpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, prommetrics.UnaryServerInterceptor("msggateway")))
 	gatewaypb.RegisterMsgGatewayServer(rpcSrv, server)
 
 	id, err := newID()

@@ -44,6 +44,10 @@ kubectl -n suim port-forward svc/msggateway-ws 10001:10001
 - 集群：ConfigMap/Secret + k8s DNS 发现；不需要 RBAC（DNS 解析由 CoreDNS 完成，`Register` 是 no-op，靠 readinessProbe 控制就绪 IP 是否进入 DNS）
 - `msgtransfer`、`crontask` 不监听端口，不需要 headless Service；crontask 单副本避免定时任务重复
 
+## Prometheus 监控
+
+每个服务暴露独立的 `/metrics` 端点，端口在 `configmap.yml` 的 `metricsPort` 配置（16080–16091）。Pod 上带 `prometheus.io/scrape=true`、`prometheus.io/path=/metrics`、`prometheus.io/port=<端口>` 注解，Prometheus 可用 Kubernetes pod discovery 自动抓取。通用指标包括 `rpc_count{name,path,code}`、`http_count`、`process_*`、`go_*`；业务指标按服务分发（如 push 的 `msg_offline_push_failed_total`、msgtransfer 的 `msg_insert_mysql_*`、msggateway 的 `online_user_num`），与 OpenIM 的指标命名保持一致。
+
 ## 已知限制
 
 - 镜像 tag 为 `:dev`，正式环境建议固定版本并开启镜像拉取鉴权。

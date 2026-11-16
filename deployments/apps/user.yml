@@ -17,6 +17,10 @@ spec:
       labels:
         app.kubernetes.io/name: suim
         app.kubernetes.io/component: user
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "16080"
     spec:
       containers:
         - name: user
@@ -36,6 +40,7 @@ spec:
               valueFrom: { secretKeyRef: { name: suim-secret, key: sms-pepper } }
           ports:
             - { name: grpc, containerPort: 8080 }
+            - { name: metrics, containerPort: 16080 }
           volumeMounts:
             - { name: config, mountPath: /config, readOnly: true }
           readinessProbe:
@@ -68,3 +73,4 @@ spec:
     app.kubernetes.io/component: user
   ports:
     - { name: grpc, port: 8080, targetPort: grpc }
+    - { name: metrics, port: 16080, targetPort: metrics }

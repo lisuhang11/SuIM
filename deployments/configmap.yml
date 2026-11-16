@@ -13,6 +13,7 @@ data:
     listenIP: 0.0.0.0
     registerIP: 0.0.0.0
     port: 8080
+    metricsPort: 16080
     mysql:
       address: [mysql:3306]
       username: root
@@ -49,6 +50,7 @@ data:
     listenIP: 0.0.0.0
     registerIP: 0.0.0.0
     port: 8083
+    metricsPort: 16081
     mysql:
       address: [mysql:3306]
       username: root
@@ -81,6 +83,7 @@ data:
     listenIP: 0.0.0.0
     registerIP: 0.0.0.0
     port: 8084
+    metricsPort: 16082
     redis:
       address: [redis:6379]
       username: ""
@@ -105,6 +108,7 @@ data:
     listenIP: 0.0.0.0
     registerIP: 0.0.0.0
     port: 8082
+    metricsPort: 16083
     mysql:
       address: [mysql:3306]
       username: root
@@ -129,6 +133,7 @@ data:
     listenIP: 0.0.0.0
     registerIP: 0.0.0.0
     port: 8085
+    metricsPort: 16084
     mysql:
       address: [mysql:3306]
       username: root
@@ -161,6 +166,7 @@ data:
 
   msg.yaml: |
     port: 8086
+    metricsPort: 16085
     mysql:
       address: [mysql:3306]
       username: root
@@ -190,6 +196,7 @@ data:
   msggateway.yaml: |
     listenIP: 0.0.0.0
     port: 8085
+    metricsPort: 16086
     wsPort: 10001
     advertiseIP: ""
     redis:
@@ -210,6 +217,7 @@ data:
       afterKickOff: { enable: false, timeout: 5, failedContinue: false }
 
   msgtransfer.yaml: |
+    metricsPort: 16087
     redis:
       address: [redis:6379]
       username: ""
@@ -226,6 +234,7 @@ data:
     listenIP: 0.0.0.0
     registerIP: 0.0.0.0
     port: 10180
+    metricsPort: 16088
     redis:
       address: [redis:6379]
       username: ""
@@ -269,6 +278,7 @@ data:
 
   rtc.yaml: |
     port: 8088
+    metricsPort: 16089
     redis:
       address: [redis:6379]
       username: ""
@@ -298,6 +308,7 @@ data:
   apigateway.yaml: |
     listenIP: 0.0.0.0
     port: 8089
+    metricsPort: 16090
     mysql:
       address: [mysql:3306]
       username: root
@@ -324,6 +335,7 @@ data:
       script: agents/voice-preview.py
 
   crontask.yaml: |
+    metricsPort: 16091
     mysql:
       address: [mysql:3306]
       username: root

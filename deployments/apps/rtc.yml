@@ -17,6 +17,10 @@ spec:
       labels:
         app.kubernetes.io/name: suim
         app.kubernetes.io/component: rtc
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "16089"
     spec:
       containers:
         - name: rtc
@@ -32,6 +36,7 @@ spec:
               valueFrom: { secretKeyRef: { name: suim-secret, key: livekit-secret }, optional: true }
           ports:
             - { name: grpc, containerPort: 8088 }
+            - { name: metrics, containerPort: 16089 }
           volumeMounts:
             - { name: config, mountPath: /config, readOnly: true }
           readinessProbe:
@@ -64,3 +69,4 @@ spec:
     app.kubernetes.io/component: rtc
   ports:
     - { name: grpc, port: 8088, targetPort: grpc }
+    - { name: metrics, port: 16089, targetPort: metrics }

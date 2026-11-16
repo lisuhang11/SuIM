@@ -17,6 +17,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mw"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
@@ -83,7 +84,8 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor))
+	prommetrics.Start(ctx, "conversation", cfg.ListenIP, cfg.MetricsPort)
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, prommetrics.UnaryServerInterceptor("conversation")))
 	messages := msgClient{msgpb.NewMsgServiceClient(msgConn)}
 	conversation := logic.New(st, messages)
 	conversation.UseSeq(messages)

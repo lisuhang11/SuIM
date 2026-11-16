@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/mq"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"github.com/lisuhang11/SuIM/services/msgtransfer/internal/model"
 )
@@ -106,7 +107,14 @@ func (h *RedisHandler) runReadSeq() {
 	}
 }
 
-func (h *RedisHandler) do(ctx context.Context, batch []*mq.Message) error {
+func (h *RedisHandler) do(ctx context.Context, batch []*mq.Message) (err error) {
+	defer func() {
+		if err != nil {
+			prommetrics.MsgInsertRedisFailed.Inc()
+		} else if len(batch) > 0 {
+			prommetrics.MsgInsertRedisSuccess.Inc()
+		}
+	}()
 	parsed := make([]*incoming, 0, len(batch))
 	for _, raw := range batch {
 		msg := &msgpb.MsgData{}

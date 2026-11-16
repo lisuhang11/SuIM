@@ -14,6 +14,7 @@ type Config struct {
 	ListenIP          string          `yaml:"listenIP"`
 	RegisterIP        string          `yaml:"registerIP"`
 	Port              int             `yaml:"port"`
+	MetricsPort       int             `yaml:"metricsPort"`
 	SignExpireSeconds int64           `yaml:"signExpireSeconds"`
 	MinIO             MinIO           `yaml:"minio"`
 	MySQL             config.MySQL    `yaml:"mysql"`

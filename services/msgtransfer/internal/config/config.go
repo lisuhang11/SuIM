@@ -9,6 +9,7 @@ import (
 )
 
 type Config struct {
+	MetricsPort        int             `yaml:"metricsPort"`
 	MySQL              config.MySQL    `yaml:"mysql"`
 	Redis              config.Redis    `yaml:"redis"`
 	Registry           register.Config `yaml:"registry"`

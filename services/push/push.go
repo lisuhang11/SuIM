@@ -19,6 +19,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/online"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -89,7 +90,8 @@ func run(cfgPath string) error {
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
-	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor))
+	prommetrics.Start(ctx, "push", cfg.ListenIP, cfg.MetricsPort)
+	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, prommetrics.UnaryServerInterceptor("push")))
 	pushpb.RegisterPushServiceServer(grpcSrv, svc)
 
 	id, err := newID()

@@ -13,6 +13,7 @@ type Config struct {
 	ListenIP     string          `yaml:"listenIP"`
 	RegisterIP   string          `yaml:"registerIP"`
 	Port         int             `yaml:"port"`
+	MetricsPort  int             `yaml:"metricsPort"`
 	MySQL        config.MySQL    `yaml:"mysql"`
 	Redis        config.Redis    `yaml:"redis"`
 	JWT          config.JWT      `yaml:"jwt"`

@@ -17,12 +17,18 @@ spec:
       labels:
         app.kubernetes.io/name: suim
         app.kubernetes.io/component: msgtransfer
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "16087"
     spec:
       containers:
         - name: msgtransfer
           image: suim/msgtransfer:dev
           imagePullPolicy: IfNotPresent
           args: ["-c", "services/msgtransfer/etc/msgtransfer.yaml"]
+          ports:
+            - { name: metrics, containerPort: 16087 }
           env:
             - name: CONFIG_PATH
               value: /config

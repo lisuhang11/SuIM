@@ -17,6 +17,10 @@ spec:
       labels:
         app.kubernetes.io/name: suim
         app.kubernetes.io/component: push
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "16088"
     spec:
       containers:
         - name: push
@@ -32,6 +36,7 @@ spec:
               valueFrom: { secretKeyRef: { name: suim-secret, key: getui-mastersecret }, optional: true }
           ports:
             - { name: grpc, containerPort: 10180 }
+            - { name: metrics, containerPort: 16088 }
           volumeMounts:
             - { name: config, mountPath: /config, readOnly: true }
           readinessProbe:
@@ -64,3 +69,4 @@ spec:
     app.kubernetes.io/component: push
   ports:
     - { name: grpc, port: 10180, targetPort: grpc }
+    - { name: metrics, port: 16088, targetPort: metrics }

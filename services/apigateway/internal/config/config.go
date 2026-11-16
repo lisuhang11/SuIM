@@ -13,8 +13,9 @@ type VoicePreviewConfig struct {
 }
 
 type Config struct {
-	ListenIP string `yaml:"listenIP"`
-	Port     int    `yaml:"port"`
+	ListenIP    string `yaml:"listenIP"`
+	Port        int    `yaml:"port"`
+	MetricsPort int    `yaml:"metricsPort"`
 	// CompressionLevel matches OpenIM: -1 off, 0 default, 1 smallest, 2 fastest.
 	CompressionLevel int                `yaml:"compressionLevel"`
 	Registry         register.Config    `yaml:"registry"`

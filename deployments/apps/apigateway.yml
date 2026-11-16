@@ -17,6 +17,10 @@ spec:
       labels:
         app.kubernetes.io/name: suim
         app.kubernetes.io/component: apigateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "16090"
     spec:
       containers:
         - name: apigateway
@@ -34,6 +38,7 @@ spec:
               valueFrom: { secretKeyRef: { name: suim-secret, key: jwt-secret } }
           ports:
             - { name: http, containerPort: 8089 }
+            - { name: metrics, containerPort: 16090 }
           volumeMounts:
             - { name: config, mountPath: /config, readOnly: true }
           readinessProbe:
@@ -65,3 +70,4 @@ spec:
     app.kubernetes.io/component: apigateway
   ports:
     - { name: http, port: 8089, targetPort: http }
+    - { name: metrics, port: 16090, targetPort: metrics }

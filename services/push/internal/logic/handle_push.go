@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/lisuhang11/SuIM/pkg/mq"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	"google.golang.org/protobuf/proto"
 )
@@ -18,6 +19,7 @@ func (s *Server) HandlePush(ctx context.Context, msg *mq.Message) error {
 		return msg.Ack(ctx)
 	}
 	if err := s.dispatch(ctx, body); err != nil {
+		prommetrics.MsgOfflinePushFailed.Inc()
 		slog.Warn("offline push failed", "err", err, "key", msg.Key)
 	}
 	return msg.Ack(ctx)

@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	userpb "github.com/lisuhang11/SuIM/proto/user"
 	"github.com/lisuhang11/SuIM/services/user/internal/store"
 )
@@ -47,6 +48,7 @@ func (s *Server) Login(ctx context.Context, req *userpb.LoginReq) (*userpb.Login
 		return nil, errorcode.ErrInternal.WithMsg("create session")
 	}
 	s.recordLoginIP(ctx, user.UserID, req.GetClientIp())
+	prommetrics.UserLoginCounter.Inc()
 	return &userpb.LoginResp{
 		User:              toPB(user),
 		Token:             pair.Access.Raw,

@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	Redis    config.Redis    `yaml:"redis"`
-	Registry register.Config `yaml:"registry"`
-	CronTask CronTask        `yaml:"cronTask"`
+	MetricsPort int             `yaml:"metricsPort"`
+	Redis       config.Redis    `yaml:"redis"`
+	Registry    register.Config `yaml:"registry"`
+	CronTask    CronTask        `yaml:"cronTask"`
 }
 
 type CronTask struct {

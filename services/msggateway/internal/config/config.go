@@ -14,6 +14,7 @@ type Config struct {
 	RegisterIP          string          `yaml:"registerIP"`
 	RPCPort             int             `yaml:"rpcPort"`
 	WSPort              int             `yaml:"wsPort"`
+	MetricsPort         int             `yaml:"metricsPort"`
 	MaxConn             int64           `yaml:"maxConn"`
 	HandshakeTimeoutSec int             `yaml:"handshakeTimeoutSec"`
 	Redis               config.Redis    `yaml:"redis"`

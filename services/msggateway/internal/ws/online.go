@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/lisuhang11/SuIM/pkg/online"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
 )
@@ -87,6 +88,7 @@ func (s *Server) DropOnline(ctx context.Context) {
 }
 
 func (s *Server) renewOnline(ctx context.Context) {
+	prommetrics.OnlineUserGauge.Set(float64(len(s.hub.Snapshot())))
 	for _, row := range s.hub.Snapshot() {
 		if ctx.Err() != nil {
 			return

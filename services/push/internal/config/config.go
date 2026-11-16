@@ -11,14 +11,15 @@ import (
 
 // Config 是推送服务的启动配置。
 type Config struct {
-	ListenIP   string          `yaml:"listenIP"`
-	RegisterIP string          `yaml:"registerIP"`
-	Port       int             `yaml:"port"`
-	Redis      config.Redis    `yaml:"redis"`
-	Registry   register.Config `yaml:"registry"`
-	Queue      Queue           `yaml:"queue"`
-	Push       Push            `yaml:"push"`
-	Webhooks   Webhooks        `yaml:"webhooks"`
+	ListenIP    string          `yaml:"listenIP"`
+	RegisterIP  string          `yaml:"registerIP"`
+	Port        int             `yaml:"port"`
+	MetricsPort int             `yaml:"metricsPort"`
+	Redis       config.Redis    `yaml:"redis"`
+	Registry    register.Config `yaml:"registry"`
+	Queue       Queue           `yaml:"queue"`
+	Push        Push            `yaml:"push"`
+	Webhooks    Webhooks        `yaml:"webhooks"`
 }
 
 // Queue 控制 toPush 消费者的订阅方式。

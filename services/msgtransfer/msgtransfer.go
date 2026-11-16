@@ -18,6 +18,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mq"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -120,6 +121,7 @@ func run(cfgPath, migratePath, conversationMigrate string) error {
 	redisConsumer := mq.NewRedisConsumer(rdb, cfg.Queue.StreamPrefix, mq.TopicToRedis, mq.TopicToRedis)
 	mysqlConsumer := mq.NewRedisConsumer(rdb, cfg.Queue.StreamPrefix, mq.TopicToMySQL, mq.TopicToMySQL)
 
+	prommetrics.Start(ctx, "msgtransfer", "0.0.0.0", cfg.MetricsPort)
 	slog.Info("msgtransfer started", "toRedis", mq.TopicToRedis, "toMysql", mq.TopicToMySQL, "toPush", mq.TopicToPush)
 
 	var wg sync.WaitGroup

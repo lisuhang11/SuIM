@@ -18,12 +18,18 @@ spec:
       labels:
         app.kubernetes.io/name: suim
         app.kubernetes.io/component: crontask
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "16091"
     spec:
       containers:
         - name: crontask
           image: suim/crontask:dev
           imagePullPolicy: IfNotPresent
           args: ["-c", "services/crontask/etc/crontask.yaml"]
+          ports:
+            - { name: metrics, containerPort: 16091 }
           env:
             - name: CONFIG_PATH
               value: /config

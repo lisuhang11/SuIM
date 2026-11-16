@@ -8,6 +8,7 @@ import (
 
 	"github.com/lisuhang11/SuIM/pkg/errorcode"
 	"github.com/lisuhang11/SuIM/pkg/msgconv"
+	"github.com/lisuhang11/SuIM/pkg/prommetrics"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 )
 
@@ -30,11 +31,27 @@ const (
 )
 
 // 校验一条消息后写入 toRedis。序号由 msgtransfer 分配，这里不落库。
-func (s *Server) SendMsg(ctx context.Context, req *msgpb.SendMsgReq) (*msgpb.SendMsgResp, error) {
+func (s *Server) SendMsg(ctx context.Context, req *msgpb.SendMsgReq) (resp *msgpb.SendMsgResp, err error) {
 	msg := req.GetMsgData()
 	if msg == nil {
 		return nil, errorcode.ErrMsgInvalidArgs.WithMsg("msg data is required")
 	}
+	group := msg.GetSessionType() == sessionGroup || msg.GetSessionType() == sessionSuper
+	defer func() {
+		if err != nil {
+			if group {
+				prommetrics.GroupChatMsgFailed.Inc()
+			} else {
+				prommetrics.SingleChatMsgFailed.Inc()
+			}
+			return
+		}
+		if group {
+			prommetrics.GroupChatMsgSuccess.Inc()
+		} else {
+			prommetrics.SingleChatMsgSuccess.Inc()
+		}
+	}()
 	sendID, err := actorUser(ctx, msg.SendId)
 	if err != nil {
 		return nil, err

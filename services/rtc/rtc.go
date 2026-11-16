@@ -20,6 +20,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/prommetrics"
+	"github.com/lisuhang11/SuIM/pkg/ratelimit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	grouppb "github.com/lisuhang11/SuIM/proto/group"
@@ -101,7 +102,7 @@ func run(cfgPath string) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 	prommetrics.Start(ctx, "rtc", cfg.ListenIP, cfg.MetricsPort)
-	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, prommetrics.UnaryServerInterceptor("rtc")))
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, ratelimit.UnaryServerInterceptor("rtc", &cfg.RateLimiter), prommetrics.UnaryServerInterceptor("rtc")))
 	rtcpb.RegisterRtcServiceServer(srv, service)
 
 	id, err := newID()

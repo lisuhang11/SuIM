@@ -18,6 +18,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/prommetrics"
+	"github.com/lisuhang11/SuIM/pkg/ratelimit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
@@ -133,7 +134,7 @@ func run(cfgPath string) error {
 	}
 	prommetrics.Start(ctx, "apigateway", cfg.ListenIP, cfg.MetricsPort)
 	srv := &http.Server{
-		Handler:           prommetrics.HTTPMiddleware(mw.GzipHandler(cfg.CompressionLevel, apiSrv.Handler())),
+		Handler:           prommetrics.HTTPMiddleware(ratelimit.HTTPMiddleware("apigateway", &cfg.RateLimiter)(mw.GzipHandler(cfg.CompressionLevel, apiSrv.Handler()))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      90 * time.Second,

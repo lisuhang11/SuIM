@@ -19,6 +19,8 @@ const (
 	TokenRequired Code = 1007
 	// NoPermission means the token user cannot perform this action.
 	NoPermission Code = 1008
+	// RateLimited means the local adaptive limiter shed the request.
+	RateLimited Code = 1009
 )
 
 var (
@@ -30,4 +32,5 @@ var (
 	ErrInvalidJSON     = Define(InvalidJSON, codes.InvalidArgument, "invalid json")
 	ErrTokenRequired   = Define(TokenRequired, codes.Unauthenticated, "token is required")
 	ErrNoPermission    = Define(NoPermission, codes.PermissionDenied, "no permission")
+	ErrRateLimited     = Define(RateLimited, codes.ResourceExhausted, "too many requests")
 )

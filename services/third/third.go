@@ -17,6 +17,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/prommetrics"
+	"github.com/lisuhang11/SuIM/pkg/ratelimit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
@@ -94,7 +95,7 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 	prommetrics.Start(ctx, "third", cfg.ListenIP, cfg.MetricsPort)
-	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, prommetrics.UnaryServerInterceptor("third")))
+	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, ratelimit.UnaryServerInterceptor("third", &cfg.RateLimiter), prommetrics.UnaryServerInterceptor("third")))
 	thirdpb.RegisterThirdServiceServer(grpcSrv, svc)
 
 	id, err := newID()

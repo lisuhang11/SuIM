@@ -23,6 +23,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/online"
 	"github.com/lisuhang11/SuIM/pkg/prommetrics"
+	"github.com/lisuhang11/SuIM/pkg/ratelimit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -156,14 +157,14 @@ func run(cfgPath string) error {
 	mux.HandleFunc("POST /msg/read_seqs", server.HandleReadSeqs)
 	mux.HandleFunc("POST /msg/set_conversation_has_read_seq", server.HandleSetConversationHasReadSeq)
 	mux.Handle("/", server)
-	wsSrv := &http.Server{Handler: mw.RecoverHandler(mw.CorsHandler(mux)), ReadHeaderTimeout: 5 * time.Second}
+	wsSrv := &http.Server{Handler: mw.RecoverHandler(ratelimit.HTTPMiddleware("msggateway", &cfg.RateLimiter)(mw.CorsHandler(mux))), ReadHeaderTimeout: 5 * time.Second}
 	rpcLis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.RPCPort))
 	if err != nil {
 		_ = wsLis.Close()
 		return fmt.Errorf("listen rpc: %w", err)
 	}
 	prommetrics.Start(ctx, "msggateway", cfg.ListenIP, cfg.MetricsPort)
-	rpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, prommetrics.UnaryServerInterceptor("msggateway")))
+	rpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, ratelimit.UnaryServerInterceptor("msggateway", &cfg.RateLimiter), prommetrics.UnaryServerInterceptor("msggateway")))
 	gatewaypb.RegisterMsgGatewayServer(rpcSrv, server)
 
 	id, err := newID()

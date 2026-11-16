@@ -18,6 +18,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/prommetrics"
+	"github.com/lisuhang11/SuIM/pkg/ratelimit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -158,7 +159,7 @@ func run(cfgPath, migratePath string) error {
 	})
 
 	prommetrics.Start(ctx, "group", cfg.ListenIP, cfg.MetricsPort)
-	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, prommetrics.UnaryServerInterceptor("group")))
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, ratelimit.UnaryServerInterceptor("group", &cfg.RateLimiter), prommetrics.UnaryServerInterceptor("group")))
 	grouppb.RegisterGroupServiceServer(srv, groupServer)
 
 	id, err := newID()

@@ -8,10 +8,11 @@ import (
 )
 
 type Config struct {
-	MetricsPort int             `yaml:"metricsPort"`
-	Redis       config.Redis    `yaml:"redis"`
-	Registry    register.Config `yaml:"registry"`
-	CronTask    CronTask        `yaml:"cronTask"`
+	MetricsPort int                `yaml:"metricsPort"`
+	RateLimiter config.RateLimiter `yaml:"rateLimiter"`
+	Redis       config.Redis       `yaml:"redis"`
+	Registry    register.Config    `yaml:"registry"`
+	CronTask    CronTask           `yaml:"cronTask"`
 }
 
 type CronTask struct {
@@ -22,6 +23,9 @@ type CronTask struct {
 }
 
 func (c *Config) Validate() error {
+	if err := c.RateLimiter.Validate(); err != nil {
+		return fmt.Errorf("rateLimiter: %w", err)
+	}
 	if len(c.Redis.Address) == 0 {
 		return fmt.Errorf("redis address is required")
 	}

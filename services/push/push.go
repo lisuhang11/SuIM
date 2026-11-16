@@ -20,6 +20,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/online"
 	"github.com/lisuhang11/SuIM/pkg/prommetrics"
+	"github.com/lisuhang11/SuIM/pkg/ratelimit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
@@ -91,7 +92,7 @@ func run(cfgPath string) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 	prommetrics.Start(ctx, "push", cfg.ListenIP, cfg.MetricsPort)
-	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, prommetrics.UnaryServerInterceptor("push")))
+	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, ratelimit.UnaryServerInterceptor("push", &cfg.RateLimiter), prommetrics.UnaryServerInterceptor("push")))
 	pushpb.RegisterPushServiceServer(grpcSrv, svc)
 
 	id, err := newID()

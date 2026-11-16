@@ -10,18 +10,19 @@ import (
 )
 
 type Config struct {
-	ListenIP     string          `yaml:"listenIP"`
-	RegisterIP   string          `yaml:"registerIP"`
-	Port         int             `yaml:"port"`
-	MetricsPort  int             `yaml:"metricsPort"`
-	MySQL        config.MySQL    `yaml:"mysql"`
-	Redis        config.Redis    `yaml:"redis"`
-	JWT          config.JWT      `yaml:"jwt"`
-	LocalCache   LocalCache      `yaml:"localCache"`
-	ProfileCache LocalCache      `yaml:"profileCache"`
-	Registry     register.Config `yaml:"registry"`
-	Webhooks     Webhooks        `yaml:"webhooks"`
-	SMS          SMS             `yaml:"sms"`
+	ListenIP     string             `yaml:"listenIP"`
+	RegisterIP   string             `yaml:"registerIP"`
+	Port         int                `yaml:"port"`
+	MetricsPort  int                `yaml:"metricsPort"`
+	RateLimiter  config.RateLimiter `yaml:"rateLimiter"`
+	MySQL        config.MySQL       `yaml:"mysql"`
+	Redis        config.Redis       `yaml:"redis"`
+	JWT          config.JWT         `yaml:"jwt"`
+	LocalCache   LocalCache         `yaml:"localCache"`
+	ProfileCache LocalCache         `yaml:"profileCache"`
+	Registry     register.Config    `yaml:"registry"`
+	Webhooks     Webhooks           `yaml:"webhooks"`
+	SMS          SMS                `yaml:"sms"`
 }
 
 type SMS struct {
@@ -67,6 +68,9 @@ func (c LocalCache) Enable() bool {
 }
 
 func (c *Config) Validate() error {
+	if err := c.RateLimiter.Validate(); err != nil {
+		return fmt.Errorf("rateLimiter: %w", err)
+	}
 	if c.Port <= 0 {
 		return fmt.Errorf("port is required")
 	}

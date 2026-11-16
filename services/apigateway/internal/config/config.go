@@ -13,9 +13,10 @@ type VoicePreviewConfig struct {
 }
 
 type Config struct {
-	ListenIP    string `yaml:"listenIP"`
-	Port        int    `yaml:"port"`
-	MetricsPort int    `yaml:"metricsPort"`
+	ListenIP    string             `yaml:"listenIP"`
+	Port        int                `yaml:"port"`
+	MetricsPort int                `yaml:"metricsPort"`
+	RateLimiter config.RateLimiter `yaml:"rateLimiter"`
 	// CompressionLevel matches OpenIM: -1 off, 0 default, 1 smallest, 2 fastest.
 	CompressionLevel int                `yaml:"compressionLevel"`
 	Registry         register.Config    `yaml:"registry"`
@@ -24,6 +25,9 @@ type Config struct {
 }
 
 func (c *Config) Validate() error {
+	if err := c.RateLimiter.Validate(); err != nil {
+		return fmt.Errorf("rateLimiter: %w", err)
+	}
 	if c.Port <= 0 {
 		return fmt.Errorf("port is required")
 	}

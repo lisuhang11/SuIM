@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -47,6 +48,38 @@ type JWT struct {
 	AccessExpireSeconds int64  `yaml:"accessExpireSeconds"` // access TTL; 0 → 3600
 	Issuer              string `yaml:"issuer"`
 	Audience            string `yaml:"audience"`
+}
+
+// RateLimiter mirrors the OpenIM rate-limiter knobs. Bucket is the number of
+// buckets in Window, not a fixed QPS. CPUThreshold uses 0-1000 (1000 = 100%).
+type RateLimiter struct {
+	Enable       bool          `yaml:"enable"`
+	Window       time.Duration `yaml:"window"`
+	Bucket       int           `yaml:"bucket"`
+	CPUThreshold int64         `yaml:"cpuThreshold"`
+}
+
+// Validate fills in OpenIM-compatible defaults and rejects invalid values.
+func (r *RateLimiter) Validate() error {
+	if r.Window == 0 {
+		r.Window = 20 * time.Second
+	}
+	if r.Bucket == 0 {
+		r.Bucket = 500
+	}
+	if r.CPUThreshold == 0 {
+		r.CPUThreshold = 850
+	}
+	if r.Window < time.Millisecond || r.Bucket < 1 {
+		return fmt.Errorf("rateLimiter window and bucket must be positive")
+	}
+	if r.Window/time.Duration(r.Bucket) <= 0 {
+		return fmt.Errorf("rateLimiter window is too small for bucket count")
+	}
+	if r.CPUThreshold < 0 || r.CPUThreshold > 1000 {
+		return fmt.Errorf("rateLimiter cpuThreshold must be between 0 and 1000")
+	}
+	return nil
 }
 
 // Load reads a YAML file into out. CONFIG_PATH can redirect the file to a

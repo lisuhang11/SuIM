@@ -48,6 +48,28 @@ kubectl -n suim port-forward svc/msggateway-ws 10001:10001
 
 每个服务暴露独立的 `/metrics` 端点，端口在 `configmap.yml` 的 `metricsPort` 配置（16080–16091）。Pod 上带 `prometheus.io/scrape=true`、`prometheus.io/path=/metrics`、`prometheus.io/port=<端口>` 注解，Prometheus 可用 Kubernetes pod discovery 自动抓取。通用指标包括 `rpc_count{name,path,code}`、`http_count`、`process_*`、`go_*`；业务指标按服务分发（如 push 的 `msg_offline_push_failed_total`、msgtransfer 的 `msg_insert_mysql_*`、msggateway 的 `online_user_num`），与 OpenIM 的指标命名保持一致。
 
+## 限流
+
+`configmap.yml` 每个服务都有 `rateLimiter`，默认关闭：
+
+```yaml
+rateLimiter:
+  enable: false
+  window: 20s
+  bucket: 500
+  cpuThreshold: 850
+```
+
+开启后：
+
+- gRPC 服务在业务 handler 前执行 BBR unary interceptor，拒绝时返回 gRPC `ResourceExhausted`。
+- `apigateway` 与 `msggateway` 的 HTTP 入口执行同样的 limiter，拒绝时返回 HTTP 429，并带上 `X-BBR-*`、`X-RateLimit-*`、`Retry-After` 响应头。
+- 限流是**进程内**的；多副本时总容量会按副本数放大，需要全局限流时应另接 Redis/网关层。
+- `msgtransfer`、`crontask` 没有入站 RPC/HTTP，配置暂不生效。
+- 拒绝次数通过 `rate_limit_rejected_total{service,kind}` 暴露到各自 `/metrics`。
+
+`bucket` 是滑动窗口的桶数，不是固定 QPS。默认 `20s/500` 表示每桶 40ms；`cpuThreshold: 850` 表示 CPU 达到 85% 后才按估算容量主动丢弃请求。
+
 ## 已知限制
 
 - 镜像 tag 为 `:dev`，正式环境建议固定版本并开启镜像拉取鉴权。

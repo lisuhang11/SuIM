@@ -20,6 +20,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/mq"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/prommetrics"
+	"github.com/lisuhang11/SuIM/pkg/ratelimit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/relationcache"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
@@ -144,7 +145,7 @@ func run(cfgPath, migratePath string) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 	prommetrics.Start(ctx, "msg", cfg.ListenIP, cfg.MetricsPort)
-	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, prommetrics.UnaryServerInterceptor("msg")))
+	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, ratelimit.UnaryServerInterceptor("msg", &cfg.RateLimiter), prommetrics.UnaryServerInterceptor("msg")))
 	msgpb.RegisterMsgServiceServer(grpcSrv, srv)
 
 	id, err := newID()

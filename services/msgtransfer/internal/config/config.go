@@ -9,13 +9,14 @@ import (
 )
 
 type Config struct {
-	MetricsPort        int             `yaml:"metricsPort"`
-	MySQL              config.MySQL    `yaml:"mysql"`
-	Redis              config.Redis    `yaml:"redis"`
-	Registry           register.Config `yaml:"registry"`
-	Queue              Queue           `yaml:"queue"`
-	MsgCacheTTLSeconds int             `yaml:"msgCacheTTLSeconds"`
-	Webhooks           Webhooks        `yaml:"webhooks"`
+	MetricsPort        int                `yaml:"metricsPort"`
+	RateLimiter        config.RateLimiter `yaml:"rateLimiter"`
+	MySQL              config.MySQL       `yaml:"mysql"`
+	Redis              config.Redis       `yaml:"redis"`
+	Registry           register.Config    `yaml:"registry"`
+	Queue              Queue              `yaml:"queue"`
+	MsgCacheTTLSeconds int                `yaml:"msgCacheTTLSeconds"`
+	Webhooks           Webhooks           `yaml:"webhooks"`
 }
 
 type Queue struct {
@@ -39,6 +40,9 @@ type AfterMsgSaveDB struct {
 }
 
 func (c *Config) Validate() error {
+	if err := c.RateLimiter.Validate(); err != nil {
+		return fmt.Errorf("rateLimiter: %w", err)
+	}
 	if len(c.MySQL.Address) == 0 || c.MySQL.Username == "" || c.MySQL.Database == "" {
 		return fmt.Errorf("mysql address, username and database are required")
 	}

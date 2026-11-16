@@ -18,6 +18,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/prommetrics"
+	"github.com/lisuhang11/SuIM/pkg/ratelimit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/relationcache"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
@@ -128,7 +129,7 @@ func run(cfgPath, migratePath string) error {
 	}
 
 	prommetrics.Start(ctx, "relation", cfg.ListenIP, cfg.MetricsPort)
-	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, prommetrics.UnaryServerInterceptor("relation")))
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, rpcctx.ServerInterceptor, ratelimit.UnaryServerInterceptor("relation", &cfg.RateLimiter), prommetrics.UnaryServerInterceptor("relation")))
 	w := cfg.Webhooks
 	relationServer := logic.New(st, userclient.New(userpb.NewUserServiceClient(userConn)), logic.Hooks{
 		Client:                hooks,

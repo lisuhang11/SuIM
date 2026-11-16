@@ -17,6 +17,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/config"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/prommetrics"
+	"github.com/lisuhang11/SuIM/pkg/ratelimit"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/webhook"
 	"github.com/lisuhang11/SuIM/proto/user"
@@ -115,7 +116,7 @@ func run(cfgPath, migratePath string) error {
 	userServer.UseSMS(sender, captcha, policy, cfg.SMS.Pepper)
 
 	prommetrics.Start(ctx, "user", cfg.ListenIP, cfg.MetricsPort)
-	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, prommetrics.UnaryServerInterceptor("user")))
+	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(mw.UnaryRecover, ratelimit.UnaryServerInterceptor("user", &cfg.RateLimiter), prommetrics.UnaryServerInterceptor("user")))
 	userpb.RegisterUserServiceServer(srv, userServer)
 
 	id, err := logic.NewID()

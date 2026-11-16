@@ -9,14 +9,15 @@ import (
 )
 
 type Config struct {
-	ListenIP    string          `yaml:"listenIP"`
-	RegisterIP  string          `yaml:"registerIP"`
-	Port        int             `yaml:"port"`
-	MetricsPort int             `yaml:"metricsPort"`
-	Redis       config.Redis    `yaml:"redis"`
-	Registry    register.Config `yaml:"registry"`
-	LiveKit     livekit.Config  `yaml:"livekit"`
-	Agents      AgentsConfig    `yaml:"agents"`
+	ListenIP    string             `yaml:"listenIP"`
+	RegisterIP  string             `yaml:"registerIP"`
+	Port        int                `yaml:"port"`
+	MetricsPort int                `yaml:"metricsPort"`
+	RateLimiter config.RateLimiter `yaml:"rateLimiter"`
+	Redis       config.Redis       `yaml:"redis"`
+	Registry    register.Config    `yaml:"registry"`
+	LiveKit     livekit.Config     `yaml:"livekit"`
+	Agents      AgentsConfig       `yaml:"agents"`
 }
 
 // AgentsConfig controls LiveKit Agent dispatch from the rtc service.
@@ -29,6 +30,9 @@ type AgentsConfig struct {
 }
 
 func (c *Config) Validate() error {
+	if err := c.RateLimiter.Validate(); err != nil {
+		return fmt.Errorf("rateLimiter: %w", err)
+	}
 	if c.Port <= 0 {
 		return fmt.Errorf("port is required")
 	}

@@ -11,15 +11,16 @@ import (
 
 // Config 是推送服务的启动配置。
 type Config struct {
-	ListenIP    string          `yaml:"listenIP"`
-	RegisterIP  string          `yaml:"registerIP"`
-	Port        int             `yaml:"port"`
-	MetricsPort int             `yaml:"metricsPort"`
-	Redis       config.Redis    `yaml:"redis"`
-	Registry    register.Config `yaml:"registry"`
-	Queue       Queue           `yaml:"queue"`
-	Push        Push            `yaml:"push"`
-	Webhooks    Webhooks        `yaml:"webhooks"`
+	ListenIP    string             `yaml:"listenIP"`
+	RegisterIP  string             `yaml:"registerIP"`
+	Port        int                `yaml:"port"`
+	MetricsPort int                `yaml:"metricsPort"`
+	RateLimiter config.RateLimiter `yaml:"rateLimiter"`
+	Redis       config.Redis       `yaml:"redis"`
+	Registry    register.Config    `yaml:"registry"`
+	Queue       Queue              `yaml:"queue"`
+	Push        Push               `yaml:"push"`
+	Webhooks    Webhooks           `yaml:"webhooks"`
 }
 
 // Queue 控制 toPush 消费者的订阅方式。
@@ -78,6 +79,9 @@ type Webhooks struct {
 
 // Validate 补齐推送服务的默认值并检查必需项。
 func (c *Config) Validate() error {
+	if err := c.RateLimiter.Validate(); err != nil {
+		return fmt.Errorf("rateLimiter: %w", err)
+	}
 	if len(c.Redis.Address) == 0 {
 		return fmt.Errorf("redis address is required")
 	}

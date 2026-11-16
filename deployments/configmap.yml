@@ -14,6 +14,11 @@ data:
     registerIP: 0.0.0.0
     port: 8080
     metricsPort: 16080
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     mysql:
       address: [mysql:3306]
       username: root
@@ -51,6 +56,11 @@ data:
     registerIP: 0.0.0.0
     port: 8083
     metricsPort: 16081
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     mysql:
       address: [mysql:3306]
       username: root
@@ -84,6 +94,11 @@ data:
     registerIP: 0.0.0.0
     port: 8084
     metricsPort: 16082
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     redis:
       address: [redis:6379]
       username: ""
@@ -109,6 +124,11 @@ data:
     registerIP: 0.0.0.0
     port: 8082
     metricsPort: 16083
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     mysql:
       address: [mysql:3306]
       username: root
@@ -134,6 +154,11 @@ data:
     registerIP: 0.0.0.0
     port: 8085
     metricsPort: 16084
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     mysql:
       address: [mysql:3306]
       username: root
@@ -167,6 +192,11 @@ data:
   msg.yaml: |
     port: 8086
     metricsPort: 16085
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     mysql:
       address: [mysql:3306]
       username: root
@@ -197,6 +227,11 @@ data:
     listenIP: 0.0.0.0
     port: 8085
     metricsPort: 16086
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     wsPort: 10001
     advertiseIP: ""
     redis:
@@ -218,6 +253,11 @@ data:
 
   msgtransfer.yaml: |
     metricsPort: 16087
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     redis:
       address: [redis:6379]
       username: ""
@@ -235,6 +275,11 @@ data:
     registerIP: 0.0.0.0
     port: 10180
     metricsPort: 16088
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     redis:
       address: [redis:6379]
       username: ""
@@ -279,6 +324,11 @@ data:
   rtc.yaml: |
     port: 8088
     metricsPort: 16089
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     redis:
       address: [redis:6379]
       username: ""
@@ -309,6 +359,11 @@ data:
     listenIP: 0.0.0.0
     port: 8089
     metricsPort: 16090
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     mysql:
       address: [mysql:3306]
       username: root
@@ -336,6 +391,11 @@ data:
 
   crontask.yaml: |
     metricsPort: 16091
+    rateLimiter:
+      enable: false
+      window: 20s
+      bucket: 500
+      cpuThreshold: 850
     mysql:
       address: [mysql:3306]
       username: root

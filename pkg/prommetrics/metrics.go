@@ -39,6 +39,10 @@ var (
 		Name: "api_count",
 		Help: "Total number of API calls.",
 	}, []string{"path", "method", "code"})
+	RateLimitRejectedCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "rate_limit_rejected_total",
+		Help: "Total number of requests shed by the local BBR limiter.",
+	}, []string{"service", "kind"})
 )
 
 // 业务指标：按服务划分，由 ForService 选择性注册。
@@ -101,6 +105,7 @@ func ForService(name string) *prometheus.Registry {
 		reg.MustRegister(c)
 	}
 	reg.MustRegister(RPCCounter)
+	reg.MustRegister(RateLimitRejectedCounter)
 	for _, c := range serviceCollectors[name] {
 		reg.MustRegister(c)
 	}
@@ -119,6 +124,10 @@ func HTTPCall(path, method string, status int) {
 
 func APICall(path, method string, code int) {
 	APICounter.WithLabelValues(path, method, codeString(code)).Inc()
+}
+
+func RateLimitRejected(service, kind string) {
+	RateLimitRejectedCounter.WithLabelValues(service, kind).Inc()
 }
 
 // Server 是一个自管理的 /metrics HTTP 服务。ctx 取消时自动优雅关闭，

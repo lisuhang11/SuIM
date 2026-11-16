@@ -37,11 +37,11 @@ func (s *Store) isFriend(ctx context.Context, owner, friend string) (bool, error
 }
 
 // AddFriendRequest inserts a pending request. A pending duplicate is rejected.
-// A refused or previously agreed request is reopened, so the same pair can apply again.
-func (s *Store) AddFriendRequest(ctx context.Context, from, to, msg string, now time.Time) error {
+// A refused, expired, or previously agreed request is reopened, so the same pair can apply again.
+func (s *Store) AddFriendRequest(ctx context.Context, from, to, msg string, addSource int32, now time.Time) error {
 	var err error
 	for attempt := 0; attempt < 3; attempt++ {
-		err = s.addFriendRequest(ctx, from, to, msg, now)
+		err = s.addFriendRequest(ctx, from, to, msg, addSource, now)
 		if !isDeadlock(err) {
 			return err
 		}
@@ -50,9 +50,9 @@ func (s *Store) AddFriendRequest(ctx context.Context, from, to, msg string, now 
 }
 
 // addFriendRequest writes the pair in one statement. A pending row is left unchanged
-// (zero affected rows). A refused or agreed row is reopened. There is no gap lock
+// (zero affected rows). A refused, expired, or agreed row is reopened. There is no gap lock
 // taken before the insert, so concurrent inserts of different pairs do not deadlock.
-func (s *Store) addFriendRequest(ctx context.Context, from, to, msg string, now time.Time) error {
+func (s *Store) addFriendRequest(ctx context.Context, from, to, msg string, addSource int32, now time.Time) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -61,18 +61,19 @@ func (s *Store) addFriendRequest(ctx context.Context, from, to, msg string, now 
 
 	res, err := tx.ExecContext(ctx, `
 		INSERT INTO friend_request (
-			from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time
-		) VALUES (?, ?, ?, ?, ?, '', '', NULL)
+			from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time, add_source
+		) VALUES (?, ?, ?, ?, ?, '', '', NULL, ?)
 		ON DUPLICATE KEY UPDATE
 			req_msg = IF(handle_result = ?, req_msg, VALUES(req_msg)),
+			add_source = IF(handle_result = ?, add_source, VALUES(add_source)),
 			create_time = IF(handle_result = ?, create_time, VALUES(create_time)),
 			handler_user_id = IF(handle_result = ?, handler_user_id, ''),
 			handle_msg = IF(handle_result = ?, handle_msg, ''),
 			handle_time = IF(handle_result = ?, handle_time, NULL),
 			handle_result = IF(handle_result = ?, handle_result, VALUES(handle_result))`,
-		from, to, model.HandlePending, msg, now.UTC(),
+		from, to, model.HandlePending, msg, now.UTC(), addSource,
 		model.HandlePending, model.HandlePending, model.HandlePending,
-		model.HandlePending, model.HandlePending, model.HandlePending)
+		model.HandlePending, model.HandlePending, model.HandlePending, model.HandlePending)
 	if err != nil {
 		return err
 	}
@@ -93,8 +94,12 @@ func (s *Store) AgreeFriendRequest(ctx context.Context, from, to, handleMsg stri
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := lockPending(ctx, tx, from, to); err != nil {
+	addSource, err := lockPending(ctx, tx, from, to)
+	if err != nil {
 		return err
+	}
+	if addSource == 0 {
+		addSource = model.AddSourceApply
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE friend_request
@@ -103,13 +108,13 @@ func (s *Store) AgreeFriendRequest(ctx context.Context, from, to, handleMsg stri
 		model.HandleAgree, handleMsg, to, now.UTC(), from, to); err != nil {
 		return err
 	}
-	if err := insertFriend(ctx, tx, from, to, now, from); err != nil {
+	if err := insertFriend(ctx, tx, from, to, now, from, addSource); err != nil {
 		return err
 	}
 	if err := incrVersion(ctx, tx, friendVersionHead, friendVersionLog, from, []string{to}, model.VersionInsert, now); err != nil {
 		return err
 	}
-	if err := insertFriend(ctx, tx, to, from, now, from); err != nil {
+	if err := insertFriend(ctx, tx, to, from, now, from, addSource); err != nil {
 		return err
 	}
 	if err := incrVersion(ctx, tx, friendVersionHead, friendVersionLog, to, []string{from}, model.VersionInsert, now); err != nil {
@@ -125,7 +130,7 @@ func (s *Store) RefuseFriendRequest(ctx context.Context, from, to, handleMsg str
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := lockPending(ctx, tx, from, to); err != nil {
+	if _, err := lockPending(ctx, tx, from, to); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -142,9 +147,9 @@ func (s *Store) TakeFriendRequest(ctx context.Context, from, to string) (model.F
 	var row model.FriendRequest
 	var created, handled sql.NullTime
 	err := s.db.QueryRowContext(ctx, `
-		SELECT from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time
+		SELECT from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time, add_source
 		FROM friend_request WHERE from_user_id = ? AND to_user_id = ?`, from, to).Scan(
-		&row.FromUserID, &row.ToUserID, &row.HandleResult, &row.ReqMsg, &created, &row.HandlerUserID, &row.HandleMsg, &handled)
+		&row.FromUserID, &row.ToUserID, &row.HandleResult, &row.ReqMsg, &created, &row.HandlerUserID, &row.HandleMsg, &handled, &row.AddSource)
 	if errors.Is(err, sql.ErrNoRows) {
 		return row, ErrRequestNotFound
 	}
@@ -186,7 +191,7 @@ func (s *Store) pageFriendRequests(ctx context.Context, column, userID string, r
 	}
 	queryArgs := append(append([]any{}, args...), limit, offset)
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time
+		SELECT from_user_id, to_user_id, handle_result, req_msg, create_time, handler_user_id, handle_msg, handle_time, add_source
 		FROM friend_request
 		WHERE `+where+`
 		ORDER BY create_time DESC, from_user_id ASC, to_user_id ASC
@@ -199,7 +204,7 @@ func (s *Store) pageFriendRequests(ctx context.Context, column, userID string, r
 	for rows.Next() {
 		var row model.FriendRequest
 		var created, handled sql.NullTime
-		if err := rows.Scan(&row.FromUserID, &row.ToUserID, &row.HandleResult, &row.ReqMsg, &created, &row.HandlerUserID, &row.HandleMsg, &handled); err != nil {
+		if err := rows.Scan(&row.FromUserID, &row.ToUserID, &row.HandleResult, &row.ReqMsg, &created, &row.HandlerUserID, &row.HandleMsg, &handled, &row.AddSource); err != nil {
 			return 0, nil, err
 		}
 		if created.Valid {
@@ -213,27 +218,27 @@ func (s *Store) pageFriendRequests(ctx context.Context, column, userID string, r
 	return total, out, rows.Err()
 }
 
-func lockPending(ctx context.Context, tx *sql.Tx, from, to string) error {
-	var result int32
-	err := tx.QueryRowContext(ctx, `SELECT handle_result FROM friend_request WHERE from_user_id = ? AND to_user_id = ? FOR UPDATE`, from, to).Scan(&result)
+func lockPending(ctx context.Context, tx *sql.Tx, from, to string) (int32, error) {
+	var result, addSource int32
+	err := tx.QueryRowContext(ctx, `SELECT handle_result, add_source FROM friend_request WHERE from_user_id = ? AND to_user_id = ? FOR UPDATE`, from, to).Scan(&result, &addSource)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ErrRequestNotFound
+		return 0, ErrRequestNotFound
 	}
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if result != model.HandlePending {
-		return ErrRequestHandled
+		return 0, ErrRequestHandled
 	}
-	return nil
+	return addSource, nil
 }
 
-func insertFriend(ctx context.Context, tx *sql.Tx, owner, friend string, now time.Time, operator string) error {
+func insertFriend(ctx context.Context, tx *sql.Tx, owner, friend string, now time.Time, operator string, addSource int32) error {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO friend (owner_user_id, friend_user_id, remark, create_time, add_source, operator_user_id, is_pinned)
 		VALUES (?, ?, '', ?, ?, ?, 0)
 		ON DUPLICATE KEY UPDATE owner_user_id = owner_user_id`,
-		owner, friend, now.UTC(), model.AddSourceApply, operator)
+		owner, friend, now.UTC(), addSource, operator)
 	return err
 }
 
@@ -318,4 +323,9 @@ func isDeadlock(err error) bool {
 func duplicateIndex(err error, stmt string) bool {
 	var me *mysqldriver.MySQLError
 	return errors.As(err, &me) && me.Number == 1061 && strings.Contains(stmt, "ADD INDEX")
+}
+
+func duplicateColumn(err error) bool {
+	var me *mysqldriver.MySQLError
+	return errors.As(err, &me) && me.Number == 1060
 }

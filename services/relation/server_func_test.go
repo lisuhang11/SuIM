@@ -173,6 +173,58 @@ func TestOneSidedDeleteThenReapply(t *testing.T) {
 	}
 }
 
+func TestFriendRequestAddSourcePersists(t *testing.T) {
+	a, b := prefixed("as-a"), prefixed("as-b")
+	ctx, srv, cfg := openRelation(t, a, b)
+
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{
+		FromUserId: a, ToUserId: b, Message: "通过群聊添加", AddSource: model.AddSourceGroup,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	recv, err := srv.GetRecvFriendRequests(ctx, &relationpb.GetRecvFriendRequestsReq{UserId: b, HandleResults: []int32{0}})
+	if err != nil || recv.GetTotal() != 1 || recv.GetRequests()[0].GetAddSource() != model.AddSourceGroup {
+		t.Fatalf("recv add_source %+v err=%v", recv, err)
+	}
+	if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: a, ToUserId: b, HandleResult: 1, HandleMsg: "ok"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := friendAddSource(t, cfg, a, b); got != model.AddSourceGroup {
+		t.Fatalf("owner add_source=%d", got)
+	}
+	if got := friendAddSource(t, cfg, b, a); got != model.AddSourceGroup {
+		t.Fatalf("peer add_source=%d", got)
+	}
+}
+
+func TestExpiredFriendRequestReopens(t *testing.T) {
+	a, b := prefixed("ex-a"), prefixed("ex-b")
+	ctx, srv, cfg := openRelation(t, a, b)
+
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: "hi", AddSource: model.AddSourceSearch}); err != nil {
+		t.Fatal(err)
+	}
+	db := openDB(t, cfg)
+	defer db.Close()
+	if _, err := db.ExecContext(ctx, `UPDATE friend_request SET handle_result = ? WHERE from_user_id = ? AND to_user_id = ?`, model.HandleExpired, a, b); err != nil {
+		t.Fatal(err)
+	}
+	expired, err := srv.GetRecvFriendRequests(ctx, &relationpb.GetRecvFriendRequestsReq{UserId: b, HandleResults: []int32{model.HandleExpired}})
+	if err != nil || expired.GetTotal() != 1 || expired.GetRequests()[0].GetHandleResult() != model.HandleExpired {
+		t.Fatalf("expired list %+v err=%v", expired, err)
+	}
+	if _, err := srv.RespondFriendApply(ctx, &relationpb.RespondFriendApplyReq{FromUserId: a, ToUserId: b, HandleResult: 1}); !isCode(err, codes.FailedPrecondition, errorcode.RelationRequestHandled) {
+		t.Fatalf("agree expired code=%v err=%v", status.Code(err), err)
+	}
+	if _, err := srv.SendFriendRequest(ctx, &relationpb.SendFriendRequestReq{FromUserId: a, ToUserId: b, Message: "again", AddSource: model.AddSourceQRCode}); err != nil {
+		t.Fatalf("reopen expired: %v", err)
+	}
+	row := requestRow(t, cfg, a, b)
+	if row.result != model.HandlePending || row.msg != "again" || row.source != model.AddSourceQRCode {
+		t.Fatalf("reopened %+v", row)
+	}
+}
+
 func TestRequestReopenOverwrites(t *testing.T) {
 	a, b := prefixed("rw-a"), prefixed("rw-b")
 	ctx, srv, cfg := openRelation(t, a, b)
@@ -527,6 +579,7 @@ type requestRecord struct {
 	handle  string
 	handler string
 	handled bool
+	source  int32
 }
 
 func requestRow(t *testing.T, cfg config.MySQL, from, to string) requestRecord {
@@ -536,14 +589,26 @@ func requestRow(t *testing.T, cfg config.MySQL, from, to string) requestRecord {
 	var row requestRecord
 	var handled sql.NullTime
 	err := db.QueryRowContext(context.Background(), `
-		SELECT handle_result, req_msg, handle_msg, handler_user_id, handle_time
+		SELECT handle_result, req_msg, handle_msg, handler_user_id, handle_time, add_source
 		FROM friend_request WHERE from_user_id = ? AND to_user_id = ?`, from, to).
-		Scan(&row.result, &row.msg, &row.handle, &row.handler, &handled)
+		Scan(&row.result, &row.msg, &row.handle, &row.handler, &handled, &row.source)
 	if err != nil {
 		t.Fatal(err)
 	}
 	row.handled = handled.Valid
 	return row
+}
+
+func friendAddSource(t *testing.T, cfg config.MySQL, owner, friend string) int32 {
+	t.Helper()
+	db := openDB(t, cfg)
+	defer db.Close()
+	var source int32
+	if err := db.QueryRowContext(context.Background(), `
+		SELECT add_source FROM friend WHERE owner_user_id = ? AND friend_user_id = ?`, owner, friend).Scan(&source); err != nil {
+		t.Fatal(err)
+	}
+	return source
 }
 
 func requestCount(t *testing.T, cfg config.MySQL, from, to string) int {

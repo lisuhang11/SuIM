@@ -6,9 +6,14 @@ const (
 	HandlePending int32 = 0
 	HandleAgree   int32 = 1
 	HandleRefuse  int32 = -1
+	HandleExpired int32 = 2
 
-	// AddSourceApply is the friend row created when a request is accepted.
-	AddSourceApply int32 = 2
+	// Friend add_source values. Unset (0) falls back to Apply when a request is accepted.
+	AddSourceImport int32 = 1 // imported by administrator
+	AddSourceApply  int32 = 2 // generic friend application
+	AddSourceSearch int32 = 3 // search
+	AddSourceQRCode int32 = 4 // QR code
+	AddSourceGroup  int32 = 5 // group chat
 
 	// Version states match the version log: insert, delete, update.
 	VersionInsert int32 = 1
@@ -46,6 +51,7 @@ type FriendRequest struct {
 	HandlerUserID string
 	HandleMsg     string
 	HandleTime    time.Time
+	AddSource     int32
 }
 
 type UserProfile struct {

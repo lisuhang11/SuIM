@@ -50,7 +50,7 @@ func normalizeHandleResults(results []int32) ([]int32, error) {
 	out := make([]int32, 0, len(results))
 	for _, result := range results {
 		switch result {
-		case model.HandlePending, model.HandleAgree, model.HandleRefuse:
+		case model.HandlePending, model.HandleAgree, model.HandleRefuse, model.HandleExpired:
 		default:
 			return nil, errorcode.ErrRelationInvalidHandle
 		}
@@ -61,6 +61,15 @@ func normalizeHandleResults(results []int32) ([]int32, error) {
 		out = append(out, result)
 	}
 	return out, nil
+}
+
+func normalizeAddSource(v int32) (int32, error) {
+	switch v {
+	case 0, model.AddSourceImport, model.AddSourceApply, model.AddSourceSearch, model.AddSourceQRCode, model.AddSourceGroup:
+		return v, nil
+	default:
+		return 0, errorcode.ErrRelationInvalidAddSource
+	}
 }
 
 func (s *Server) requestInfos(ctx context.Context, rows []model.FriendRequest) ([]*relationpb.FriendRequestInfo, error) {
@@ -90,6 +99,7 @@ func (s *Server) requestInfos(ctx context.Context, rows []model.FriendRequest) (
 			CreateTime:    millis(row.CreateTime),
 			HandleTime:    millis(row.HandleTime),
 			HandlerUserId: row.HandlerUserID,
+			AddSource:     row.AddSource,
 		}
 		if user, ok := users[row.FromUserID]; ok {
 			info.FromNickname = user.Nickname

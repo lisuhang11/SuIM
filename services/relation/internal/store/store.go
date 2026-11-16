@@ -53,7 +53,7 @@ func (s *Store) Migrate(ctx context.Context, script string) error {
 		if stmt == "" {
 			continue
 		}
-		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !duplicateIndex(err, stmt) {
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !duplicateIndex(err, stmt) && !duplicateColumn(err) {
 			return fmt.Errorf("migrate: %w", err)
 		}
 	}

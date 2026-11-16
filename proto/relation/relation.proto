@@ -32,7 +32,8 @@ service RelationService {
 }
 
 // --------------- FriendRequestInfo ---------------
-// handle_result: 0 = pending, 1 = accepted, -1 = rejected.
+// handle_result: 0 = pending, 1 = accepted, -1 = rejected, 2 = expired.
+// add_source: 0 unset, 2 apply, 3 search, 4 QR code, 5 group chat.
 // create_time and handle_time are Unix milliseconds. handle_time is 0 when unset.
 message FriendRequestInfo {
   string from_user_id     = 1;
@@ -47,6 +48,7 @@ message FriendRequestInfo {
   string to_nickname      = 10;
   string to_avatar_url    = 11;
   string handler_user_id  = 12;
+  int32  add_source       = 13;
 }
 
 // offset is zero-based. limit 0 means 20, and limit cannot exceed 200.
@@ -76,10 +78,13 @@ message GetSentFriendRequestsResp {
 }
 
 // --------------- SendFriendRequest ---------------
+// add_source: 0 unset, 2 apply, 3 search, 4 QR code, 5 group chat.
+// Accepted requests copy this value onto both friend.add_source rows.
 message SendFriendRequestReq {
   string from_user_id = 1;
   string to_user_id   = 2;
   string message      = 3;
+  int32  add_source   = 4;
 }
 
 message SendFriendRequestResp {}
@@ -166,6 +171,7 @@ message PublicUserInfo {
   string avatar_url = 3;
 }
 
+// add_source: 0 unset, 1 import, 2 apply, 3 search, 4 QR code, 5 group chat.
 message FriendInfo {
   string         owner_user_id    = 1;
   string         remark           = 2;

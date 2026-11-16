@@ -21,6 +21,7 @@ const (
 	RelationGroupFriendForbidden Code = 3015
 	RelationBlocked              Code = 3016
 	RelationCannotBlockYourself  Code = 3017
+	RelationInvalidAddSource     Code = 3018
 )
 
 var (
@@ -41,4 +42,5 @@ var (
 	ErrRelationGroupFriendForbidden = Define(RelationGroupFriendForbidden, codes.PermissionDenied, "group members cannot add each other")
 	ErrRelationBlocked              = Define(RelationBlocked, codes.PermissionDenied, "blocked")
 	ErrRelationCannotBlockYourself  = Define(RelationCannotBlockYourself, codes.InvalidArgument, "cannot block yourself")
+	ErrRelationInvalidAddSource     = Define(RelationInvalidAddSource, codes.InvalidArgument, "add_source is invalid")
 )

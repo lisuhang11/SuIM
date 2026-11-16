@@ -24,6 +24,10 @@ func (s *Server) SendFriendRequest(ctx context.Context, req *relationpb.SendFrie
 	if err != nil {
 		return nil, err
 	}
+	addSource, err := normalizeAddSource(req.GetAddSource())
+	if err != nil {
+		return nil, err
+	}
 	// 2. 不能添加自己。
 	if from == to {
 		return nil, errorcode.ErrRelationCanNotAddYourself
@@ -69,8 +73,8 @@ func (s *Server) SendFriendRequest(ctx context.Context, req *relationpb.SendFrie
 			return nil, errorcode.ErrRelationGroupFriendForbidden
 		}
 	}
-	// 8. 写入好友申请。待处理的重复申请拒绝；已拒绝或已同意但不再互为好友的申请重新打开。
-	if err := s.store.AddFriendRequest(ctx, from, to, msg, s.now()); err != nil {
+	// 8. 写入好友申请。待处理的重复申请拒绝；已拒绝、已过期或已同意但不再互为好友的申请重新打开。
+	if err := s.store.AddFriendRequest(ctx, from, to, msg, addSource, s.now()); err != nil {
 		if errors.Is(err, store.ErrRequestRepeated) {
 			return nil, errorcode.ErrRelationRequestRepeated
 		}

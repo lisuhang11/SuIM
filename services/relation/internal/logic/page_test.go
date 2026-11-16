@@ -33,4 +33,13 @@ func TestFriendListRejectsBadPage(t *testing.T) {
 	if !ok || got != errorcode.RelationInvalidHandle {
 		t.Fatalf("sent handle err=%v", err)
 	}
+	if _, err := normalizeHandleResults([]int32{0, 1, -1, 2}); err != nil {
+		t.Fatalf("expired handle filter: %v", err)
+	}
+	if _, err := normalizeAddSource(9); err == nil {
+		t.Fatal("expected invalid add_source")
+	}
+	if got, err := normalizeAddSource(5); err != nil || got != 5 {
+		t.Fatalf("group add_source got=%d err=%v", got, err)
+	}
 }

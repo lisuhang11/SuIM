@@ -542,7 +542,7 @@ func probeRequestInsert(t *testing.T, ctx context.Context, st *store.Store, db *
 			defer wg.Done()
 			from := benchID(6_900_001 + i*2)
 			to := benchID(6_900_002 + i*2)
-			errs[i] = st.AddFriendRequest(ctx, from, to, "probe", time.Now())
+			errs[i] = st.AddFriendRequest(ctx, from, to, "probe", 0, time.Now())
 		}(i)
 	}
 	wg.Wait()

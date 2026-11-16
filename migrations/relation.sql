@@ -2,8 +2,8 @@ CREATE TABLE IF NOT EXISTS `friend` (
     `owner_user_id`    VARCHAR(64)  NOT NULL COMMENT '关系拥有者 userID',
     `friend_user_id`   VARCHAR(64)  NOT NULL COMMENT '好友 userID',
     `remark`           VARCHAR(255) DEFAULT '' COMMENT '好友备注',
-    `create_time`      DATETIME     DEFAULT NULL COMMENT '成为好友的时间',
-    `add_source`       INT          DEFAULT 0 COMMENT '添加来源',
+    `create_time`      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '成为好友的时间',
+    `add_source`       INT          DEFAULT 0 COMMENT '添加来源：2申请 3搜索 4二维码 5群聊',
     `operator_user_id` VARCHAR(64)  DEFAULT '' COMMENT '操作者 userID',
     `is_pinned`        TINYINT(1)   DEFAULT 0 COMMENT '是否置顶(1是0否)',
     PRIMARY KEY (`owner_user_id`, `friend_user_id`),
@@ -13,12 +13,13 @@ CREATE TABLE IF NOT EXISTS `friend` (
 CREATE TABLE IF NOT EXISTS `friend_request` (
     `from_user_id`    VARCHAR(64)  NOT NULL COMMENT '申请人 userID',
     `to_user_id`      VARCHAR(64)  NOT NULL COMMENT '被申请人 userID',
-    `handle_result`   INT          DEFAULT 0 COMMENT '0未处理 1同意 -1拒绝',
+    `handle_result`   INT          DEFAULT 0 COMMENT '0未处理 1同意 -1拒绝 2已过期',
     `req_msg`         VARCHAR(512) DEFAULT '' COMMENT '申请留言',
-    `create_time`     DATETIME     DEFAULT NULL COMMENT '申请时间',
+    `create_time`     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '申请时间',
     `handler_user_id` VARCHAR(64)  DEFAULT '' COMMENT '处理人 userID',
     `handle_msg`      VARCHAR(512) DEFAULT '' COMMENT '处理留言',
-    `handle_time`     DATETIME     DEFAULT NULL COMMENT '处理时间',
+    `handle_time`     DATETIME(3)  NULL COMMENT '处理时间',
+    `add_source`      INT          DEFAULT 0 COMMENT '添加来源：2申请 3搜索 4二维码 5群聊',
     PRIMARY KEY (`from_user_id`, `to_user_id`),
     INDEX `idx_friend_request_to` (`to_user_id`, `handle_result`, `create_time`, `from_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友申请表';
@@ -26,7 +27,7 @@ CREATE TABLE IF NOT EXISTS `friend_request` (
 CREATE TABLE IF NOT EXISTS `black` (
     `owner_user_id`    VARCHAR(64) NOT NULL COMMENT '拉黑者 userID',
     `block_user_id`    VARCHAR(64) NOT NULL COMMENT '被拉黑者 userID',
-    `create_time`      DATETIME    DEFAULT NULL COMMENT '拉黑时间',
+    `create_time`      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '拉黑时间',
     `add_source`       INT         DEFAULT 0 COMMENT '添加来源',
     `operator_user_id` VARCHAR(64) DEFAULT '' COMMENT '操作者 userID',
     PRIMARY KEY (`owner_user_id`, `block_user_id`)
@@ -41,7 +42,7 @@ CREATE TABLE IF NOT EXISTS `friend_version` (
     `owner_user_id` VARCHAR(64)     NOT NULL COMMENT '关系拥有者',
     `version`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '当前版本号',
     `deleted`       BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '固定为0',
-    `last_update`   DATETIME(3)     NOT NULL COMMENT '最后更新时间',
+    `last_update`   DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '最后更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_friend_version_owner` (`owner_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='好友版本';
@@ -62,3 +63,18 @@ DROP TABLE IF EXISTS `black_version`;
 
 -- Existing databases already have friend_request. Add the inbox index there too.
 ALTER TABLE `friend_request` ADD INDEX `idx_friend_request_to` (`to_user_id`, `handle_result`, `create_time`, `from_user_id`);
+
+-- Existing databases: add_source on friend_request, and document the expired handle_result.
+ALTER TABLE `friend_request` ADD COLUMN `add_source` INT DEFAULT 0 COMMENT '添加来源：2申请 3搜索 4二维码 5群聊';
+ALTER TABLE `friend_request` MODIFY `handle_result` INT DEFAULT 0 COMMENT '0未处理 1同意 -1拒绝 2已过期';
+
+-- Align datetime precision to milliseconds for existing installs.
+UPDATE `friend` SET `create_time` = CURRENT_TIMESTAMP(3) WHERE `create_time` IS NULL;
+UPDATE `friend_request` SET `create_time` = CURRENT_TIMESTAMP(3) WHERE `create_time` IS NULL;
+UPDATE `black` SET `create_time` = CURRENT_TIMESTAMP(3) WHERE `create_time` IS NULL;
+ALTER TABLE `friend` MODIFY `create_time` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '成为好友的时间';
+ALTER TABLE `friend_request` MODIFY `create_time` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '申请时间';
+ALTER TABLE `friend_request` MODIFY `handle_time` DATETIME(3) NULL COMMENT '处理时间';
+ALTER TABLE `black` MODIFY `create_time` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '拉黑时间';
+ALTER TABLE `friend_version` MODIFY `last_update` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '最后更新时间';
+ALTER TABLE `friend_version_log` MODIFY `last_update` DATETIME(3) NOT NULL COMMENT '最后更新时间';

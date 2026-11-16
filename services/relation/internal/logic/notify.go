@@ -160,6 +160,7 @@ func (s *Server) friendRequestTip(ctx context.Context, from, to string) *friendR
 		HandlerUserID: row.HandlerUserID,
 		HandleMsg:     row.HandleMsg,
 		HandleTime:    millis(row.HandleTime),
+		AddSource:     row.AddSource,
 	}
 	if s.users == nil {
 		return tip
@@ -230,4 +231,5 @@ type friendRequestTip struct {
 	HandlerUserID string `json:"handlerUserID,omitempty"`
 	HandleMsg     string `json:"handleMsg,omitempty"`
 	HandleTime    int64  `json:"handleTime,omitempty"`
+	AddSource     int32  `json:"addSource,omitempty"`
 }

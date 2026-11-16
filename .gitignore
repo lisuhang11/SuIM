@@ -1,6 +1,11 @@
 # Docker volume data. These directories are owned by the containers.
 /data/
 
+# Local orchestration artifacts: compiled binaries, logs and pid files.
+/bin/
+/logs/
+/run/
+
 # Local credentials. Copy services/user/etc/user.yaml.example to user.yaml.
 .env
 services/user/etc/user.yaml

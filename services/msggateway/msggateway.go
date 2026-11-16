@@ -28,6 +28,7 @@ import (
 	"github.com/lisuhang11/SuIM/proto/group"
 	msgpb "github.com/lisuhang11/SuIM/proto/msg"
 	gatewaypb "github.com/lisuhang11/SuIM/proto/msggateway"
+	pushpb "github.com/lisuhang11/SuIM/proto/push"
 	rtcpb "github.com/lisuhang11/SuIM/proto/rtc"
 	"github.com/lisuhang11/SuIM/proto/user"
 	svcconfig "github.com/lisuhang11/SuIM/services/msggateway/internal/config"
@@ -101,6 +102,14 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial group service: %w", err)
 	}
 	defer groupConn.Close()
+	pushConn, err := reg.Dial(ctx, "push",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial push service: %w", err)
+	}
+	defer pushConn.Close()
 	groupClient := groups{rpc.NewGroupClient(grouppb.NewGroupServiceClient(groupConn))}
 
 	var hooks *webhook.Client
@@ -116,6 +125,7 @@ func run(cfgPath string) error {
 		Joined:           groupClient,
 		GroupSync:        ws.NewRedisGroupSync(rdb),
 		Messages:         rpc.NewMsgClient(msgpb.NewMsgServiceClient(msgConn)),
+		Push:             rpc.NewPushClient(pushpb.NewPushServiceClient(pushConn)),
 		Calls:            call.New(rdb),
 		Signals:          rpc.NewRtcClient(rtcpb.NewRtcServiceClient(rtcConn)),
 		Online:           online.New(rdb),

@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package push;
+
+option go_package = "github.com/lisuhang11/SuIM/proto/push;pushpb";
+
+// PushService manages device push tokens and the application badge. A push
+// worker consumes toPush and sends offline notifications through this state.
+service PushService {
+  // FcmUpdateToken stores or clears the FCM token of one device. An empty token clears it.
+  rpc FcmUpdateToken(FcmUpdateTokenReq) returns (FcmUpdateTokenResp);
+  // DelUserPushToken clears the push token of one platform when the user logs out.
+  rpc DelUserPushToken(DelUserPushTokenReq) returns (DelUserPushTokenResp);
+  // SetAppBadge overwrites the badge count shown on the user's devices.
+  rpc SetAppBadge(SetAppBadgeReq) returns (SetAppBadgeResp);
+}
+
+message FcmUpdateTokenReq {
+  string user_id = 1;
+  int32 platform_id = 2;
+  string token = 3;
+}
+
+message FcmUpdateTokenResp {}
+
+message DelUserPushTokenReq {
+  string user_id = 1;
+  int32 platform_id = 2;
+}
+
+message DelUserPushTokenResp {}
+
+message SetAppBadgeReq {
+  string user_id = 1;
+  int64 count = 2;
+}
+
+message SetAppBadgeResp {}

@@ -1,0 +1,60 @@
+listenIP: 0.0.0.0
+registerIP: 127.0.0.1
+port: 10180
+
+redis:
+  address:
+    - 127.0.0.1:6379
+  username: ""
+  password: suIM123
+  redisMode: standalone
+  db: 0
+  maxRetry: 3
+  poolSize: 10
+
+registry:
+  type: etcd
+  etcd:
+    endpoints:
+      - 127.0.0.1:2379
+    rootDir: /services
+    username: ""
+    password: ""
+    dialTimeout: 5
+    ttl: 10
+
+queue:
+  streamPrefix: mq
+  maxLen: 100000
+  consumerGroup: push
+
+push:
+  # dummy / getui / fcm / jpush
+  enable: dummy
+  maxConcurrentWorkers: 8
+  getui:
+    pushURL: ""
+    appKey: ""
+    masterSecret: ""
+    intent: ""
+    channelID: ""
+    channelName: ""
+  fcm:
+    credentialsFile: ""
+    authURL: ""
+  jpush:
+    appKey: ""
+    masterSecret: ""
+    pushURL: ""
+    pushIntent: ""
+  iosPush:
+    pushSound: default
+    badgeCount: true
+    production: false
+
+webhooks:
+  url: ""
+  beforeOfflinePush:
+    enable: false
+    timeout: 5
+    failedContinue: false

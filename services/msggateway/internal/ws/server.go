@@ -62,6 +62,11 @@ type Messages interface {
 	SetConversationHasReadSeq(ctx context.Context, req *msgpb.SetConversationHasReadSeqReq) (*msgpb.SetConversationHasReadSeqResp, error)
 }
 
+// PushTokens clears a device push token when the user logs out.
+type PushTokens interface {
+	DelUserPushToken(ctx context.Context, userID string, platformID int32) error
+}
+
 // Server accepts SDK websocket connections and pushes messages that arrive on toPush.
 type Server struct {
 	gatewaypb.UnimplementedMsgGatewayServer
@@ -71,6 +76,7 @@ type Server struct {
 	joined   JoinedGroups
 	syncLog  GroupSyncCache
 	messages Messages
+	push     PushTokens
 	// calls only subscribes to signals published by the rtc service.
 	calls    *call.Board
 	signals  CallSignals
@@ -97,6 +103,7 @@ type Options struct {
 	Joined    JoinedGroups
 	GroupSync GroupSyncCache
 	Messages  Messages
+	Push      PushTokens
 	// Calls is the Redis subscription used to deliver frame 2006. Call state stays in the rtc service.
 	Calls            *call.Board
 	Signals          CallSignals
@@ -123,6 +130,7 @@ func New(opts Options) *Server {
 		joined:   opts.Joined,
 		syncLog:  opts.GroupSync,
 		messages: opts.Messages,
+		push:     opts.Push,
 		calls:    opts.Calls,
 		signals:  opts.Signals,
 		online:   opts.Online,

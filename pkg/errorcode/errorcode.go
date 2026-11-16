@@ -7,6 +7,8 @@
 //	4000-4999 group
 //	5000-5999 third
 //	6000-6999 message
+//	7001-7003 conversation
+//	7004-7999 push
 //	8000-8999 call
 package errorcode
 

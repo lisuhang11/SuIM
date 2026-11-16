@@ -60,6 +60,9 @@
 //	POST /object/complete_multipart_upload
 //	POST /object/initiate_form_data
 //	POST /object/complete_form_data
+//	POST /push/fcm_token
+//	POST /push/del_token
+//	POST /push/set_badge
 //
 // Part bytes are PUT to the presigned MinIO URL returned by third.
 // A form upload POSTs the file to the MinIO URL in initiate_form_data.
@@ -88,6 +91,7 @@ import (
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	"github.com/lisuhang11/SuIM/proto/group"
+	pushpb "github.com/lisuhang11/SuIM/proto/push"
 	"github.com/lisuhang11/SuIM/proto/relation"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 	"github.com/lisuhang11/SuIM/proto/user"
@@ -103,15 +107,16 @@ type session struct {
 type ctxKey struct{}
 
 type Server struct {
-	users            userpb.UserServiceClient
-	friends          relationpb.RelationServiceClient
-	groups           grouppb.GroupServiceClient
-	conversations    conversationpb.ConversationServiceClient
-	third            thirdpb.ThirdServiceClient
-	rdb              redis.UniversalClient
-	httpClient       *http.Client
-	previewPython    string
-	previewScript    string
+	users         userpb.UserServiceClient
+	friends       relationpb.RelationServiceClient
+	groups        grouppb.GroupServiceClient
+	conversations conversationpb.ConversationServiceClient
+	third         thirdpb.ThirdServiceClient
+	push          pushpb.PushServiceClient
+	rdb           redis.UniversalClient
+	httpClient    *http.Client
+	previewPython string
+	previewScript string
 }
 
 func New(users userpb.UserServiceClient, friends relationpb.RelationServiceClient, groups grouppb.GroupServiceClient, conversations conversationpb.ConversationServiceClient, third thirdpb.ThirdServiceClient) *Server {
@@ -138,6 +143,13 @@ func (s *Server) UsePreviewTools(python, script string) {
 func (s *Server) UseRedis(rdb redis.UniversalClient) {
 	if s != nil {
 		s.rdb = rdb
+	}
+}
+
+// UsePush 接入推送服务，用于 token 与角标上报。
+func (s *Server) UsePush(push pushpb.PushServiceClient) {
+	if s != nil {
+		s.push = push
 	}
 }
 
@@ -211,6 +223,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /object/complete_multipart_upload", s.auth(s.completeMultipartUpload))
 	mux.HandleFunc("POST /object/initiate_form_data", s.auth(s.initiateFormData))
 	mux.HandleFunc("POST /object/complete_form_data", s.auth(s.completeFormData))
+
+	mux.HandleFunc("POST /push/fcm_token", s.auth(s.fcmUpdateToken))
+	mux.HandleFunc("POST /push/del_token", s.auth(s.delUserPushToken))
+	mux.HandleFunc("POST /push/set_badge", s.auth(s.setAppBadge))
 
 	mux.HandleFunc("GET /agent/voices", s.auth(s.listAgentVoices))
 	mux.HandleFunc("POST /agent/voices/preview", s.auth(s.previewAgentVoice))

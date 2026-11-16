@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -32,9 +33,9 @@ func (s *Server) dispatch(c *Client, req *Req) error {
 	case reqPullConvLastMsg:
 		return s.lastMessages(c, req)
 	case reqLogoutMsg:
-		// 1. 接受登出请求。当前没有推送令牌表，所以只回空响应。
+		var logout msgpb.DelUserPushTokenReq
 		if len(req.Data) > 0 {
-			if err := proto.Unmarshal(req.Data, &msgpb.DelUserPushTokenReq{}); err != nil {
+			if err := proto.Unmarshal(req.Data, &logout); err != nil {
 				return c.reply(req, errArgs, "invalid logout request", nil)
 			}
 		}
@@ -44,6 +45,13 @@ func (s *Server) dispatch(c *Client, req *Req) error {
 		}
 		if err := c.reply(req, 0, "", body); err != nil {
 			return err
+		}
+		if s.push != nil && logout.GetUserId() != "" && logout.GetPlatformId() > 0 {
+			pushCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			if err := s.push.DelUserPushToken(pushCtx, logout.GetUserId(), logout.GetPlatformId()); err != nil {
+				slog.Warn("clear push token on logout", "err", err, "userID", logout.GetUserId())
+			}
 		}
 		return errLogout
 	case reqSetBackground:

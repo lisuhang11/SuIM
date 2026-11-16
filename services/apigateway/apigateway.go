@@ -16,17 +16,18 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/lisuhang11/SuIM/pkg/config"
-	"github.com/redis/go-redis/v9"
 	"github.com/lisuhang11/SuIM/pkg/mw"
 	"github.com/lisuhang11/SuIM/pkg/register"
 	"github.com/lisuhang11/SuIM/pkg/rpcctx"
 	conversationpb "github.com/lisuhang11/SuIM/proto/conversation"
 	"github.com/lisuhang11/SuIM/proto/group"
+	pushpb "github.com/lisuhang11/SuIM/proto/push"
 	"github.com/lisuhang11/SuIM/proto/relation"
 	thirdpb "github.com/lisuhang11/SuIM/proto/third"
 	"github.com/lisuhang11/SuIM/proto/user"
 	"github.com/lisuhang11/SuIM/services/apigateway/internal/api"
 	svcconfig "github.com/lisuhang11/SuIM/services/apigateway/internal/config"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -94,6 +95,14 @@ func run(cfgPath string) error {
 		return fmt.Errorf("dial third service: %w", err)
 	}
 	defer thirdConn.Close()
+	pushConn, err := reg.Dial(ctx, "push",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(rpcctx.ClientInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("dial push service: %w", err)
+	}
+	defer pushConn.Close()
 
 	apiSrv := api.New(
 		userpb.NewUserServiceClient(userConn),
@@ -102,6 +111,7 @@ func run(cfgPath string) error {
 		conversationpb.NewConversationServiceClient(conversationConn),
 		thirdpb.NewThirdServiceClient(thirdConn),
 	)
+	apiSrv.UsePush(pushpb.NewPushServiceClient(pushConn))
 	apiSrv.UsePreviewTools(cfg.VoicePreview.Python, cfg.VoicePreview.Script)
 	if len(cfg.Redis.Address) > 0 {
 		rdb := redis.NewClient(&redis.Options{
